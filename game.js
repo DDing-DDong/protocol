@@ -35,6 +35,10 @@
   const GROUND_Y = 462;
   const SAMPLE_STEP = 0.06;
   const TILE_SIZE = 32;
+  const CORE_X = 1088;
+  const SHIELD_DURATION = 2.5;
+  const HIT_INVINCIBLE_TIME = 0.9;
+  const SHIELD_BLOCK_INVINCIBLE_TIME = 0.75;
 
   const TURN = {
     ATTACK: "attack",
@@ -119,7 +123,7 @@
     trapSlots: [],
     platforms: [],
     baseHazards: [],
-    core: { x: 850, y: 392, w: 42, h: 70 },
+    core: { x: CORE_X, y: 392, w: 42, h: 70 },
     metrics: createMetrics(),
     mods: createDefaultMods(),
     defenseBudget: 4,
@@ -171,6 +175,7 @@
       invincible: 0,
       dashCooldown: 0,
       shield: false,
+      shieldTime: 0,
     };
   }
 
@@ -189,7 +194,7 @@
     game.platforms = createPlatforms(game.stage);
     game.trapSlots = createTrapSlots(game.stage);
     game.baseHazards = createBaseHazards(game.stage);
-    game.core = { x: 850, y: 392, w: 42, h: 70 };
+    game.core = { x: CORE_X, y: 392, w: 42, h: 70 };
 
     if (isAttack) {
       game.hacker = createHacker();
@@ -230,7 +235,7 @@
   function getObjective(stage) {
     const table = {
       1: "데이터 코어 탈취",
-      2: "해커를 3초 이상 지연",
+      2: "해커를 2초 이상 지연",
       3: "강화 보안 구역 돌파",
       4: "탐지 2회 이상",
       5: "제한 시간 안에 탈취",
@@ -248,28 +253,28 @@
   function createPlatforms(stage) {
     const platforms = [
       { x: 0, y: GROUND_Y, w: WIDTH, h: 78 },
-      { x: 220, y: 360, w: 130, h: 18 },
-      { x: 430, y: 300, w: 135, h: 18 },
-      { x: 650, y: 365, w: 130, h: 18 },
+      { x: 250, y: 360, w: 150, h: 18 },
+      { x: 520, y: 300, w: 150, h: 18 },
+      { x: 810, y: 365, w: 150, h: 18 },
     ];
 
-    if (stage >= 5) platforms.push({ x: 520, y: 405, w: 85, h: 18 });
-    if (stage >= 9) platforms.push({ x: 750, y: 280, w: 80, h: 18 });
+    if (stage >= 5) platforms.push({ x: 650, y: 405, w: 96, h: 18 });
+    if (stage >= 9) platforms.push({ x: 970, y: 280, w: 96, h: 18 });
     return platforms;
   }
 
   function createBaseHazards(stage) {
     if (!isAttackStage(stage)) return [];
     const hazards = [
-      { type: "laser", x: 310, y: 352, w: 15, h: 110 },
-      { type: "shock", x: 570, y: 448, w: 90, h: 14 },
-      { type: "camera", x: 465, y: 252, w: 120, h: 70 },
+      { type: "laser", x: 340, y: 352, w: 15, h: 110 },
+      { type: "shock", x: 680, y: 448, w: 90, h: 14 },
+      { type: "camera", x: 540, y: 252, w: 120, h: 70 },
     ];
 
-    if (stage >= 5) hazards.push({ type: "laser", x: 705, y: 272, w: 15, h: 190 });
+    if (stage >= 5) hazards.push({ type: "laser", x: 890, y: 272, w: 15, h: 190 });
     if (stage >= 7) hazards.push({ type: "shock", x: 185, y: 448, w: 90, h: 14 });
-    if (stage >= 9) hazards.push({ type: "camera", x: 720, y: 232, w: 140, h: 80 });
-    if (stage >= 12) hazards.push({ type: "laser", x: 820, y: 310, w: 15, h: 152 });
+    if (stage >= 9) hazards.push({ type: "camera", x: 930, y: 232, w: 140, h: 80 });
+    if (stage >= 12) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
     hazards.push(...getCarriedHazards(stage));
     return hazards;
   }
@@ -337,6 +342,8 @@
 
     h.dashCooldown = Math.max(0, h.dashCooldown - dt);
     h.invincible = Math.max(0, h.invincible - dt);
+    h.shieldTime = Math.max(0, h.shieldTime - dt);
+    h.shield = h.shieldTime > 0;
 
     const left = keys.has("ArrowLeft") || keys.has("KeyA");
     const right = keys.has("ArrowRight") || keys.has("KeyD");
@@ -363,13 +370,6 @@
       h.dashCooldown = game.mods.dashCooldown;
     }
 
-    h.shield = keys.has("KeyE") && h.energy > 0;
-    if (h.shield) {
-      const drain = game.mods.shieldDrain * dt;
-      h.energy = Math.max(0, h.energy - drain);
-      game.metrics.energyUsed += drain;
-    }
-
     h.vy += GRAVITY * dt;
 
     moveAndCollide(h, dt);
@@ -386,6 +386,23 @@
     if (h.hp <= 0) {
       endStage(false, "해커가 무력화되었습니다.");
     }
+  }
+
+  function activateShield() {
+    if (game.turn !== TURN.ATTACK || !game.hacker) return;
+    const h = game.hacker;
+    const cost = game.mods.shieldDrain;
+    if (h.shieldTime > 0) return;
+    if (h.energy < cost) {
+      flashLog("실드를 켜기 위한 에너지가 부족합니다.");
+      return;
+    }
+
+    h.energy -= cost;
+    game.metrics.energyUsed += cost;
+    h.shieldTime = SHIELD_DURATION;
+    h.shield = true;
+    flashLog(`실드 활성화. ${SHIELD_DURATION.toFixed(1)}초 동안 1회 방어합니다.`);
   }
 
   function moveAndCollide(entity, dt) {
@@ -428,19 +445,28 @@
   function applyAttackHazards(h) {
     for (const hazard of game.baseHazards) {
       if (!rectsOverlap(h, getHazardHitbox(hazard))) continue;
-      if (h.shield || h.invincible > 0) continue;
+      if (h.invincible > 0) continue;
+
+      if (h.shield) {
+        h.shield = false;
+        h.shieldTime = 0;
+        h.invincible = SHIELD_BLOCK_INVINCIBLE_TIME;
+        flashLog("실드가 함정을 막고 사라졌습니다.");
+        return;
+      }
 
       if (game.mods.freeHit > 0) {
         game.mods.freeHit -= 1;
-        h.invincible = 1.1;
+        h.invincible = HIT_INVINCIBLE_TIME;
         flashLog("보호막으로 피해를 1회 무시했습니다.");
-        continue;
+        return;
       }
 
       h.hp -= 1;
       game.metrics.hpLost += 1;
-      h.invincible = 1.1;
+      h.invincible = HIT_INVINCIBLE_TIME;
       flashLog(`${TRAPS[hazard.type].name}에 걸렸습니다. 체력 -1`);
+      return;
     }
   }
 
@@ -547,7 +573,7 @@
 
   function evaluateDefenseSuccess() {
     const stage = game.stage;
-    if (stage === 2) return game.metrics.delay >= 3;
+    if (stage === 2) return game.metrics.delay >= 2;
     if (stage === 4) return game.metrics.detections >= 2;
     if (stage === 6) return game.metrics.delay >= 5 || game.metrics.detections >= 3;
     if (stage === 8) return game.metrics.delay >= 3 || game.metrics.detections >= 2 || game.metrics.energyUsed >= 25;
@@ -1205,6 +1231,9 @@
     createRotationControl();
 
     window.addEventListener("keydown", (event) => {
+      if (event.code === "KeyE" && !event.repeat) {
+        activateShield();
+      }
       keys.add(event.code);
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();

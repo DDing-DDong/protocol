@@ -42,7 +42,7 @@ button.secondary {
 }
 
 .topbar {
-  max-width: 1280px;
+  max-width: 1560px;
   margin: 0 auto 14px;
   display: flex;
   justify-content: space-between;
@@ -68,7 +68,7 @@ button.secondary {
 }
 
 .game-layout {
-  max-width: 1280px;
+  max-width: 1560px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 320px;
