@@ -864,7 +864,7 @@
       const box = getOrientedTrapBox(trap);
       if (trap.type === "laser") drawLaser(box.x, box.y, box.w, box.h);
       if (trap.type === "shock") drawShock(box.x, box.y, box.w, box.h);
-      if (trap.type === "camera") drawCamera(box.x, box.y, box.w, box.h);
+      if (trap.type === "camera") drawCamera(box.x, box.y, box.w, box.h, normalizeRotation(trap.rotation));
       if (trap.type === "firewall") drawFirewall(box.x, box.y, box.w, box.h);
     }
   }
@@ -894,25 +894,36 @@
     ctx.restore();
   }
 
-  function drawCamera(x, y, w, h) {
+  function drawCamera(x, y, w, h, rotation = 0) {
     ctx.save();
     ctx.fillStyle = "rgba(187, 92, 255, 0.16)";
     ctx.beginPath();
-    if (h > w) {
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + w, y);
-      ctx.lineTo(x + w / 2, y + h);
-    } else {
+    if (rotation === 0) {
       ctx.moveTo(x, y);
       ctx.lineTo(x + w, y + h / 2);
       ctx.lineTo(x, y + h);
+    } else if (rotation === 90) {
+      ctx.moveTo(x, y + h);
+      ctx.lineTo(x + w / 2, y);
+      ctx.lineTo(x + w, y + h);
+    } else if (rotation === 180) {
+      ctx.moveTo(x + w, y);
+      ctx.lineTo(x, y + h / 2);
+      ctx.lineTo(x + w, y + h);
+    } else {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + w / 2, y + h);
+      ctx.lineTo(x + w, y);
     }
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = "#bb5cff";
     ctx.shadowColor = "#bb5cff";
     ctx.shadowBlur = 10;
-    ctx.fillRect(x + 6, y + h - 16, 28, 18);
+    if (rotation === 0) ctx.fillRect(x - 10, y + h / 2 - 9, 28, 18);
+    else if (rotation === 90) ctx.fillRect(x + w / 2 - 14, y + h - 10, 28, 18);
+    else if (rotation === 180) ctx.fillRect(x + w - 18, y + h / 2 - 9, 28, 18);
+    else ctx.fillRect(x + w / 2 - 14, y - 8, 28, 18);
     ctx.restore();
   }
 
@@ -1128,30 +1139,28 @@
     }
   }
 
-  function selectOrientation(orientation) {
-    selectedOrientation = orientation;
-    for (const btn of document.querySelectorAll(".orientation-btn")) {
-      btn.classList.toggle("selected", btn.dataset.orientation === orientation);
-    }
+  function rotateTrapPreview() {
+    selectedRotation = (selectedRotation + 90) % 360;
+    updateRotationButton();
   }
 
-  function createOrientationControls() {
-    if (!ui.defenseTools || ui.defenseTools.querySelector(".orientation-grid")) return;
+  function updateRotationButton() {
+    const btn = ui.defenseTools?.querySelector(".rotation-btn");
+    if (btn) btn.textContent = `회전 ${selectedRotation}도`;
+  }
+
+  function createRotationControl() {
+    if (!ui.defenseTools || ui.defenseTools.querySelector(".rotation-grid")) return;
 
     const grid = document.createElement("div");
-    grid.className = "orientation-grid";
-    grid.innerHTML = `
-      <button class="orientation-btn" data-orientation="vertical" type="button">세로</button>
-      <button class="orientation-btn" data-orientation="horizontal" type="button">가로</button>
-    `;
+    grid.className = "rotation-grid";
+    grid.innerHTML = `<button class="rotation-btn" type="button">회전 0도</button>`;
 
     const actions = ui.defenseTools.querySelector(".tool-actions");
     ui.defenseTools.insertBefore(grid, actions);
 
-    for (const btn of grid.querySelectorAll(".orientation-btn")) {
-      btn.addEventListener("click", () => selectOrientation(btn.dataset.orientation));
-    }
-    selectOrientation(selectedOrientation);
+    grid.querySelector(".rotation-btn").addEventListener("click", rotateTrapPreview);
+    updateRotationButton();
   }
 
   function showHelp() {
@@ -1193,7 +1202,7 @@
   }
 
   function bindEvents() {
-    createOrientationControls();
+    createRotationControl();
 
     window.addEventListener("keydown", (event) => {
       keys.add(event.code);

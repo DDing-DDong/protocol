@@ -174,18 +174,19 @@ button.secondary {
 }
 
 .trap-grid,
-.orientation-grid {
+.rotation-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.orientation-grid {
+.rotation-grid {
   margin-top: 8px;
+  grid-template-columns: 1fr;
 }
 
 .trap-btn,
-.orientation-btn {
+.rotation-btn {
   background: #17283b;
   color: #e9f8ff;
   border: 1px solid #2d516d;
@@ -194,12 +195,11 @@ button.secondary {
   align-items: center;
 }
 
-.orientation-btn {
+.rotation-btn {
   justify-content: center;
 }
 
-.trap-btn.selected,
-.orientation-btn.selected {
+.trap-btn.selected {
   background: #18e0ff;
   color: #031018;
 }
