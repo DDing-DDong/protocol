@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trace Protocol MVP</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <h1>TRACE PROTOCOL</h1>
+        <p id="subtitle">해커 공격과 AI 방어를 번갈아 진행하는 샘플 MVP</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="restartBtn" class="secondary" type="button">처음부터</button>
+        <button id="helpBtn" class="secondary" type="button">도움말</button>
+      </div>
+    </header>
+
+    <main class="game-layout">
+      <section class="canvas-panel">
+        <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card">
+            <h2 id="overlayTitle">제목</h2>
+            <p id="overlayText">내용</p>
+            <div id="rewardList" class="reward-list"></div>
+            <button id="overlayButton" type="button">확인</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <div class="panel-block">
+          <h2>상태</h2>
+          <div class="stat-row"><span>스테이지</span><strong id="stageLabel">1</strong></div>
+          <div class="stat-row"><span>턴</span><strong id="turnLabel">해커 공격</strong></div>
+          <div class="stat-row"><span>목표</span><strong id="objectiveLabel">데이터 코어 탈취</strong></div>
+          <div class="stat-row"><span>시간</span><strong id="timerLabel">48.0</strong></div>
+          <div class="meter">
+            <div class="meter-label"><span>체력</span><span id="hpLabel">3 / 3</span></div>
+            <div class="meter-bar"><div id="hpBar"></div></div>
+          </div>
+          <div class="meter">
+            <div class="meter-label"><span>에너지</span><span id="energyLabel">100 / 100</span></div>
+            <div class="meter-bar"><div id="energyBar"></div></div>
+          </div>
+          <div class="stat-row"><span>방어 예산</span><strong id="budgetLabel">-</strong></div>
+          <div class="stat-row"><span>탐지</span><strong id="detectLabel">0</strong></div>
+          <div class="stat-row"><span>지연</span><strong id="delayLabel">0.0s</strong></div>
+        </div>
+
+        <div id="defenseTools" class="panel-block hidden">
+          <h2>함정 배치</h2>
+          <p class="hint">함정을 선택한 뒤 맵의 슬롯을 클릭하세요. 배치가 끝나면 리플레이를 시작합니다.</p>
+          <div class="trap-grid">
+            <button class="trap-btn selected" data-trap="laser" type="button">레이저 <small>2</small></button>
+            <button class="trap-btn" data-trap="shock" type="button">감전 바닥 <small>2</small></button>
+            <button class="trap-btn" data-trap="camera" type="button">카메라 <small>1</small></button>
+            <button class="trap-btn" data-trap="firewall" type="button">방화벽 <small>3</small></button>
+          </div>
+          <div class="tool-actions">
+            <button id="undoTrapBtn" class="secondary" type="button">되돌리기</button>
+            <button id="startReplayBtn" type="button">리플레이 시작</button>
+          </div>
+        </div>
+
+        <div class="panel-block">
+          <h2>시스템</h2>
+          <div class="stat-row"><span>공격 모듈</span><strong>이동 · 대시 · 실드</strong></div>
+          <div class="stat-row"><span>방어 모듈</span><strong>레이저 · 감전 · 카메라 · 방화벽</strong></div>
+          <div class="stat-row"><span>진행</span><strong>11단계 + 무한 모드</strong></div>
+        </div>
+
+        <div class="panel-block">
+          <h2>로그</h2>
+          <p id="logText" class="log-text">공격 턴에서 이동 경로를 기록합니다.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="./game.js"></script>
+</body>
+</html>
