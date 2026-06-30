@@ -481,9 +481,6 @@ export function initUI(callbacks) {
     createRotationControl();
 
     window.addEventListener("keydown", (event) => {
-      if (event.code === "KeyE" && !event.repeat) {
-        callbacks.onShield();
-      }
 
       keys.add(event.code);
 
