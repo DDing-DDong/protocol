@@ -13,18 +13,29 @@ export function createHacker(game) {
     h: 54,
     vx: 0,
     vy: 0,
+
     speed: 250,
     jumpPower: 620,
     facing: 1,
     onGround: false,
+
     hp: 3,
     maxHp: 3,
+
     energy: game.mods.maxEnergy,
     maxEnergy: game.mods.maxEnergy,
+
     invincible: 0,
+
     dashCooldown: 0,
+    dashSpeed: 760,
+    dashCost: 18,
+    dashInputLock: false,
+
     shield: false,
     shieldTime: 0,
+    shieldDuration: 3,
+    shieldInputLock: false,
   };
 }
 
@@ -43,8 +54,11 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   h.shieldTime = Math.max(0, h.shieldTime - dt);
   h.shield = h.shieldTime > 0;
 
-  const left = keys.has("ArrowLeft") || keys.has("KeyA");
-  const right = keys.has("ArrowRight") || keys.has("KeyD");
+  const left = keys.has("ArrowLeft");
+  const right = keys.has("ArrowRight");
+  const jump = keys.has("ArrowUp");
+  const dash = keys.has("ShiftLeft") || keys.has("ShiftRight");
+  const shield = keys.has("Space");
 
   if (left && !right) {
     h.vx = -h.speed;
@@ -56,16 +70,27 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     h.vx = approach(h.vx, 0, 1800 * dt);
   }
 
-  if ((keys.has("Space") || keys.has("KeyW") || keys.has("ArrowUp")) && h.onGround) {
+  if (jump && h.onGround) {
     h.vy = -h.jumpPower;
     h.onGround = false;
   }
 
-  if ((keys.has("ShiftLeft") || keys.has("ShiftRight")) && h.dashCooldown <= 0 && h.energy >= 18) {
-    h.vx = h.facing * 620;
-    h.energy -= 18;
-    game.metrics.energyUsed += 18;
-    h.dashCooldown = game.mods.dashCooldown;
+  if (dash && !h.dashInputLock) {
+    tryDash(game, flashLog);
+    h.dashInputLock = true;
+  }
+
+  if (!dash) {
+    h.dashInputLock = false;
+  }
+
+  if (shield && !h.shieldInputLock) {
+    activateShield(game, flashLog);
+    h.shieldInputLock = true;
+  }
+
+  if (!shield) {
+    h.shieldInputLock = false;
   }
 
   h.vy += 1600 * dt;
@@ -86,11 +111,32 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   }
 }
 
+function tryDash(game, flashLog) {
+  if (game.turn !== TURN.ATTACK || !game.hacker) return;
+
+  const h = game.hacker;
+
+  if (h.dashCooldown > 0) return;
+
+  if (h.energy < h.dashCost) {
+    flashLog("대시를 사용하기 위한 에너지가 부족합니다.");
+    return;
+  }
+
+  h.vx = h.facing * h.dashSpeed;
+  h.energy -= h.dashCost;
+  game.metrics.energyUsed += h.dashCost;
+  h.dashCooldown = game.mods.dashCooldown;
+}
+
 export function activateShield(game, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
+
   const h = game.hacker;
   const cost = game.mods.shieldDrain;
+
   if (h.shieldTime > 0) return;
+
   if (h.energy < cost) {
     flashLog("실드를 켜기 위한 에너지가 부족합니다.");
     return;
@@ -98,9 +144,10 @@ export function activateShield(game, flashLog) {
 
   h.energy -= cost;
   game.metrics.energyUsed += cost;
-  h.shieldTime = 2.5;
+  h.shieldTime = h.shieldDuration;
   h.shield = true;
-  flashLog(`실드 활성화. ${2.5.toFixed(1)}초 동안 1회 방어합니다.`);
+
+  flashLog(`실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
 }
 
 function moveAndCollide(entity, dt, game) {
@@ -113,6 +160,7 @@ function moveAndCollide(entity, dt, game) {
 
   for (const p of game.platforms) {
     if (!rectsOverlap(entity, p)) continue;
+
     const prevTop = previousY;
     const prevBottom = previousY + entity.h;
 
