@@ -32,6 +32,10 @@ export function createHacker(game) {
     dashCost: 18,
     dashInputLock: false,
 
+    isDashing: false,
+    dashTime: 0,
+    dashDuration: 0.2,
+
     shield: false,
     shieldTime: 0,
     shieldDuration: 3,
@@ -51,6 +55,10 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.dashCooldown = Math.max(0, h.dashCooldown - dt);
   h.invincible = Math.max(0, h.invincible - dt);
+
+  h.dashTime = Math.max(0, h.dashTime - dt);
+  h.isDashing = h.dashTime > 0;
+
   h.shieldTime = Math.max(0, h.shieldTime - dt);
   h.shield = h.shieldTime > 0;
 
@@ -127,6 +135,9 @@ function tryDash(game, flashLog) {
   h.energy -= h.dashCost;
   game.metrics.energyUsed += h.dashCost;
   h.dashCooldown = game.mods.dashCooldown;
+
+  h.isDashing = true;
+  h.dashTime = h.dashDuration;
 }
 
 export function activateShield(game, flashLog) {
@@ -185,12 +196,19 @@ function moveAndCollide(entity, dt, game) {
     entity.y = 320;
     entity.vx = 0;
     entity.vy = 0;
+    entity.isDashing = false;
+    entity.dashTime = 0;
   }
 }
 
 function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
     if (!rectsOverlap(h, getHazardHitbox(hazard))) continue;
+
+    if (game.turn === TURN.ATTACK && game.stage % 2 === 1 && h.isDashing) {
+      continue;
+    }
+
     if (h.invincible > 0) continue;
 
     if (h.shield) {
