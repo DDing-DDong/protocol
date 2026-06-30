@@ -15,6 +15,9 @@ export const TRAPS = {
   firewall: { name: "방화벽", cost: 3, color: "#ff7040" },
 };
 
+export const STORY_STAGE_COUNT = 11;
+export const INFINITE_STAGE_START = STORY_STAGE_COUNT + 1;
+
 export const rewardPool = {
   attack: [
     {
@@ -62,6 +65,37 @@ export const rewardPool = {
   ],
 };
 
+export const stages = [
+  {
+    id: 1,
+    name: "데이터 코어 탈취",
+    mode: "story",
+    securityLevel: 1,
+    objective: "데이터 코어 탈취",
+    timeLimit: 48,
+    playerStart: { x: 72, y: 392 },
+    goal: { x: 1088, y: 392, w: 42, h: 70, type: "core" },
+    platforms: [
+      { x: 0, y: 462, w: 1200, h: 78 },
+      { x: 250, y: 360, w: 150, h: 18 },
+      { x: 520, y: 300, w: 150, h: 18 },
+      { x: 810, y: 365, w: 150, h: 18 },
+    ],
+    trapNodes: [
+      { id: "stage-1-laser-1", type: "laser", x: 340, y: 352, w: 15, h: 110 },
+      { id: "stage-1-shock-1", type: "shock", x: 680, y: 448, w: 90, h: 14 },
+      { id: "stage-1-camera-1", type: "camera", x: 540, y: 252, w: 120, h: 70 },
+    ],
+    reward: {
+      choices: 3,
+      pools: {
+        attack: "attack",
+        defense: "defense",
+      },
+    },
+  },
+];
+
 export const WIDTH = 1200;
 export const HEIGHT = 540;
 export const GRAVITY = 1600;
@@ -72,6 +106,11 @@ export const CORE_X = 1088;
 export const SHIELD_DURATION = 2.5;
 export const HIT_INVINCIBLE_TIME = 0.9;
 export const SHIELD_BLOCK_INVINCIBLE_TIME = 0.75;
+
+export function getStageById(stageId) {
+  const stageData = stages.find((stage) => stage.id === Number(stageId));
+  return stageData ? cloneStageData(stageData) : null;
+}
 
 export function createDefaultMods() {
   return {
@@ -98,13 +137,19 @@ export function createMetrics() {
 }
 
 export function getStageTime(stage) {
+  const stageData = getStageById(stage);
+  if (stageData && stageData.timeLimit) return stageData.timeLimit;
+
   if (stage <= 3) return 48;
   if (stage <= 7) return 42;
-  if (stage <= 11) return 38;
-  return Math.max(24, 40 - Math.floor((stage - 12) * 1.2));
+  if (stage <= STORY_STAGE_COUNT) return 38;
+  return Math.max(24, 40 - Math.floor((stage - INFINITE_STAGE_START) * 1.2));
 }
 
 export function getObjective(stage) {
+  const stageData = getStageById(stage);
+  if (stageData && stageData.objective) return stageData.objective;
+
   const table = {
     1: "데이터 코어 탈취",
     2: "해커를 2초 이상 지연",
@@ -118,7 +163,7 @@ export function getObjective(stage) {
     10: "최종 접근 방해",
     11: "중앙 데이터 코어 탈취",
   };
-  if (table[stage]) return table[stage];
+  if (stage <= STORY_STAGE_COUNT && table[stage]) return table[stage];
   return stage % 2 === 1 ? "무한 모드: 코어 탈취" : "무한 모드: 탐지 또는 지연";
 }
 
@@ -152,4 +197,18 @@ export function rectsOverlap(a, b) {
 export function cryptoSafeId() {
   if (globalThis.crypto && globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
   return `trap-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function cloneStageData(stageData) {
+  return {
+    ...stageData,
+    playerStart: { ...stageData.playerStart },
+    goal: { ...stageData.goal },
+    platforms: stageData.platforms.map((platform) => ({ ...platform })),
+    trapNodes: stageData.trapNodes.map((trapNode) => ({ ...trapNode })),
+    reward: {
+      ...stageData.reward,
+      pools: { ...stageData.reward.pools },
+    },
+  };
 }
