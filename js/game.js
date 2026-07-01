@@ -17,7 +17,7 @@ import {
 import { createHacker, updateAttack, activateShield } from "./player.js";
 import { initUI } from "./ui.js";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js";
-import { placeTrapAtSlot, undoTrap, carryDefenseTrapsToNextStage } from "./trap.js";
+import { placeTrapAtSlot, undoTrap, carryDefenseTrapsToNextStage, getAllowedRotation } from "./trap.js";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js";
 
 const canvas = document.getElementById("gameCanvas");
@@ -34,13 +34,15 @@ const uiModule = initUI({
   },
   onRestart: resetGame,
   onHelp: showHelp,
-  onTrapSelected: (type) => {
+  onTrapSelected: (type, wasSelected) => {
+    if (type === "laser" && wasSelected) {
+      selectedRotation = getAllowedRotation(type, selectedRotation + 90);
+      flashLog(`레이저 회전 ${selectedRotation}도`);
+      return;
+    }
     selectedTrap = type;
+    selectedRotation = getAllowedRotation(selectedTrap, selectedRotation);
   },
-  onRotateTrap: () => {
-    selectedRotation = (selectedRotation + 90) % 360;
-  },
-  getSelectedRotation: () => selectedRotation,
   onCanvasClick: handleCanvasClick,
   onApplyReward: applyReward,
 });
@@ -54,6 +56,7 @@ const game = {
   replayIndex: 0,
   replayPause: 0,
   replayFinished: false,
+  nextEmpowerTrapIndex: 0,
   currentRecording: [],
   lastAttackRecording: [],
   placedTraps: [],
@@ -91,6 +94,7 @@ function setupStage() {
   game.replayIndex = 0;
   game.replayPause = 0;
   game.replayFinished = false;
+  game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
   game.platforms = createPlatforms(game.stage);

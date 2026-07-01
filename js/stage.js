@@ -69,8 +69,11 @@ export function createBaseHazards(stage, game) {
     if (stage >= INFINITE_STAGE_START) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
   }
 
-  hazards.push(...getCarriedHazards(stage, game));
-  return hazards;
+  const normalizedHazards = hazards.map((hazard) => (
+    hazard.type === "camera" ? normalizeStageCameraHazard(hazard, game.platforms) : hazard
+  ));
+  normalizedHazards.push(...getCarriedHazards(stage, game));
+  return normalizedHazards;
 }
 
 export function getCarriedHazards(stage, game) {
@@ -79,7 +82,14 @@ export function getCarriedHazards(stage, game) {
 }
 
 export function trapToAttackHazard(trap, game) {
-  return { type: trap.type, ...getOrientedTrapBox(trap, game), carried: true };
+  return {
+    type: trap.type,
+    ...getOrientedTrapBox(trap, game),
+    carried: true,
+    empowered: trap.empowered,
+    closed: trap.closed,
+    closedTime: trap.closedTime,
+  };
 }
 
 export function createTrapSlots(stage, game) {
@@ -161,3 +171,37 @@ function cloneRects(rects) {
 function cloneTrapNodes(trapNodes) {
   return trapNodes.map(({ id, ...trapNode }) => ({ ...trapNode }));
 }
+
+function normalizeStageCameraHazard(camera, platforms) {
+  const anchorX = Number.isFinite(camera.w) ? camera.x + camera.w / 2 : camera.x;
+  const anchorY = findCameraPlatformY(camera, anchorX, platforms) ?? (
+    Number.isFinite(camera.h) ? camera.y + camera.h : camera.y
+  );
+  return {
+    type: "camera",
+    x: anchorX,
+    y: anchorY,
+  };
+}
+
+function findCameraPlatformY(camera, anchorX, platforms) {
+  const cameraBottom = Number.isFinite(camera.h) ? camera.y + camera.h : camera.y;
+  let bestPlatform = null;
+  let bestDistance = Infinity;
+
+  for (const platform of platforms || []) {
+    const horizontalMatch = anchorX >= platform.x - 24 && anchorX <= platform.x + platform.w + 24;
+    if (!horizontalMatch) continue;
+    const distance = Math.abs(platform.y - cameraBottom);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestPlatform = platform;
+    }
+  }
+
+  return bestPlatform ? bestPlatform.y : null;
+}
+
+// 수정 이유:
+// - 수비턴에서 설치한 EMP와 방화벽 상태를 다음 공격턴 hazard로 넘길 때 타입별 상태를 유지하기 위함
+// - 스테이지 기본 카메라를 유저 설치 카메라와 같은 플랫폼 anchor 방식으로 정규화하기 위함

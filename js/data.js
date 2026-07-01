@@ -10,11 +10,18 @@ export const TURN = {
 
 export const TRAPS = {
   laser: { name: "레이저", cost: 2, color: "#ff3b67" },
-  shock: { name: "감전 바닥", cost: 2, color: "#ffcc33" },
+  shock: { name: "감전패널", cost: 2, color: "#ffcc33" },
   camera: { name: "카메라", cost: 1, color: "#bb5cff" },
-  firewall: { name: "방화벽", cost: 3, color: "#ff7040" },
+  firewall: { name: "방화벽", cost: 1, color: "#ff7040" },
+  emp: { name: "EMP패널", cost: 1, color: "#33e6ff" },
 };
 
+export const FIREWALL_BLOCK_TIME = 5;
+export const FIREWALL_REWARD_BLOCK_BONUS = 1;
+export const SHOCK_SLOW_TIME = 2;
+export const SHOCK_SLOW_MULTIPLIER = 0.55;
+export const SHOCK_EMPOWERED_DURATION_BONUS = 0.8;
+export const CAMERA_NETWORK_EMPOWER_BONUS = 1;
 export const STORY_STAGE_COUNT = 11;
 export const INFINITE_STAGE_START = STORY_STAGE_COUNT + 1;
 
@@ -26,9 +33,9 @@ export const rewardPool = {
       apply: (game) => { game.mods.defenseBudgetBonus += 2; },
     },
     {
-      name: "카메라 비용 -1",
-      desc: "카메라 배치 비용이 최소 1까지 줄어듭니다.",
-      apply: (game) => { game.mods.cameraDiscount = Math.min(1, game.mods.cameraDiscount + 1); },
+      name: "감시 네트워크",
+      desc: "카메라 탐지 시 다음 함정 1개를 추가로 강화합니다.",
+      apply: (game) => { game.mods.cameraNetworkBonus += CAMERA_NETWORK_EMPOWER_BONUS; },
     },
     {
       name: "레이저 강화",
@@ -37,8 +44,8 @@ export const rewardPool = {
     },
     {
       name: "방화벽 강화",
-      desc: "방화벽의 지연 시간이 증가합니다.",
-      apply: (game) => { game.mods.firewallDelay += 0.45; },
+      desc: "방화벽의 차단 시간이 1초 증가합니다.",
+      apply: (game) => { game.mods.firewallDelay += FIREWALL_REWARD_BLOCK_BONUS; },
     },
   ],
   defense: [
@@ -119,15 +126,32 @@ export function createDefaultMods() {
     shieldDrain: 48,
     freeHit: 0,
     defenseBudgetBonus: 0,
-    cameraDiscount: 0,
+    cameraNetworkBonus: 0,
     laserBoost: 0,
-    firewallDelay: 1.2,
+    firewallDelay: 0,
   };
+}
+
+export function getFirewallBlockTime(game) {
+  return FIREWALL_BLOCK_TIME + (game?.mods?.firewallDelay || 0);
+}
+
+export function getShockSlowTime(trap) {
+  return SHOCK_SLOW_TIME + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0);
+}
+
+export function getShockDelay(trap) {
+  return 1 + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0);
+}
+
+export function getCameraEmpowerCount(game) {
+  return 1 + (game?.mods?.cameraNetworkBonus || 0);
 }
 
 export function createMetrics() {
   return {
     detections: 0,
+    alertCharge: 0,
     delay: 0,
     energyUsed: 0,
     clearTime: 0,
