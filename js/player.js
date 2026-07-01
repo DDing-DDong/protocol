@@ -28,13 +28,19 @@ export function createHacker(game) {
     invincible: 0,
 
     dashCooldown: 0,
-    dashSpeed: 760,
+
+    // 대시 거리 조정: 약 4칸 정도 이동하도록 속도/시간을 낮춤
+    dashSpeed: 580,
+    dashDuration: 0.16,
+
     dashCost: 18,
     dashInputLock: false,
-
     isDashing: false,
     dashTime: 0,
-    dashDuration: 0.2,
+    dashDirection: 1,
+
+    // 대시 직후 장애물 끝부분에 걸리는 문제 방지
+    dashHazardGrace: 0,
 
     shield: false,
     shieldTime: 0,
@@ -55,6 +61,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.dashCooldown = Math.max(0, h.dashCooldown - dt);
   h.invincible = Math.max(0, h.invincible - dt);
+  h.dashHazardGrace = Math.max(0, h.dashHazardGrace - dt);
 
   h.dashTime = Math.max(0, h.dashTime - dt);
   h.isDashing = h.dashTime > 0;
@@ -68,7 +75,18 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   const dash = keys.has("ShiftLeft") || keys.has("ShiftRight");
   const shield = keys.has("Space");
 
-  if (left && !right) {
+  if (dash && !h.dashInputLock) {
+    tryDash(game, keys, flashLog);
+    h.dashInputLock = true;
+  }
+
+  if (!dash) {
+    h.dashInputLock = false;
+  }
+
+  if (h.isDashing) {
+    h.vx = h.dashDirection * h.dashSpeed;
+  } else if (left && !right) {
     h.vx = -h.speed;
     h.facing = -1;
   } else if (right && !left) {
@@ -81,15 +99,6 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   if (jump && h.onGround) {
     h.vy = -h.jumpPower;
     h.onGround = false;
-  }
-
-  if (dash && !h.dashInputLock) {
-    tryDash(game, flashLog);
-    h.dashInputLock = true;
-  }
-
-  if (!dash) {
-    h.dashInputLock = false;
   }
 
   if (shield && !h.shieldInputLock) {
@@ -119,7 +128,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   }
 }
 
-function tryDash(game, flashLog) {
+function tryDash(game, keys, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
 
   const h = game.hacker;
@@ -131,13 +140,29 @@ function tryDash(game, flashLog) {
     return;
   }
 
-  h.vx = h.facing * h.dashSpeed;
+  const left = keys.has("ArrowLeft");
+  const right = keys.has("ArrowRight");
+
+  if (left && !right) {
+    h.dashDirection = -1;
+  } else if (right && !left) {
+    h.dashDirection = 1;
+  } else {
+    h.dashDirection = h.facing || 1;
+  }
+
+  h.facing = h.dashDirection;
+  h.vx = h.dashDirection * h.dashSpeed;
+
   h.energy -= h.dashCost;
   game.metrics.energyUsed += h.dashCost;
   h.dashCooldown = game.mods.dashCooldown;
 
   h.isDashing = true;
   h.dashTime = h.dashDuration;
+
+  // 대시 중 + 대시 직후까지 짧게 장애물 판정을 무시
+  h.dashHazardGrace = h.dashDuration + 0.22;
 }
 
 export function activateShield(game, flashLog) {
@@ -198,6 +223,7 @@ function moveAndCollide(entity, dt, game) {
     entity.vy = 0;
     entity.isDashing = false;
     entity.dashTime = 0;
+    entity.dashHazardGrace = 0;
   }
 }
 
@@ -205,7 +231,7 @@ function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
     if (!rectsOverlap(h, getHazardHitbox(hazard))) continue;
 
-    if (game.turn === TURN.ATTACK && game.stage % 2 === 1 && h.isDashing) {
+    if (game.turn === TURN.ATTACK && game.stage % 2 === 1 && h.dashHazardGrace > 0) {
       continue;
     }
 
