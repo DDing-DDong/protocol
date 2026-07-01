@@ -71,20 +71,118 @@ export const stages = [
     name: "데이터 코어 탈취",
     mode: "story",
     securityLevel: 1,
+    theme: {
+      id: "access-room",
+      name: "Access Room",
+      palette: "cyan",
+      securityTone: "low",
+      background: "server-room",
+    },
+    mapIntent: {
+      role: "tutorial",
+      learningGoals: ["movement", "platform", "goal", "trap-slot"],
+      difficulty: 1,
+      description: "기본 이동과 Goal 도달 흐름을 학습하는 첫 번째 서버실 맵",
+      pacing: {
+        start: "초반에는 함정 압박이 낮은 안전한 이동 구간을 제공한다.",
+        middle: "중간 플랫폼에서는 함정과 감지 범위의 의미를 자연스럽게 인지시킨다.",
+        end: "마지막 구간에서는 데이터 코어를 명확히 보여주고 도달 목표를 강조한다.",
+      },
+    },
+    backgroundLayers: {
+      far: ["future-city"],
+      mid: ["server-rack", "cable", "security-panel"],
+      front: ["platform-floor", "glow-line"],
+      fx: ["scan-line", "soft-glow"],
+    },
     objective: "데이터 코어 탈취",
     timeLimit: 48,
-    playerStart: { x: 72, y: 392 },
-    goal: { x: 1088, y: 392, w: 42, h: 70, type: "core" },
+    playerStart: {
+      x: 72,
+      y: 392,
+      intent: "플레이어가 바닥 이동과 점프 타이밍을 안전하게 익히는 시작 위치",
+    },
+    goal: {
+      x: 1088,
+      y: 392,
+      w: 42,
+      h: 70,
+      type: "core",
+      label: "Data Core",
+      intent: "첫 스테이지의 최종 목적지를 화면 오른쪽 끝에 명확히 배치한다.",
+    },
     platforms: [
-      { x: 0, y: 462, w: 1200, h: 78 },
-      { x: 250, y: 360, w: 150, h: 18 },
-      { x: 520, y: 300, w: 150, h: 18 },
-      { x: 810, y: 365, w: 150, h: 18 },
+      {
+        id: "stage-1-ground",
+        x: 0,
+        y: 462,
+        w: 1200,
+        h: 78,
+        role: "main-route",
+        intent: "기본 이동, 함정 슬롯 배치, Goal 접근을 모두 받쳐주는 기준 바닥",
+      },
+      {
+        id: "stage-1-platform-start",
+        x: 250,
+        y: 360,
+        w: 150,
+        h: 18,
+        role: "movement-step",
+        intent: "첫 점프와 플랫폼 착지를 학습시키는 낮은 난이도의 디딤대",
+      },
+      {
+        id: "stage-1-platform-mid",
+        x: 520,
+        y: 300,
+        w: 150,
+        h: 18,
+        role: "trap-learning",
+        intent: "중간 구간에서 카메라 감지와 함정 배치의 의미를 학습시키는 플랫폼",
+      },
+      {
+        id: "stage-1-platform-goal",
+        x: 810,
+        y: 365,
+        w: 150,
+        h: 18,
+        role: "goal-approach",
+        intent: "Goal 직전 접근 경로를 정리하고 마지막 점프 흐름을 만든다.",
+      },
     ],
     trapNodes: [
-      { id: "stage-1-laser-1", type: "laser", x: 340, y: 352, w: 15, h: 110 },
-      { id: "stage-1-shock-1", type: "shock", x: 680, y: 448, w: 90, h: 14 },
-      { id: "stage-1-camera-1", type: "camera", x: 540, y: 252, w: 120, h: 70 },
+      {
+        id: "stage-1-laser-1",
+        type: "laser",
+        x: 340,
+        y: 352,
+        w: 15,
+        h: 110,
+        intent: "초반 플랫폼 이후 세로 장애물을 보여주되 우회와 타이밍 학습이 가능하게 한다.",
+        recommendedTrap: "laser",
+        teaches: ["timing", "vertical-threat"],
+      },
+      {
+        id: "stage-1-shock-1",
+        type: "shock",
+        x: 680,
+        y: 448,
+        w: 90,
+        h: 14,
+        intent: "지상 이동 중 바닥 함정의 위험을 짧고 명확하게 학습시키는 위치",
+        recommendedTrap: "shock",
+        teaches: ["ground-threat", "route-choice"],
+      },
+      {
+        id: "stage-1-camera-1",
+        type: "camera",
+        x: 540,
+        y: 252,
+        w: 120,
+        h: 70,
+        intent: "플레이어가 중간 플랫폼을 통과할 때 감지 위험을 학습하게 하는 위치",
+        recommendedTrap: "camera",
+        teaches: ["detection", "platform-risk"],
+      },
     ],
     reward: {
       choices: 3,
@@ -202,10 +300,37 @@ export function cryptoSafeId() {
 function cloneStageData(stageData) {
   return {
     ...stageData,
+    theme: stageData.theme ? { ...stageData.theme } : null,
+    mapIntent: {
+      ...(stageData.mapIntent || {}),
+      learningGoals: stageData.mapIntent && stageData.mapIntent.learningGoals
+        ? stageData.mapIntent.learningGoals.slice()
+        : [],
+      pacing: stageData.mapIntent && stageData.mapIntent.pacing
+        ? { ...stageData.mapIntent.pacing }
+        : {},
+    },
+    backgroundLayers: {
+      far: stageData.backgroundLayers && stageData.backgroundLayers.far
+        ? stageData.backgroundLayers.far.slice()
+        : [],
+      mid: stageData.backgroundLayers && stageData.backgroundLayers.mid
+        ? stageData.backgroundLayers.mid.slice()
+        : [],
+      front: stageData.backgroundLayers && stageData.backgroundLayers.front
+        ? stageData.backgroundLayers.front.slice()
+        : [],
+      fx: stageData.backgroundLayers && stageData.backgroundLayers.fx
+        ? stageData.backgroundLayers.fx.slice()
+        : [],
+    },
     playerStart: { ...stageData.playerStart },
     goal: { ...stageData.goal },
     platforms: stageData.platforms.map((platform) => ({ ...platform })),
-    trapNodes: stageData.trapNodes.map((trapNode) => ({ ...trapNode })),
+    trapNodes: stageData.trapNodes.map((trapNode) => ({
+      ...trapNode,
+      teaches: trapNode.teaches ? trapNode.teaches.slice() : [],
+    })),
     reward: {
       ...stageData.reward,
       pools: { ...stageData.reward.pools },
