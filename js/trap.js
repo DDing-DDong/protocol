@@ -29,10 +29,13 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
 
 export function undoTrap(game) {
   if (game.turn !== TURN.DEFENSE_BUILD) return;
+
   const trap = game.placedTraps.pop();
   if (!trap) return;
+
   const slot = game.trapSlots.find((s) => s.id === trap.slotId);
   if (slot) slot.occupied = false;
+
   game.defenseBudget += getTrapCost(trap.type, game);
 }
 
@@ -53,6 +56,7 @@ export function getOrientedTrapBox(trap, game) {
 
   if (trap.type === "laser") {
     const length = 118 + game.mods.laserBoost;
+
     if (horizontal) {
       return {
         x: positive ? trap.x : trap.x - length,
@@ -61,6 +65,7 @@ export function getOrientedTrapBox(trap, game) {
         h: 16,
       };
     }
+
     return {
       x: trap.x - 8,
       y: positive ? trap.y - length : trap.y,
@@ -84,6 +89,7 @@ export function getOrientedTrapBox(trap, game) {
         h: 70,
       };
     }
+
     return {
       x: trap.x - 35,
       y: positive ? trap.y - 100 : trap.y,
@@ -102,8 +108,23 @@ export function getOrientedTrapBox(trap, game) {
 }
 
 export function getHazardHitbox(hazard) {
-  if (hazard.type === "camera") return { x: hazard.x, y: hazard.y, w: hazard.w, h: hazard.h };
+  if (hazard.type === "camera") {
+    return getCameraHazardHitbox(hazard);
+  }
+
   return hazard;
+}
+
+function getCameraHazardHitbox(hazard) {
+  const hitboxScaleX = 0.68;
+  const hitboxScaleY = 0.46;
+
+  return {
+    x: hazard.x + hazard.w * 0.14,
+    y: hazard.y + hazard.h * 0.22,
+    w: hazard.w * hitboxScaleX,
+    h: hazard.h * hitboxScaleY,
+  };
 }
 
 export function getTrapHitbox(trap, game) {
@@ -119,5 +140,6 @@ export function carryDefenseTrapsToNextStage(game, stage) {
     y: trap.y,
     slotId: trap.slotId,
   }));
+
   game.carriedTrapsByStage.set(stage, traps);
 }
