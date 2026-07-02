@@ -17,7 +17,7 @@ import {
 import { createHacker, updateAttack, activateShield } from "./player.js";
 import { initUI } from "./ui.js";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js";
-import { placeTrapAtSlot, undoTrap, carryDefenseTrapsToNextStage } from "./trap.js";
+import { placeTrapAtSlot, undoTrap, carryDefenseTrapsToNextStage, getAllowedRotation } from "./trap.js";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js";
 
 const canvas = document.getElementById("gameCanvas");
@@ -34,13 +34,21 @@ const uiModule = initUI({
   },
   onRestart: resetGame,
   onHelp: showHelp,
-  onTrapSelected: (type) => {
+  onTrapSelected: (type, wasSelected) => {
+    if (type === "laser" && wasSelected) {
+      selectedRotation = getAllowedRotation(type, selectedRotation + 90);
+      laserRotation = selectedRotation;
+      flashLog(`레이저 회전 ${selectedRotation}도`);
+      return selectedRotation;
+    }
     selectedTrap = type;
+    if (selectedTrap === "laser") {
+      selectedRotation = laserRotation;
+    } else {
+      selectedRotation = getAllowedRotation(selectedTrap, selectedRotation);
+    }
+    return selectedTrap === "laser" ? laserRotation : selectedRotation;
   },
-  onRotateTrap: () => {
-    selectedRotation = (selectedRotation + 90) % 360;
-  },
-  getSelectedRotation: () => selectedRotation,
   onCanvasClick: handleCanvasClick,
   onApplyReward: applyReward,
 });
@@ -54,6 +62,7 @@ const game = {
   replayIndex: 0,
   replayPause: 0,
   replayFinished: false,
+  nextEmpowerTrapIndex: 0,
   currentRecording: [],
   lastAttackRecording: [],
   placedTraps: [],
@@ -73,7 +82,8 @@ const game = {
 
 let lastTime = performance.now();
 let selectedTrap = "laser";
-let selectedRotation = 0;
+let selectedRotation = 90;
+let laserRotation = 90;
 
 function flashLog(text) {
   if (game.messageCooldown > 0) return;
@@ -91,6 +101,7 @@ function setupStage() {
   game.replayIndex = 0;
   game.replayPause = 0;
   game.replayFinished = false;
+  game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
   game.platforms = createPlatforms(game.stage);
@@ -199,7 +210,7 @@ function showHelp() {
 
   uiModule.showOverlay({
     title: "조작법",
-    text: "공격 턴에는 A/D 이동, Space 점프, Shift 대시, E 실드를 사용합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
+    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 실드를 사용합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });
@@ -238,5 +249,6 @@ function loop(now) {
 }
 
 uiModule.bindEvents();
+uiModule.updateLaserDirection(laserRotation);
 setupStage();
 requestAnimationFrame(loop);

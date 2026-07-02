@@ -1,8 +1,18 @@
 ﻿// ui.js
 // 책임: 화면 표시와 버튼 / 캔버스 이벤트만 담당합니다.
 
-import { TURN, getObjective } from "./data.js";
-import { getOrientedTrapBox, normalizeRotation } from "./trap.js";
+import {
+  TURN,
+  getObjective,
+  getFirewallBlockTime,
+  getCameraEmpowerCount,
+  FIREWALL_REWARD_BLOCK_BONUS,
+  SHOCK_SLOW_TIME,
+  SHOCK_SLOW_MULTIPLIER,
+  SHOCK_EMPOWERED_DURATION_BONUS,
+  CAMERA_NETWORK_EMPOWER_BONUS,
+} from "./data.js";
+import { getCameraHazardBox, getOrientedTrapBox } from "./trap.js";
 
 export function initUI(callbacks) {
   const canvas = document.getElementById("gameCanvas");
@@ -92,6 +102,7 @@ export function initUI(callbacks) {
     ui.defenseTools.classList.toggle("hidden", game.turn !== TURN.DEFENSE_BUILD);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
+    updateTrapTooltips(game);
   }
 
   function getTurnLabel(turn) {
@@ -99,6 +110,60 @@ export function initUI(callbacks) {
     if (turn === TURN.DEFENSE_BUILD) return "AI 방어 준비";
     if (turn === TURN.DEFENSE_REPLAY) return "AI 방어 리플레이";
     return "결과";
+  }
+
+  function updateTrapTooltips(game) {
+    const shockBtn = ui.defenseTools?.querySelector('[data-trap="shock"]');
+    if (shockBtn) {
+      shockBtn.dataset.tooltip = [
+        "해커를 감전시켜 이동을 지연시키고 이동속도를 낮춥니다.",
+        `공격턴: 이동속도 ${formatPercent(1 - SHOCK_SLOW_MULTIPLIER)} 감소 ${formatSeconds(SHOCK_SLOW_TIME)}`,
+        `강화: 지연/감속 지속 +${formatSeconds(SHOCK_EMPOWERED_DURATION_BONUS)}`,
+      ].join("\n");
+    }
+
+    const cameraBtn = ui.defenseTools?.querySelector('[data-trap="camera"]');
+    if (cameraBtn) {
+      cameraBtn.dataset.tooltip = [
+        "피해를 주지않지만 해커를 탐지해 경보를 충전합니다.",
+        `경보는 설치 순서대로 다음 함정 ${getCameraEmpowerCount(game)}개를 강화합니다.`,
+        `감시 네트워크 보상: 강화 +${CAMERA_NETWORK_EMPOWER_BONUS}개`,
+      ].join("\n");
+    }
+
+    const firewallBtn = ui.defenseTools?.querySelector('[data-trap="firewall"]');
+    if (!firewallBtn) return;
+
+    firewallBtn.dataset.tooltip = [
+      "기본 상태에서는 열려 있습니다.",
+      `강화: 현재 ${formatSeconds(getFirewallBlockTime(game))} 동안 경로 차단`,
+      `방화벽 강화 보상: +${formatSeconds(FIREWALL_REWARD_BLOCK_BONUS)}`,
+    ].join("\n");
+  }
+
+  function updateLaserDirection(rotation) {
+    const laserBtn = ui.defenseTools?.querySelector('[data-trap="laser"]');
+    const direction = laserBtn?.querySelector(".laser-direction");
+    if (!direction) return;
+
+    const normalized = ((Math.round((Number(rotation) || 0) / 90) * 90) % 360 + 360) % 360;
+    const arrowByRotation = {
+      0: "→",
+      90: "↑",
+      180: "←",
+      270: "↓",
+    };
+    direction.textContent = arrowByRotation[normalized] || "↑";
+    laserBtn.setAttribute("aria-label", `레이저 ${direction.textContent} 방향`);
+  }
+
+  function formatSeconds(value) {
+    const rounded = Math.round(value * 10) / 10;
+    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}초`;
+  }
+
+  function formatPercent(value) {
+    return `${Math.round(value * 100)}%`;
   }
 
   function draw(game) {
@@ -200,8 +265,12 @@ export function initUI(callbacks) {
     for (const hazard of game.baseHazards) {
       if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
-      if (hazard.type === "camera") drawCamera(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
-      if (hazard.type === "firewall") drawFirewall(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
+      if (hazard.type === "camera") {
+        const cameraBox = getCameraHazardBox(hazard);
+        drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h);
+      }
+      if (hazard.type === "firewall") drawFirewall(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard.closed || hazard.empowered);
+      if (hazard.type === "emp") drawEmp(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
     }
   }
 
@@ -223,8 +292,10 @@ export function initUI(callbacks) {
       const box = getOrientedTrapBox(trap, game);
       if (trap.type === "laser") drawLaser(ctx, box.x, box.y, box.w, box.h);
       if (trap.type === "shock") drawShock(ctx, box.x, box.y, box.w, box.h);
-      if (trap.type === "camera") drawCamera(ctx, box.x, box.y, box.w, box.h, normalizeRotation(trap.rotation));
-      if (trap.type === "firewall") drawFirewall(ctx, box.x, box.y, box.w, box.h);
+      if (trap.type === "camera") drawCamera(ctx, box.x, box.y, box.w, box.h);
+      if (trap.type === "firewall") drawFirewall(ctx, box.x, box.y, box.w, box.h, trap.closed || trap.empowered);
+      if (trap.type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h);
+      if (trap.empowered) drawEmpoweredMark(ctx, box);
     }
   }
 
@@ -253,48 +324,85 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawCamera(ctx, x, y, w, h, rotation = 0) {
+  function drawEmp(ctx, x, y, w, h) {
     ctx.save();
-    ctx.fillStyle = "rgba(187, 92, 255, 0.16)";
-    ctx.beginPath();
-    if (rotation === 0) {
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + w, y + h / 2);
-      ctx.lineTo(x, y + h);
-    } else if (rotation === 90) {
-      ctx.moveTo(x, y + h);
-      ctx.lineTo(x + w / 2, y);
-      ctx.lineTo(x + w, y + h);
-    } else if (rotation === 180) {
-      ctx.moveTo(x + w, y);
-      ctx.lineTo(x, y + h / 2);
-      ctx.lineTo(x + w, y + h);
-    } else {
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + w / 2, y + h);
-      ctx.lineTo(x + w, y);
+    ctx.fillStyle = "rgba(51, 230, 255, 0.26)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#33e6ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "#33e6ff";
+    for (let i = x + 8; i < x + w - 6; i += 14) {
+      ctx.beginPath();
+      ctx.moveTo(i, y + h - 3);
+      ctx.lineTo(i + 5, y + 3);
+      ctx.lineTo(i + 10, y + h - 3);
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#bb5cff";
-    ctx.shadowColor = "#bb5cff";
-    ctx.shadowBlur = 10;
-    if (rotation === 0) ctx.fillRect(x - 10, y + h / 2 - 9, 28, 18);
-    else if (rotation === 90) ctx.fillRect(x + w / 2 - 14, y + h - 10, 28, 18);
-    else if (rotation === 180) ctx.fillRect(x + w - 18, y + h / 2 - 9, 28, 18);
-    else ctx.fillRect(x + w / 2 - 14, y - 8, 28, 18);
     ctx.restore();
   }
 
-  function drawFirewall(ctx, x, y, w, h) {
+  function drawCamera(ctx, x, y, w, h) {
+    const bodyW = Math.min(56, w * 0.5);
+    const bodyH = Math.min(36, h * 0.32);
+    const bodyX = x + w - bodyW - 2;
+    const bodyY = y;
+    const coneTopLeft = { x: bodyX + 4, y: bodyY + bodyH };
+    const coneTopRight = { x: bodyX + bodyW - 10, y: bodyY + bodyH };
+    const coneBottomRight = { x: coneTopRight.x, y: y + h };
+    const coneBottomLeft = { x: x + 8, y: y + h };
+
     ctx.save();
-    ctx.fillStyle = "rgba(255, 112, 64, 0.28)";
+    ctx.fillStyle = "rgba(187, 92, 255, 0.24)";
+    ctx.beginPath();
+    ctx.moveTo(coneTopLeft.x, coneTopLeft.y);
+    ctx.lineTo(coneTopRight.x, coneTopRight.y);
+    ctx.lineTo(coneBottomRight.x, coneBottomRight.y);
+    ctx.lineTo(coneBottomLeft.x, coneBottomLeft.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(233, 248, 255, 0.45)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([7, 7]);
+    ctx.strokeStyle = "rgba(187, 92, 255, 0.78)";
+    ctx.beginPath();
+    ctx.moveTo(bodyX + bodyW / 2, bodyY + bodyH);
+    ctx.lineTo((coneBottomLeft.x + coneBottomRight.x) / 2, coneBottomLeft.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#bb5cff";
+    ctx.shadowColor = "#bb5cff";
+    ctx.shadowBlur = 10;
+    roundRect(ctx, bodyX, bodyY, bodyW, bodyH, 8);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFirewall(ctx, x, y, w, h, closed = false) {
+    ctx.save();
+    ctx.fillStyle = closed ? "rgba(255, 112, 64, 0.36)" : "rgba(255, 112, 64, 0.10)";
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = "#ff7040";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = closed ? "#ff7040" : "rgba(255, 112, 64, 0.58)";
+    ctx.lineWidth = closed ? 3 : 2;
     ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = "#ff7040";
-    for (let yy = y + 8; yy < y + h; yy += 16) ctx.fillRect(x + 5, yy, w - 10, 4);
+    ctx.fillStyle = closed ? "#ff7040" : "rgba(255, 112, 64, 0.42)";
+    for (let yy = y + 8; yy < y + h; yy += 16) {
+      if (closed || yy % 32 === 0) ctx.fillRect(x + 5, yy, w - 10, 4);
+    }
+    ctx.restore();
+  }
+
+  function drawEmpoweredMark(ctx, box) {
+    ctx.save();
+    ctx.strokeStyle = "#27ffc8";
+    ctx.shadowColor = "#27ffc8";
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
+    ctx.fillStyle = "#27ffc8";
+    ctx.font = "bold 11px system-ui";
+    ctx.fillText("BOOST", box.x, box.y - 8);
     ctx.restore();
   }
 
@@ -315,6 +423,7 @@ export function initUI(callbacks) {
   function drawHacker(ctx, h, isGhost) {
     ctx.save();
     ctx.globalAlpha = isGhost ? 0.72 : 1;
+    if (isGhost && h.glitchTime > 0) drawGlitchAura(ctx, h);
     ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
     ctx.scale(h.facing || 1, 1);
     ctx.fillStyle = isGhost ? "#8af2ff" : "#18e0ff";
@@ -336,6 +445,20 @@ export function initUI(callbacks) {
       drawShieldTimer(ctx, h);
     }
 
+    ctx.restore();
+  }
+
+  function drawGlitchAura(ctx, h) {
+    const t = performance.now() / 1000;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "#ff3b67";
+    ctx.fillRect(h.x - 3 + Math.sin(t * 32) * 2, h.y + 5, 4, h.h - 10);
+    ctx.fillStyle = "#33e6ff";
+    ctx.fillRect(h.x + h.w - 1 + Math.cos(t * 28) * 2, h.y + 10, 4, h.h - 16);
+    ctx.strokeStyle = "rgba(233, 248, 255, 0.62)";
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(h.x - 5, h.y - 4, h.w + 10, h.h + 8);
     ctx.restore();
   }
 
@@ -440,46 +563,15 @@ export function initUI(callbacks) {
   }
 
   function selectTrap(type) {
+    const wasSelected = Boolean(ui.defenseTools?.querySelector(`.trap-btn.selected[data-trap="${type}"]`));
     for (const btn of document.querySelectorAll(".trap-btn")) {
       btn.classList.toggle("selected", btn.dataset.trap === type);
     }
-    callbacks.onTrapSelected(type);
-  }
-
-  function rotateTrapPreview() {
-    callbacks.onRotateTrap();
-    updateRotationButton();
-  }
-
-  function updateRotationButton() {
-    const btn = ui.defenseTools?.querySelector(".rotation-btn");
-    if (btn) {
-      btn.textContent = `회전 ${callbacks.getSelectedRotation()}도`;
-    }
-  }
-
-  function createRotationControl() {
-    if (!ui.defenseTools || ui.defenseTools.querySelector(".rotation-grid")) return;
-
-    const grid = document.createElement("div");
-    grid.className = "rotation-grid";
-    grid.innerHTML = `
-      <button class="rotation-btn" type="button">
-        회전 ${callbacks.getSelectedRotation()}도
-      </button>
-    `;
-
-    const actions = ui.defenseTools.querySelector(".tool-actions");
-    ui.defenseTools.insertBefore(grid, actions);
-
-    grid
-      .querySelector(".rotation-btn")
-      .addEventListener("click", rotateTrapPreview);
+    const rotation = callbacks.onTrapSelected(type, wasSelected);
+    if (type === "laser") updateLaserDirection(rotation);
   }
 
   function bindEvents() {
-    createRotationControl();
-
     window.addEventListener("keydown", (event) => {
 
       keys.add(event.code);
@@ -566,5 +658,15 @@ export function initUI(callbacks) {
     showOverlay,
     hideOverlay,
     setLog,
+    updateLaserDirection,
   };
 }
+
+// 수정 이유:
+// - EMP패널과 강화 함정 상태를 캔버스에 표시하고 카메라 시야 방향을 더 명확히 표현하기 위함
+// - 수비 리플레이 지연 중 해커 글리치 효과를 판정 좌표 변경 없이 렌더링에서만 처리하기 위함
+// - 공격턴으로 넘어온 방화벽도 실제 닫힘/강화 상태와 같은 모습으로 표시하기 위함
+// - 카메라 회전을 제거하고 상단 본체와 하향 시야 형태로 고정하기 위함
+// - 설치형/스테이지 카메라 표시 크기를 20% 줄인 공통 크기로 통일하기 위함
+// - 감전패널 이동속도 감소와 감시 네트워크 보상 수치를 툴팁에 반영하기 위함
+// - 별도 회전 버튼 없이 레이저 선택 버튼 재클릭으로 회전하도록 선택 UI를 단순화하기 위함

@@ -173,30 +173,105 @@ button.secondary {
   line-height: 1.45;
 }
 
-.trap-grid,
-.rotation-grid {
+.trap-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.rotation-grid {
-  margin-top: 8px;
-  grid-template-columns: 1fr;
-}
-
-.trap-btn,
-.rotation-btn {
+.trap-btn {
+  position: relative;
   background: #17283b;
   color: #e9f8ff;
   border: 1px solid #2d516d;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
-.rotation-btn {
+.trap-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.laser-direction {
+  display: none;
+  width: 18px;
+  height: 18px;
+  align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  background: rgba(3, 16, 24, 0.16);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.trap-btn.selected[data-trap="laser"] .laser-direction {
+  display: inline-flex;
+}
+
+.trap-btn:hover,
+.trap-btn:focus-visible {
+  z-index: 20;
+}
+
+.trap-btn[data-tooltip]::before,
+.trap-btn[data-tooltip]::after {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.trap-btn[data-tooltip]::before {
+  content: "";
+  top: -9px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid #1f3a52;
+  transform: translate(-50%, -2px);
+}
+
+.trap-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 260px;
+  padding: 9px 10px;
+  background: #0b1a27;
+  color: #e9f8ff;
+  border: 1px solid #1f3a52;
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-line;
+  transform: translate(-50%, 4px);
+}
+
+.trap-btn[data-tooltip]:hover::before,
+.trap-btn[data-tooltip]:hover::after,
+.trap-btn[data-tooltip]:focus-visible::before,
+.trap-btn[data-tooltip]:focus-visible::after {
+  opacity: 1;
+}
+
+.trap-btn[data-tooltip]:hover::before,
+.trap-btn[data-tooltip]:focus-visible::before {
+  transform: translate(-50%, 0);
+}
+
+.trap-btn[data-tooltip]:hover::after,
+.trap-btn[data-tooltip]:focus-visible::after {
+  transform: translate(-50%, 0);
 }
 
 .trap-btn.selected {
