@@ -332,7 +332,54 @@ export function initUI(callbacks) {
       ctx.beginPath();
       ctx.arc(0, 0, 38, 0, Math.PI * 2);
       ctx.stroke();
+
+      drawShieldTimer(ctx, h);
     }
+
+    ctx.restore();
+  }
+
+  function drawShieldTimer(ctx, h) {
+    const shieldTime =
+      typeof h.shieldTimer === "number"
+        ? h.shieldTimer
+        : typeof h.shieldTime === "number"
+          ? h.shieldTime
+          : typeof h.shieldDuration === "number"
+            ? h.shieldDuration
+            : null;
+
+    if (shieldTime === null) return;
+
+    const remainSeconds = Math.max(0, Math.ceil(shieldTime));
+
+    ctx.save();
+    ctx.scale(h.facing || 1, 1);
+
+    const x = -14;
+    const y = -h.h / 2 - 34;
+
+    ctx.strokeStyle = "#27ffc8";
+    ctx.fillStyle = "rgba(39, 255, 200, 0.08)";
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y + 2);
+    ctx.quadraticCurveTo(x + 10, y - 3, x + 20, y + 2);
+    ctx.lineTo(x + 18, y + 15);
+    ctx.quadraticCurveTo(x + 10, y + 23, x + 2, y + 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#27ffc8";
+    ctx.shadowColor = "#27ffc8";
+    ctx.shadowBlur = 8;
+    ctx.font = "bold 15px system-ui";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${remainSeconds}s`, x + 30, y + 11);
+
     ctx.restore();
   }
 
@@ -342,7 +389,13 @@ export function initUI(callbacks) {
     ctx.fillRect(16, 16, 390, 54);
     ctx.fillStyle = "#18e0ff";
     ctx.font = "bold 16px system-ui";
-    ctx.fillText(`STAGE ${game.stage} / ${game.turn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"}`, 30, 40);
+    ctx.fillText(
+      `STAGE ${game.stage} / ${
+        game.turn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
+      }`,
+      30,
+      40
+    );
     ctx.fillStyle = "#c4e9f4";
     ctx.font = "13px system-ui";
     ctx.fillText(getObjective(game.stage), 30, 60);
@@ -351,6 +404,16 @@ export function initUI(callbacks) {
       ctx.fillStyle = "#ffcc33";
       ctx.fillText(`INFINITE MODE · BEST ${game.infiniteBest}`, 700, 40);
     }
+
+    // ===== 기존 상단 실드 타이머 삭제 =====
+    // 아래 코드가 있었다면 전부 삭제
+    //
+    // if (game.hacker?.shield) {
+    //    ctx.fillText(...);
+    // }
+    //
+    // ===================================
+
     ctx.restore();
   }
 
@@ -390,49 +453,97 @@ export function initUI(callbacks) {
 
   function updateRotationButton() {
     const btn = ui.defenseTools?.querySelector(".rotation-btn");
-    if (btn) btn.textContent = `회전 ${callbacks.getSelectedRotation()}도`;
+    if (btn) {
+      btn.textContent = `회전 ${callbacks.getSelectedRotation()}도`;
+    }
   }
 
   function createRotationControl() {
     if (!ui.defenseTools || ui.defenseTools.querySelector(".rotation-grid")) return;
+
     const grid = document.createElement("div");
     grid.className = "rotation-grid";
-    grid.innerHTML = `<button class="rotation-btn" type="button">회전 ${callbacks.getSelectedRotation()}도</button>`;
+    grid.innerHTML = `
+      <button class="rotation-btn" type="button">
+        회전 ${callbacks.getSelectedRotation()}도
+      </button>
+    `;
+
     const actions = ui.defenseTools.querySelector(".tool-actions");
     ui.defenseTools.insertBefore(grid, actions);
-    grid.querySelector(".rotation-btn").addEventListener("click", rotateTrapPreview);
+
+    grid
+      .querySelector(".rotation-btn")
+      .addEventListener("click", rotateTrapPreview);
   }
 
   function bindEvents() {
     createRotationControl();
 
     window.addEventListener("keydown", (event) => {
-      if (event.code === "KeyE" && !event.repeat) {
-        callbacks.onShield();
-      }
+
       keys.add(event.code);
-      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
+
+      if (
+        [
+          "Space",
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+        ].includes(event.code)
+      ) {
         event.preventDefault();
       }
     });
 
     window.addEventListener("keyup", (event) => keys.delete(event.code));
-    canvas.addEventListener("click", (event) => callbacks.onCanvasClick(getCanvasPos(event)));
-    ui.overlay.addEventListener("click", (event) => event.stopPropagation());
+
+    canvas.addEventListener("click", (event) =>
+      callbacks.onCanvasClick(getCanvasPos(event))
+    );
+
+    ui.overlay.addEventListener("click", (event) =>
+      event.stopPropagation()
+    );
+
     ui.overlayButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+
       const action = overlayAction;
-      if (typeof action === "function") action();
-      else hideOverlay();
+
+      if (typeof action === "function") {
+        action();
+      } else {
+        hideOverlay();
+      }
     });
-    ui.startReplayBtn.addEventListener("click", callbacks.onStartReplay);
-    ui.undoTrapBtn.addEventListener("click", callbacks.onUndoTrap);
-    ui.restartBtn.addEventListener("click", callbacks.onRestart);
-    ui.helpBtn.addEventListener("click", callbacks.onHelp);
+
+    ui.startReplayBtn.addEventListener(
+      "click",
+      callbacks.onStartReplay
+    );
+
+    ui.undoTrapBtn.addEventListener(
+      "click",
+      callbacks.onUndoTrap
+    );
+
+    ui.restartBtn.addEventListener(
+      "click",
+      callbacks.onRestart
+    );
+
+    ui.helpBtn.addEventListener(
+      "click",
+      callbacks.onHelp
+    );
 
     for (const btn of document.querySelectorAll(".trap-btn")) {
-      btn.addEventListener("click", () => selectTrap(btn.dataset.trap));
+      btn.addEventListener("click", () =>
+        selectTrap(btn.dataset.trap)
+      );
     }
   }
 

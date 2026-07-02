@@ -13,18 +13,39 @@ export function createHacker(game) {
     h: 54,
     vx: 0,
     vy: 0,
+
     speed: 250,
     jumpPower: 620,
     facing: 1,
     onGround: false,
+
     hp: 3,
     maxHp: 3,
+
     energy: game.mods.maxEnergy,
     maxEnergy: game.mods.maxEnergy,
+
     invincible: 0,
+
     dashCooldown: 0,
+
+    // 대시 거리 조정: 약 4칸 정도 이동하도록 속도/시간을 낮춤
+    dashSpeed: 580,
+    dashDuration: 0.16,
+
+    dashCost: 18,
+    dashInputLock: false,
+    isDashing: false,
+    dashTime: 0,
+    dashDirection: 1,
+
+    // 대시 직후 장애물 끝부분에 걸리는 문제 방지
+    dashHazardGrace: 0,
+
     shield: false,
     shieldTime: 0,
+    shieldDuration: 3,
+    shieldInputLock: false,
   };
 }
 
@@ -40,13 +61,32 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.dashCooldown = Math.max(0, h.dashCooldown - dt);
   h.invincible = Math.max(0, h.invincible - dt);
+  h.dashHazardGrace = Math.max(0, h.dashHazardGrace - dt);
+
+  h.dashTime = Math.max(0, h.dashTime - dt);
+  h.isDashing = h.dashTime > 0;
+
   h.shieldTime = Math.max(0, h.shieldTime - dt);
   h.shield = h.shieldTime > 0;
 
-  const left = keys.has("ArrowLeft") || keys.has("KeyA");
-  const right = keys.has("ArrowRight") || keys.has("KeyD");
+  const left = keys.has("ArrowLeft");
+  const right = keys.has("ArrowRight");
+  const jump = keys.has("ArrowUp");
+  const dash = keys.has("ShiftLeft") || keys.has("ShiftRight");
+  const shield = keys.has("Space");
 
-  if (left && !right) {
+  if (dash && !h.dashInputLock) {
+    tryDash(game, keys, flashLog);
+    h.dashInputLock = true;
+  }
+
+  if (!dash) {
+    h.dashInputLock = false;
+  }
+
+  if (h.isDashing) {
+    h.vx = h.dashDirection * h.dashSpeed;
+  } else if (left && !right) {
     h.vx = -h.speed;
     h.facing = -1;
   } else if (right && !left) {
@@ -56,16 +96,18 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     h.vx = approach(h.vx, 0, 1800 * dt);
   }
 
-  if ((keys.has("Space") || keys.has("KeyW") || keys.has("ArrowUp")) && h.onGround) {
+  if (jump && h.onGround) {
     h.vy = -h.jumpPower;
     h.onGround = false;
   }
 
-  if ((keys.has("ShiftLeft") || keys.has("ShiftRight")) && h.dashCooldown <= 0 && h.energy >= 18) {
-    h.vx = h.facing * 620;
-    h.energy -= 18;
-    game.metrics.energyUsed += 18;
-    h.dashCooldown = game.mods.dashCooldown;
+  if (shield && !h.shieldInputLock) {
+    activateShield(game, flashLog);
+    h.shieldInputLock = true;
+  }
+
+  if (!shield) {
+    h.shieldInputLock = false;
   }
 
   h.vy += 1600 * dt;
@@ -86,11 +128,51 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   }
 }
 
+function tryDash(game, keys, flashLog) {
+  if (game.turn !== TURN.ATTACK || !game.hacker) return;
+
+  const h = game.hacker;
+
+  if (h.dashCooldown > 0) return;
+
+  if (h.energy < h.dashCost) {
+    flashLog("대시를 사용하기 위한 에너지가 부족합니다.");
+    return;
+  }
+
+  const left = keys.has("ArrowLeft");
+  const right = keys.has("ArrowRight");
+
+  if (left && !right) {
+    h.dashDirection = -1;
+  } else if (right && !left) {
+    h.dashDirection = 1;
+  } else {
+    h.dashDirection = h.facing || 1;
+  }
+
+  h.facing = h.dashDirection;
+  h.vx = h.dashDirection * h.dashSpeed;
+
+  h.energy -= h.dashCost;
+  game.metrics.energyUsed += h.dashCost;
+  h.dashCooldown = game.mods.dashCooldown;
+
+  h.isDashing = true;
+  h.dashTime = h.dashDuration;
+
+  // 대시 중 + 대시 직후까지 짧게 장애물 판정을 무시
+  h.dashHazardGrace = h.dashDuration + 0.22;
+}
+
 export function activateShield(game, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
+
   const h = game.hacker;
   const cost = game.mods.shieldDrain;
+
   if (h.shieldTime > 0) return;
+
   if (h.energy < cost) {
     flashLog("실드를 켜기 위한 에너지가 부족합니다.");
     return;
@@ -98,9 +180,10 @@ export function activateShield(game, flashLog) {
 
   h.energy -= cost;
   game.metrics.energyUsed += cost;
-  h.shieldTime = 2.5;
+  h.shieldTime = h.shieldDuration;
   h.shield = true;
-  flashLog(`실드 활성화. ${2.5.toFixed(1)}초 동안 1회 방어합니다.`);
+
+  flashLog(`실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
 }
 
 function moveAndCollide(entity, dt, game) {
@@ -113,6 +196,7 @@ function moveAndCollide(entity, dt, game) {
 
   for (const p of game.platforms) {
     if (!rectsOverlap(entity, p)) continue;
+
     const prevTop = previousY;
     const prevBottom = previousY + entity.h;
 
@@ -137,12 +221,20 @@ function moveAndCollide(entity, dt, game) {
     entity.y = 320;
     entity.vx = 0;
     entity.vy = 0;
+    entity.isDashing = false;
+    entity.dashTime = 0;
+    entity.dashHazardGrace = 0;
   }
 }
 
 function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
     if (!rectsOverlap(h, getHazardHitbox(hazard))) continue;
+
+    if (game.turn === TURN.ATTACK && game.stage % 2 === 1 && h.dashHazardGrace > 0) {
+      continue;
+    }
+
     if (h.invincible > 0) continue;
 
     if (h.shield) {
