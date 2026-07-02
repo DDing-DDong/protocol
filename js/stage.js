@@ -110,6 +110,7 @@ function buildStage(stageData) {
   if (!stageLayer) return;
 
   stageLayer.replaceChildren();
+  applyStageMetadata(stageLayer, stageData);
 
   for (const platform of stageData.platforms) {
     stageLayer.appendChild(createPlatformElement(platform));
@@ -125,6 +126,9 @@ function buildStage(stageData) {
 function createPlatformElement(platform) {
   const element = document.createElement("div");
   element.className = "stage-platform";
+  setDatasetValue(element, "platformId", platform.id);
+  setDatasetValue(element, "platformRole", platform.role);
+  setDatasetValue(element, "intent", platform.intent);
   applyRectStyle(element, platform);
   return element;
 }
@@ -133,6 +137,8 @@ function createGoalElement(goal) {
   const element = document.createElement("div");
   element.className = "stage-goal";
   element.dataset.goalType = goal.type || "goal";
+  setDatasetValue(element, "label", goal.label);
+  setDatasetValue(element, "intent", goal.intent);
   applyRectStyle(element, goal);
   return element;
 }
@@ -142,8 +148,23 @@ function createTrapNodeElement(trapNode) {
   element.className = "stage-trap-node";
   element.dataset.trapNodeId = trapNode.id || "";
   element.dataset.trapType = trapNode.type;
+  setDatasetValue(element, "intent", trapNode.intent);
+  setDatasetValue(element, "recommendedTrap", trapNode.recommendedTrap);
+  setDatasetValue(element, "teaches", trapNode.teaches);
   applyRectStyle(element, trapNode);
   return element;
+}
+
+function applyStageMetadata(stageLayer, stageData) {
+  setDatasetValue(stageLayer, "themeId", stageData.theme && stageData.theme.id);
+  setDatasetValue(stageLayer, "themePalette", stageData.theme && stageData.theme.palette);
+  setDatasetValue(stageLayer, "securityTone", stageData.theme && stageData.theme.securityTone);
+  setDatasetValue(stageLayer, "mapRole", stageData.mapIntent && stageData.mapIntent.role);
+  setDatasetValue(stageLayer, "learningGoals", stageData.mapIntent && stageData.mapIntent.learningGoals);
+  setDatasetValue(stageLayer, "backgroundFar", stageData.backgroundLayers && stageData.backgroundLayers.far);
+  setDatasetValue(stageLayer, "backgroundMid", stageData.backgroundLayers && stageData.backgroundLayers.mid);
+  setDatasetValue(stageLayer, "backgroundFront", stageData.backgroundLayers && stageData.backgroundLayers.front);
+  setDatasetValue(stageLayer, "backgroundFx", stageData.backgroundLayers && stageData.backgroundLayers.fx);
 }
 
 function applyRectStyle(element, rect) {
@@ -154,10 +175,18 @@ function applyRectStyle(element, rect) {
   element.style.height = `${rect.h}px`;
 }
 
+function setDatasetValue(element, key, value) {
+  if (value === undefined || value === null) return;
+  element.dataset[key] = Array.isArray(value) ? value.join(",") : String(value);
+}
+
 function cloneRects(rects) {
   return rects.map((rect) => ({ ...rect }));
 }
 
 function cloneTrapNodes(trapNodes) {
-  return trapNodes.map(({ id, ...trapNode }) => ({ ...trapNode }));
+  return trapNodes.map(({ id, teaches, ...trapNode }) => ({
+    ...trapNode,
+    teaches: teaches ? teaches.slice() : [],
+  }));
 }
