@@ -87,7 +87,7 @@ export const stages = [
     },
     mapIntent: {
       role: "tutorial",
-      learningGoals: ["movement", "platform", "goal", "trap-slot"],
+      learningGoals: ["movement", "platform", "goal", "trap-slot", "wall-surface"],
       difficulty: 1,
       description: "기본 이동과 Goal 도달 흐름을 학습하는 첫 번째 서버실 맵",
       pacing: {
@@ -99,7 +99,7 @@ export const stages = [
     backgroundLayers: {
       far: ["future-city"],
       mid: ["server-rack", "cable", "security-panel"],
-      front: ["platform-floor", "glow-line"],
+      front: ["large-square-tile", "platform-floor", "pipe-line", "glow-line"],
       fx: ["scan-line", "soft-glow"],
     },
     objective: "데이터 코어 탈취",
@@ -189,6 +189,32 @@ export const stages = [
         intent: "플레이어가 중간 플랫폼을 통과할 때 감지 위험을 학습하게 하는 위치",
         recommendedTrap: "camera",
         teaches: ["detection", "platform-risk"],
+      },
+    ],
+    wallTrapSlots: [
+      {
+        id: "stage-1-wall-left-upper",
+        x: 220,
+        y: 328,
+        surface: "left-wall",
+        allowedTraps: ["laser", "camera"],
+        intent: "향후 벽타기 구간 진입 전에 벽면 함정의 방향성과 감지 위험을 실험할 슬롯",
+      },
+      {
+        id: "stage-1-wall-mid-panel",
+        x: 500,
+        y: 268,
+        surface: "mid-server-wall",
+        allowedTraps: ["camera", "emp"],
+        intent: "중간 플랫폼 주변 서버 패널에 설치되는 감지/방해형 벽면 함정 후보 위치",
+      },
+      {
+        id: "stage-1-wall-goal-guard",
+        x: 982,
+        y: 336,
+        surface: "goal-side-wall",
+        allowedTraps: ["laser", "firewall"],
+        intent: "Goal 직전 압박을 만들 수 있지만 현재 방어 턴 바닥 슬롯과는 분리된 벽면 후보 위치",
       },
     ],
     reward: {
@@ -355,6 +381,12 @@ function cloneStageData(stageData) {
       ...trapNode,
       teaches: trapNode.teaches ? trapNode.teaches.slice() : [],
     })),
+    wallTrapSlots: stageData.wallTrapSlots
+      ? stageData.wallTrapSlots.map((slot) => ({
+        ...slot,
+        allowedTraps: slot.allowedTraps ? slot.allowedTraps.slice() : [],
+      }))
+      : [],
     reward: {
       ...stageData.reward,
       pools: { ...stageData.reward.pools },

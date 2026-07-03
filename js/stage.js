@@ -1,8 +1,10 @@
 ﻿// stage.js
 // 책임: 스테이지 로딩과 맵 생성만 담당합니다.
 
-import { GROUND_Y, INFINITE_STAGE_START, TILE_SIZE, WIDTH, getStageById } from "./data.js";
+import { GROUND_Y, INFINITE_STAGE_START, WIDTH, getStageById } from "./data.js";
 import { getOrientedTrapBox } from "./trap.js";
+
+const TRAP_SLOT_SPACING = 48;
 
 let currentStageId = null;
 
@@ -97,11 +99,11 @@ export function createTrapSlots(stage, game) {
   let id = 0;
 
   for (const platform of game.platforms) {
-    const cols = Math.floor(platform.w / TILE_SIZE);
+    const cols = Math.floor(platform.w / TRAP_SLOT_SPACING);
     if (cols <= 0) continue;
 
     for (let col = 0; col < cols; col += 1) {
-      const x = platform.x + col * TILE_SIZE + TILE_SIZE / 2;
+      const x = platform.x + col * TRAP_SLOT_SPACING + TRAP_SLOT_SPACING / 2;
       const y = platform.y;
       if (x < 80 || x > WIDTH - 70) continue;
       if (Math.abs(x - game.core.x) < 46 && y >= GROUND_Y - 4) continue;
@@ -111,6 +113,15 @@ export function createTrapSlots(stage, game) {
   }
 
   return slots;
+}
+
+export function getWallTrapSlots(stageId) {
+  const stageData = getStageById(stageId);
+  if (!stageData || !stageData.wallTrapSlots) return [];
+  return stageData.wallTrapSlots.map((slot) => ({
+    ...slot,
+    allowedTraps: slot.allowedTraps ? slot.allowedTraps.slice() : [],
+  }));
 }
 
 function buildStage(stageData) {
@@ -130,6 +141,10 @@ function buildStage(stageData) {
 
   for (const trapNode of stageData.trapNodes) {
     stageLayer.appendChild(createTrapNodeElement(trapNode));
+  }
+
+  for (const wallSlot of stageData.wallTrapSlots || []) {
+    stageLayer.appendChild(createWallTrapSlotElement(wallSlot));
   }
 }
 
@@ -165,6 +180,19 @@ function createTrapNodeElement(trapNode) {
   return element;
 }
 
+function createWallTrapSlotElement(wallSlot) {
+  const element = document.createElement("div");
+  element.className = "stage-wall-trap-slot";
+  setDatasetValue(element, "wallTrapSlotId", wallSlot.id);
+  setDatasetValue(element, "surface", wallSlot.surface);
+  setDatasetValue(element, "allowedTraps", wallSlot.allowedTraps);
+  setDatasetValue(element, "intent", wallSlot.intent);
+  element.style.position = "absolute";
+  element.style.left = `${wallSlot.x}px`;
+  element.style.top = `${wallSlot.y}px`;
+  return element;
+}
+
 function applyStageMetadata(stageLayer, stageData) {
   setDatasetValue(stageLayer, "themeId", stageData.theme && stageData.theme.id);
   setDatasetValue(stageLayer, "themePalette", stageData.theme && stageData.theme.palette);
@@ -175,6 +203,7 @@ function applyStageMetadata(stageLayer, stageData) {
   setDatasetValue(stageLayer, "backgroundMid", stageData.backgroundLayers && stageData.backgroundLayers.mid);
   setDatasetValue(stageLayer, "backgroundFront", stageData.backgroundLayers && stageData.backgroundLayers.front);
   setDatasetValue(stageLayer, "backgroundFx", stageData.backgroundLayers && stageData.backgroundLayers.fx);
+  setDatasetValue(stageLayer, "wallTrapSlotCount", stageData.wallTrapSlots && stageData.wallTrapSlots.length);
 }
 
 function applyRectStyle(element, rect) {

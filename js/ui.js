@@ -3,6 +3,7 @@
 
 import {
   TURN,
+  getStageById,
   getObjective,
   getFirewallBlockTime,
   getCameraEmpowerCount,
@@ -13,6 +14,53 @@ import {
   CAMERA_NETWORK_EMPOWER_BONUS,
 } from "./data.js";
 import { getCameraHazardBox, getOrientedTrapBox } from "./trap.js";
+
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 540;
+const VISUAL_TILE_SIZE = 48;
+const VISUAL_TILE_DRAW_W = 56;
+const VISUAL_SLOT_W = 44;
+const VISUAL_SLOT_H = 11;
+const DEFAULT_BACKGROUND_LAYERS = {
+  far: ["future-city"],
+  mid: ["server-rack", "cable", "security-panel"],
+  front: ["large-square-tile", "platform-floor", "pipe-line", "glow-line"],
+  fx: ["scan-line", "soft-glow"],
+};
+const VISUAL_THEMES = {
+  cyan: {
+    top: "#061825",
+    mid: "#07111b",
+    bottom: "#03080d",
+    glow: "24, 224, 255",
+    accent: "39, 255, 200",
+    skyline: "9, 34, 50",
+  },
+  "blue-purple": {
+    top: "#081329",
+    mid: "#0c1022",
+    bottom: "#05070f",
+    glow: "130, 116, 255",
+    accent: "24, 224, 255",
+    skyline: "18, 26, 58",
+  },
+  "orange-red": {
+    top: "#1b1010",
+    mid: "#120d12",
+    bottom: "#07070b",
+    glow: "255, 112, 64",
+    accent: "255, 204, 51",
+    skyline: "54, 24, 24",
+  },
+  core: {
+    top: "#10101d",
+    mid: "#090b16",
+    bottom: "#03050b",
+    glow: "255, 59, 103",
+    accent: "39, 255, 200",
+    skyline: "42, 18, 40",
+  },
+};
 
 export function initUI(callbacks) {
   const canvas = document.getElementById("gameCanvas");
@@ -168,8 +216,8 @@ export function initUI(callbacks) {
 
   function draw(game) {
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, 1200, 540);
-    drawBackground(ctx);
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    drawBackground(ctx, game);
     drawPlatforms(ctx, game.platforms);
     drawCore(ctx, game.core);
     drawBaseHazards(ctx, game);
@@ -188,26 +236,223 @@ export function initUI(callbacks) {
     drawStageBanner(ctx, game);
   }
 
-  function drawBackground(ctx) {
+  function drawBackground(ctx, game) {
+    const stageData = getStageById(game.stage);
+    const visualTheme = getStageVisualTheme(game.stage, stageData);
+    const colors = getVisualThemeColors(visualTheme.theme.palette);
+
     ctx.save();
-    ctx.fillStyle = "#071019";
-    ctx.fillRect(0, 0, 1200, 540);
-    ctx.strokeStyle = "rgba(24, 224, 255, 0.07)";
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    bgGradient.addColorStop(0, colors.top);
+    bgGradient.addColorStop(0.58, colors.mid);
+    bgGradient.addColorStop(1, colors.bottom);
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    drawFarLayer(ctx, visualTheme, colors);
+    drawMidLayer(ctx, visualTheme, colors);
+    drawFrontLayer(ctx, visualTheme, colors);
+    drawFxLayer(ctx, visualTheme, colors);
+    ctx.restore();
+  }
+
+  function getStageVisualTheme(stage, stageData) {
+    const fallback = getFallbackVisualTheme(stage);
+    return {
+      theme: {
+        ...fallback.theme,
+        ...(stageData?.theme || {}),
+      },
+      backgroundLayers: {
+        far: stageData?.backgroundLayers?.far?.length ? stageData.backgroundLayers.far : fallback.backgroundLayers.far,
+        mid: stageData?.backgroundLayers?.mid?.length ? stageData.backgroundLayers.mid : fallback.backgroundLayers.mid,
+        front: stageData?.backgroundLayers?.front?.length ? stageData.backgroundLayers.front : fallback.backgroundLayers.front,
+        fx: stageData?.backgroundLayers?.fx?.length ? stageData.backgroundLayers.fx : fallback.backgroundLayers.fx,
+      },
+    };
+  }
+
+  function getFallbackVisualTheme(stage) {
+    const palette = stage >= 11
+      ? "core"
+      : stage >= 8
+        ? "orange-red"
+        : stage >= 4
+          ? "blue-purple"
+          : "cyan";
+    const securityTone = stage >= 11
+      ? "final"
+      : stage >= 8
+        ? "high"
+        : stage >= 4
+          ? "medium"
+          : "low";
+
+    return {
+      theme: {
+        id: `fallback-stage-${stage}`,
+        palette,
+        securityTone,
+        background: "server-room",
+      },
+      backgroundLayers: DEFAULT_BACKGROUND_LAYERS,
+    };
+  }
+
+  function getVisualThemeColors(palette) {
+    return VISUAL_THEMES[palette] || VISUAL_THEMES.cyan;
+  }
+
+  function drawFarLayer(ctx, visualTheme, colors) {
+    if (!visualTheme.backgroundLayers.far.includes("future-city")) return;
+
+    ctx.save();
+    ctx.fillStyle = `rgba(${colors.skyline}, 0.88)`;
+    const skyline = [
+      [42, 170, 58, 190],
+      [120, 128, 84, 232],
+      [238, 158, 68, 202],
+      [360, 108, 92, 252],
+      [522, 150, 74, 210],
+      [648, 118, 86, 242],
+      [790, 160, 70, 200],
+      [930, 102, 96, 258],
+      [1082, 145, 76, 215],
+    ];
+
+    for (const [x, y, w, h] of skyline) {
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = `rgba(${colors.glow}, 0.08)`;
+      for (let yy = y + 18; yy < y + h - 12; yy += 24) {
+        ctx.fillRect(x + 10, yy, w - 20, 2);
+      }
+      ctx.fillStyle = `rgba(${colors.skyline}, 0.88)`;
+    }
+
+    ctx.strokeStyle = `rgba(${colors.glow}, 0.10)`;
     ctx.lineWidth = 1;
-    for (let x = 0; x < 1200; x += 48) {
+    for (let x = 0; x < CANVAS_WIDTH; x += 96) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 540);
+      ctx.moveTo(x, 92);
+      ctx.lineTo(x + 72, 250);
       ctx.stroke();
     }
-    for (let y = 0; y < 540; y += 48) {
+    ctx.restore();
+  }
+
+  function drawMidLayer(ctx, visualTheme, colors) {
+    const layers = visualTheme.backgroundLayers.mid || [];
+    if (layers.length === 0) return;
+
+    ctx.save();
+    for (let x = 76; x < CANVAS_WIDTH; x += 168) {
+      drawServerRack(ctx, x, 188, 92, 226, colors);
+    }
+
+    if (layers.includes("cable")) {
+      ctx.strokeStyle = `rgba(${colors.accent}, 0.18)`;
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i += 1) {
+        const y = 128 + i * 34;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(260, y + 34, 560, y - 42, CANVAS_WIDTH, y + 20);
+        ctx.stroke();
+      }
+    }
+
+    if (layers.includes("security-panel")) {
+      drawSecurityPanel(ctx, 1034, 182, 92, 118, colors);
+      drawSecurityPanel(ctx, 42, 258, 84, 104, colors);
+    }
+    ctx.restore();
+  }
+
+  function drawServerRack(ctx, x, y, w, h, colors) {
+    ctx.fillStyle = "rgba(11, 28, 42, 0.82)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(96, 180, 196, 0.20)";
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    for (let yy = y + 14; yy < y + h - 10; yy += 28) {
+      ctx.fillStyle = "rgba(14, 46, 63, 0.95)";
+      ctx.fillRect(x + 10, yy, w - 20, 16);
+      ctx.fillStyle = `rgba(${colors.glow}, 0.42)`;
+      ctx.fillRect(x + 16, yy + 5, 18, 3);
+      ctx.fillStyle = `rgba(${colors.accent}, 0.26)`;
+      ctx.fillRect(x + w - 28, yy + 4, 6, 6);
+    }
+  }
+
+  function drawSecurityPanel(ctx, x, y, w, h, colors) {
+    ctx.fillStyle = "rgba(13, 45, 58, 0.70)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = `rgba(${colors.glow}, 0.22)`;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = `rgba(${colors.glow}, 0.24)`;
+    ctx.fillRect(x + 14, y + 18, w - 28, 8);
+    ctx.fillRect(x + 14, y + 42, w - 42, 5);
+    ctx.fillStyle = "rgba(255, 204, 51, 0.34)";
+    ctx.fillRect(x + w - 28, y + h - 30, 10, 10);
+  }
+
+  function drawFrontLayer(ctx, visualTheme, colors) {
+    const layers = visualTheme.backgroundLayers.front || [];
+    if (layers.length === 0) return;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 15, 23, 0.50)";
+    ctx.fillRect(0, 442, CANVAS_WIDTH, 98);
+
+    if (layers.includes("pipe-line")) {
+      ctx.strokeStyle = "rgba(77, 122, 140, 0.34)";
+      ctx.lineWidth = 6;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(1200, y);
+      ctx.moveTo(0, 430);
+      ctx.lineTo(310, 430);
+      ctx.lineTo(360, 404);
+      ctx.lineTo(710, 404);
+      ctx.lineTo(760, 430);
+      ctx.lineTo(CANVAS_WIDTH, 430);
       ctx.stroke();
     }
-    ctx.fillStyle = "rgba(255, 59, 103, 0.05)";
-    ctx.fillRect(0, 0, 1200, 70);
+
+    if (layers.includes("glow-line")) {
+      ctx.strokeStyle = `rgba(${colors.glow}, 0.24)`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 458);
+      ctx.lineTo(CANVAS_WIDTH, 458);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawFxLayer(ctx, visualTheme, colors) {
+    const layers = visualTheme.backgroundLayers.fx || [];
+    if (layers.length === 0) return;
+
+    ctx.save();
+    if (layers.includes("soft-glow")) {
+      const glow = ctx.createRadialGradient(780, 280, 20, 780, 280, 520);
+      glow.addColorStop(0, `rgba(${colors.glow}, 0.11)`);
+      glow.addColorStop(1, `rgba(${colors.glow}, 0)`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+
+    if (layers.includes("scan-line")) {
+      ctx.strokeStyle = `rgba(${colors.glow}, 0.055)`;
+      ctx.lineWidth = 1;
+      for (let y = 12; y < CANVAS_HEIGHT; y += 12) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(CANVAS_WIDTH, y + 0.5);
+        ctx.stroke();
+      }
+    }
+
+    ctx.fillStyle = `rgba(${colors.glow}, 0.035)`;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, 70);
     ctx.restore();
   }
 
@@ -218,31 +463,89 @@ export function initUI(callbacks) {
   }
 
   function drawTilePlatform(ctx, platform) {
-    const cols = Math.ceil(platform.w / 32);
-    const rows = Math.ceil(platform.h / 32);
+    const visualH = Math.max(VISUAL_TILE_SIZE, Math.ceil(platform.h / VISUAL_TILE_SIZE) * VISUAL_TILE_SIZE);
+    const visualW = getPlatformVisualTileWidth(platform);
+    const cols = Math.ceil(visualW / VISUAL_TILE_SIZE);
+    const rows = Math.ceil(visualH / VISUAL_TILE_SIZE);
+    const visualX = Math.round(platform.x);
 
     ctx.save();
+    ctx.beginPath();
+    ctx.rect(platform.x - VISUAL_TILE_SIZE / 2, platform.y, platform.w + VISUAL_TILE_SIZE, visualH);
+    ctx.clip();
+
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
-        const x = platform.x + col * 32;
-        const y = platform.y + row * 32;
-        const w = Math.min(32, platform.x + platform.w - x);
-        const h = Math.min(32, platform.y + platform.h - y);
-        if (w <= 0 || h <= 0) continue;
-
-        ctx.fillStyle = row === 0 ? "#12324a" : "#0f2638";
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = "rgba(24, 224, 255, 0.18)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
-
-        if (row === 0) {
-          ctx.fillStyle = "rgba(24, 224, 255, 0.62)";
-          ctx.fillRect(x, y, w, 3);
-        }
+        const x = visualX + col * VISUAL_TILE_SIZE;
+        const y = platform.y + row * VISUAL_TILE_SIZE;
+        drawSquareMetalTile(ctx, x, y, row === 0);
       }
     }
+
+    ctx.strokeStyle = "rgba(24, 224, 255, 0.28)";
+    ctx.lineWidth = 1;
+    for (let x = visualX; x <= visualX + visualW; x += VISUAL_TILE_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, platform.y);
+      ctx.lineTo(x + 0.5, platform.y + visualH);
+      ctx.stroke();
+    }
+    for (let y = platform.y; y <= platform.y + visualH; y += VISUAL_TILE_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(platform.x, y + 0.5);
+      ctx.lineTo(platform.x + platform.w, y + 0.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+    ctx.fillRect(platform.x, platform.y, platform.w, 2);
+    ctx.fillStyle = "rgba(24, 224, 255, 0.12)";
+    ctx.fillRect(platform.x, platform.y + 2, platform.w, 1);
     ctx.restore();
+  }
+
+  function getPlatformVisualTileWidth(platform) {
+    if (platform.w <= VISUAL_TILE_SIZE) return VISUAL_TILE_SIZE;
+    const tileCount = Math.max(1, Math.round(platform.w / VISUAL_TILE_SIZE));
+    return tileCount * VISUAL_TILE_SIZE;
+  }
+
+  function drawSquareMetalTile(ctx, x, y, isTopRow) {
+    const size = VISUAL_TILE_SIZE;
+    const tileW = VISUAL_TILE_DRAW_W;
+    const tileX = x + (size - tileW) / 2;
+    const gapX = 7;
+    const gapY = 9;
+    const innerX = tileX + gapX / 2;
+    const innerY = y + gapY / 2;
+    const innerW = tileW - gapX;
+    const innerH = size - gapY;
+    const tileGradient = ctx.createLinearGradient(x, y, x, y + size);
+    tileGradient.addColorStop(0, isTopRow ? "#16445a" : "#123044");
+    tileGradient.addColorStop(0.52, isTopRow ? "#102f43" : "#0d2536");
+    tileGradient.addColorStop(1, "#091b28");
+
+    ctx.fillStyle = "rgba(2, 8, 13, 0.62)";
+    ctx.fillRect(tileX, y, tileW, size);
+    ctx.fillStyle = tileGradient;
+    ctx.fillRect(innerX, innerY, innerW, innerH);
+
+    ctx.strokeStyle = "rgba(3, 8, 13, 0.78)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(innerX + 0.5, innerY + 0.5, innerW - 1, innerH - 1);
+
+    ctx.strokeStyle = "rgba(233, 248, 255, 0.10)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tileX + 9.5, y + 10.5, tileW - 19, size - 21);
+
+    ctx.fillStyle = "rgba(24, 224, 255, 0.09)";
+    ctx.fillRect(tileX + 12, y + 11, tileW - 24, 2);
+    ctx.fillStyle = "rgba(39, 255, 200, 0.08)";
+    ctx.fillRect(tileX + 12, y + size - 15, tileW - 24, 2);
+
+    if (isTopRow) {
+      ctx.fillStyle = "rgba(24, 224, 255, 0.42)";
+      ctx.fillRect(tileX + 9, y + 6, tileW - 18, 2);
+    }
   }
 
   function drawCore(ctx, core) {
@@ -277,12 +580,18 @@ export function initUI(callbacks) {
   function drawTrapSlots(ctx, trapSlots) {
     for (const slot of trapSlots) {
       ctx.save();
-      ctx.strokeStyle = slot.occupied ? "rgba(255,255,255,0.18)" : "#18e0ff";
-      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.06)" : "rgba(24,224,255,0.08)";
-      ctx.lineWidth = 2;
-      roundRect(ctx, slot.x - 16 + 2, slot.y - 32 + 2, 32 - 4, 32 - 4, 6);
+      const x = Math.round(slot.x - VISUAL_SLOT_W / 2);
+      const y = Math.round(slot.y - VISUAL_SLOT_H - 2);
+      ctx.strokeStyle = slot.occupied ? "rgba(255,255,255,0.12)" : "rgba(24,224,255,0.42)";
+      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.045)" : "rgba(24,224,255,0.055)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H, 2);
       ctx.fill();
       ctx.stroke();
+      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.09)" : "rgba(24,224,255,0.16)";
+      ctx.fillRect(x + 7, y + 3, VISUAL_SLOT_W - 14, 1);
+      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.060)" : "rgba(39,255,200,0.085)";
+      ctx.fillRect(x + 12, y + VISUAL_SLOT_H - 3, VISUAL_SLOT_W - 24, 1);
       ctx.restore();
     }
   }
