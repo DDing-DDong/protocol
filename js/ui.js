@@ -4,7 +4,9 @@
 import {
   TURN,
   getStageById,
+  TRAPS,
   getObjective,
+  getDefenseObjectiveItems,
   getFirewallBlockTime,
   getCameraEmpowerCount,
   FIREWALL_REWARD_BLOCK_BONUS,
@@ -13,7 +15,12 @@ import {
   SHOCK_EMPOWERED_DURATION_BONUS,
   CAMERA_NETWORK_EMPOWER_BONUS,
 } from "./data.js";
-import { getCameraHazardBox, getOrientedTrapBox } from "./trap.js";
+import {
+  getCameraHazardBox,
+  getOrientedTrapBox,
+  previewNextHazardsByPlacementOrder,
+  previewNextTrapsByPlacementOrder,
+} from "./trap.js";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -73,6 +80,10 @@ export function initUI(callbacks) {
     energyLabel: document.getElementById("energyLabel"),
     hpBar: document.getElementById("hpBar"),
     energyBar: document.getElementById("energyBar"),
+    empowerPreview: document.getElementById("empowerPreview"),
+    objectiveHud: document.getElementById("objectiveHud"),
+    objectiveToggle: document.getElementById("objectiveToggle"),
+    objectivePanel: document.getElementById("objectivePanel"),
     budgetLabel: document.getElementById("budgetLabel"),
     detectLabel: document.getElementById("detectLabel"),
     delayLabel: document.getElementById("delayLabel"),
@@ -84,12 +95,13 @@ export function initUI(callbacks) {
     overlayButton: document.getElementById("overlayButton"),
     rewardList: document.getElementById("rewardList"),
     startReplayBtn: document.getElementById("startReplayBtn"),
-    undoTrapBtn: document.getElementById("undoTrapBtn"),
+    deleteTrapBtn: document.getElementById("deleteTrapBtn"),
     restartBtn: document.getElementById("restartBtn"),
     helpBtn: document.getElementById("helpBtn"),
   };
 
   let overlayAction = null;
+  let objectivePanelOpen = false;
   const keys = new Set();
 
   function setLog(text) {
@@ -127,7 +139,7 @@ export function initUI(callbacks) {
   function updateUI(game) {
     ui.stageLabel.textContent = String(game.stage);
     ui.turnLabel.textContent = getTurnLabel(game.turn);
-    ui.objectiveLabel.textContent = getObjective(game.stage);
+    ui.objectiveLabel.textContent = getObjectiveDisplayText(game);
     ui.timerLabel.textContent = game.turn === TURN.ATTACK ? game.timer.toFixed(1) : "-";
 
     if (game.hacker) {
@@ -149,8 +161,18 @@ export function initUI(callbacks) {
     ui.delayLabel.textContent = `${game.metrics.delay.toFixed(1)}s`;
     ui.defenseTools.classList.toggle("hidden", game.turn !== TURN.DEFENSE_BUILD);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
+    ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
+    setDeleteMode(Boolean(game.deleteMode && game.turn === TURN.DEFENSE_BUILD));
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
+    updateEmpowerPreview(game);
+    updateDefenseObjectiveHUD(game);
     updateTrapTooltips(game);
+  }
+
+  function setDeleteMode(active) {
+    if (!ui.deleteTrapBtn) return;
+    ui.deleteTrapBtn.classList.toggle("selected", Boolean(active));
+    ui.deleteTrapBtn.setAttribute("aria-pressed", active ? "true" : "false");
   }
 
   function getTurnLabel(turn) {
@@ -158,6 +180,19 @@ export function initUI(callbacks) {
     if (turn === TURN.DEFENSE_BUILD) return "AI 방어 준비";
     if (turn === TURN.DEFENSE_REPLAY) return "AI 방어 리플레이";
     return "결과";
+  }
+
+  function getObjectiveDisplayText(game) {
+    const hasDefenseObjectives = getDefenseObjectiveItems(game).length > 0;
+    const isDefenseView = game.turn === TURN.DEFENSE_BUILD ||
+      game.turn === TURN.DEFENSE_REPLAY ||
+      game.showFailedDefenseLayout;
+
+    if (hasDefenseObjectives && isDefenseView) {
+      return "수비 목표를 달성해서 보안을 강화";
+    }
+
+    return getObjective(game.stage);
   }
 
   function updateTrapTooltips(game) {
@@ -205,6 +240,167 @@ export function initUI(callbacks) {
     laserBtn.setAttribute("aria-label", `레이저 ${direction.textContent} 방향`);
   }
 
+  function createTrapIcon(type, extraClass = "") {
+    const icon = document.createElement("span");
+    icon.className = `empower-icon empower-icon-${type}${extraClass ? ` ${extraClass}` : ""}`;
+    icon.style.setProperty("--trap-color", TRAPS[type].color);
+
+    const glyph = document.createElement("span");
+    glyph.className = "empower-glyph";
+    glyph.setAttribute("aria-hidden", "true");
+    icon.appendChild(glyph);
+    return icon;
+  }
+
+  function initializeTrapButtonIcons() {
+    for (const btn of document.querySelectorAll(".trap-btn")) {
+      const type = btn.dataset.trap;
+      if (!TRAPS[type]) continue;
+
+      const cost = btn.querySelector("small")?.cloneNode(true);
+      const label = document.createElement("span");
+      label.className = "trap-label";
+
+      const icon = createTrapIcon(type, "trap-button-icon");
+      icon.setAttribute("aria-hidden", "true");
+      label.appendChild(icon);
+
+      if (type === "laser") {
+        const direction = document.createElement("span");
+        direction.className = "laser-direction";
+        direction.setAttribute("aria-hidden", "true");
+        direction.textContent = "↑";
+        label.appendChild(direction);
+      }
+
+      const name = document.createElement("span");
+      name.className = "trap-name";
+      name.textContent = TRAPS[type].name;
+      label.appendChild(name);
+
+      btn.replaceChildren(label);
+      if (cost) btn.appendChild(cost);
+    }
+  }
+
+  function updateEmpowerPreview(game) {
+    if (!ui.empowerPreview) return;
+
+    const isAttack = game.turn === TURN.ATTACK;
+    const isDefense = game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY;
+    const targets = isAttack ? (game.baseHazards || []) : isDefense ? (game.placedTraps || []) : [];
+    const previewTraps = isAttack
+      ? previewNextHazardsByPlacementOrder(game)
+      : isDefense ? previewNextTrapsByPlacementOrder(game) : [];
+    const visible = (isAttack || isDefense) && targets.length > 0;
+
+    ui.empowerPreview.classList.toggle("hidden", !visible);
+    ui.empowerPreview.replaceChildren();
+    if (!visible) return;
+
+    const label = document.createElement("span");
+    label.className = "empower-preview-label";
+    label.textContent = "다음 강화";
+    ui.empowerPreview.appendChild(label);
+
+    if (previewTraps.length === 0) {
+      const empty = document.createElement("span");
+      empty.className = "empower-summary";
+      empty.textContent = "대상 없음";
+      ui.empowerPreview.appendChild(empty);
+      return;
+    }
+
+    if (previewTraps.length <= 2) {
+      const icons = document.createElement("span");
+      icons.className = "empower-icons";
+
+      for (const trap of previewTraps) {
+        const icon = createTrapIcon(trap.type);
+        icon.dataset.tooltip = TRAPS[trap.type].name;
+        icon.tabIndex = 0;
+        icon.setAttribute("aria-label", TRAPS[trap.type].name);
+        icons.appendChild(icon);
+      }
+
+      ui.empowerPreview.appendChild(icons);
+      return;
+    }
+
+    const summary = document.createElement("span");
+    summary.className = "empower-summary";
+    summary.textContent = summarizeTrapTypes(previewTraps);
+    summary.dataset.tooltip = summarizeTrapTypes(previewTraps);
+    summary.tabIndex = 0;
+    ui.empowerPreview.appendChild(summary);
+  }
+
+  function updateDefenseObjectiveHUD(game) {
+    if (!ui.objectiveHud || !ui.objectiveToggle || !ui.objectivePanel) return;
+
+    const items = getDefenseObjectiveItems(game);
+    const visible = items.length > 0 && (
+      game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY
+    );
+
+    if (!visible) {
+      objectivePanelOpen = false;
+      ui.objectiveHud.classList.add("hidden");
+      ui.objectivePanel.classList.add("hidden");
+      ui.objectiveToggle.setAttribute("aria-expanded", "false");
+      return;
+    }
+
+    const completed = items.filter((item) => item.complete).length;
+    ui.objectiveHud.classList.remove("hidden");
+    ui.objectiveToggle.textContent = `목표 ${completed}/${items.length}`;
+    ui.objectiveToggle.setAttribute("aria-expanded", objectivePanelOpen ? "true" : "false");
+    ui.objectivePanel.classList.toggle("hidden", !objectivePanelOpen);
+    ui.objectivePanel.replaceChildren();
+
+    const title = document.createElement("div");
+    title.className = "objective-panel-title";
+    title.textContent = "수비 목표";
+    ui.objectivePanel.appendChild(title);
+
+    const list = document.createElement("div");
+    list.className = "objective-checklist";
+
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.className = "objective-check-row";
+      row.classList.toggle("complete", item.complete);
+
+      const box = document.createElement("span");
+      box.className = "objective-check-box";
+      box.setAttribute("aria-hidden", "true");
+
+      const label = document.createElement("span");
+      label.className = "objective-check-label";
+      label.textContent = item.label;
+
+      const progress = document.createElement("span");
+      progress.className = "objective-check-progress";
+      progress.textContent = item.progress;
+
+      row.append(box, label, progress);
+      list.appendChild(row);
+    }
+
+    ui.objectivePanel.appendChild(list);
+  }
+
+  function summarizeTrapTypes(traps) {
+    const counts = new Map();
+    for (const trap of traps) {
+      counts.set(trap.type, (counts.get(trap.type) || 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .map(([type, count]) => `${TRAPS[type].name} ${count}개`)
+      .join(", ");
+  }
+
   function formatSeconds(value) {
     const rounded = Math.round(value * 10) / 10;
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}초`;
@@ -222,14 +418,18 @@ export function initUI(callbacks) {
     drawCore(ctx, game.core);
     drawBaseHazards(ctx, game);
 
-    if (game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY) {
+    const showDefenseLayout = game.turn === TURN.DEFENSE_BUILD ||
+      game.turn === TURN.DEFENSE_REPLAY ||
+      game.showFailedDefenseLayout;
+
+    if (showDefenseLayout) {
       drawReplayPath(ctx, game.lastAttackRecording);
       drawTrapSlots(ctx, game.trapSlots);
       drawPlacedTraps(ctx, game.placedTraps, game);
     }
 
     if (game.turn === TURN.ATTACK && game.hacker) drawHacker(ctx, game.hacker, false);
-    if ((game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY) && game.replayHacker) {
+    if (showDefenseLayout && game.replayHacker) {
       drawHacker(ctx, game.replayHacker, true);
     }
 
@@ -566,14 +766,17 @@ export function initUI(callbacks) {
   function drawBaseHazards(ctx, game) {
     if (!game.baseHazards || game.baseHazards.length === 0) return;
     for (const hazard of game.baseHazards) {
+      let box = hazard;
       if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "camera") {
         const cameraBox = getCameraHazardBox(hazard);
+        box = cameraBox;
         drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h);
       }
       if (hazard.type === "firewall") drawFirewall(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard.closed || hazard.empowered);
       if (hazard.type === "emp") drawEmp(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
+      if (hazard.empowered) drawEmpoweredMark(ctx, box);
     }
   }
 
@@ -830,7 +1033,7 @@ export function initUI(callbacks) {
     );
     ctx.fillStyle = "#c4e9f4";
     ctx.font = "13px system-ui";
-    ctx.fillText(getObjective(game.stage), 30, 60);
+    ctx.fillText(getObjectiveDisplayText(game), 30, 60);
 
     if (game.stage >= 12) {
       ctx.fillStyle = "#ffcc33";
@@ -881,6 +1084,8 @@ export function initUI(callbacks) {
   }
 
   function bindEvents() {
+    initializeTrapButtonIcons();
+
     window.addEventListener("keydown", (event) => {
 
       keys.add(event.code);
@@ -926,10 +1131,18 @@ export function initUI(callbacks) {
       callbacks.onStartReplay
     );
 
-    ui.undoTrapBtn.addEventListener(
+    ui.deleteTrapBtn.addEventListener(
       "click",
-      callbacks.onUndoTrap
+      () => setDeleteMode(callbacks.onDeleteTrapMode())
     );
+
+    ui.objectiveToggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      objectivePanelOpen = !objectivePanelOpen;
+      ui.objectiveToggle.setAttribute("aria-expanded", objectivePanelOpen ? "true" : "false");
+      ui.objectivePanel.classList.toggle("hidden", !objectivePanelOpen);
+    });
 
     ui.restartBtn.addEventListener(
       "click",
@@ -968,6 +1181,7 @@ export function initUI(callbacks) {
     hideOverlay,
     setLog,
     updateLaserDirection,
+    setDeleteMode,
   };
 }
 

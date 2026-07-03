@@ -8,6 +8,7 @@ import {
   getFirewallBlockTime,
   getCameraEmpowerCount,
   getShockDelay,
+  getDefenseObjectiveItems,
   rectsOverlap,
 } from "./data.js";
 import {
@@ -18,6 +19,8 @@ import {
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
 } from "./trap.js";
+
+const REPLAY_PLAYBACK_SPEED = 1.5;
 
 export function createReplayHacker(game) {
   const first = game.lastAttackRecording[0] || { x: 64, y: 388, facing: 1 };
@@ -55,6 +58,7 @@ export function startReplay(game) {
   game.turn = TURN.DEFENSE_REPLAY;
   game.replayIndex = 0;
   game.replayPause = 0;
+  game.replayStepTimer = 0;
   game.replayFinished = false;
   game.replayHacker = createReplayHacker(game);
 }
@@ -69,19 +73,24 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
 
   if (game.replayPause > 0) {
     const pauseDt = Math.min(game.replayPause, dt);
-    game.replayPause -= pauseDt;
-    game.metrics.delay += pauseDt;
-    if (evaluateDefenseSuccess(game.stage, game.metrics)) {
+    game.replayPause = normalizeTime(game.replayPause - pauseDt);
+    game.metrics.delay = normalizeTime(game.metrics.delay + pauseDt);
+    if (evaluateDefenseSuccess(game)) {
       endStage(true, "방어 목표를 달성했습니다.");
     }
     return;
   }
 
   const path = game.lastAttackRecording;
+  const sampleStep = game.sampleStep || 0.06;
+  game.replayStepTimer = (game.replayStepTimer || 0) + dt * REPLAY_PLAYBACK_SPEED;
+  if (game.replayStepTimer < sampleStep) return;
+  game.replayStepTimer = normalizeTime(game.replayStepTimer - sampleStep);
+
   if (game.replayIndex >= path.length - 1) {
     game.replayFinished = true;
-    const success = evaluateDefenseSuccess(game.stage, game.metrics);
-    endStage(success, success ? "방어 목표를 달성했습니다." : "해커의 침투를 충분히 방해하지 못했습니다.");
+    const success = evaluateDefenseSuccess(game);
+    endStage(success, success ? "방어 목표를 달성했습니다." : "방어 목표를 모두 달성하지 못했습니다.");
     return;
   }
 
@@ -94,9 +103,7 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
 
   checkDefenseTraps(r, game, flashLog);
 
-  if (r.hp <= 0) {
-    endStage(true, "해커를 완전히 차단했습니다.");
-  } else if (evaluateDefenseSuccess(game.stage, game.metrics)) {
+  if (evaluateDefenseSuccess(game)) {
     endStage(true, "방어 목표를 달성했습니다.");
   }
 }
@@ -124,15 +131,16 @@ function checkDefenseTraps(r, game, flashLog) {
       const wasEmpowered = trap.empowered;
       const detections = trap.empowered ? 2 : 1;
       game.metrics.detections += detections;
-      r.hp -= 1;
+      recordTrapTrigger(game.metrics, trap.type);
       r.trapCooldowns.set(key, 0.7);
       trap.empowered = false;
-      flashLog(wasEmpowered ? "강화 레이저가 해커를 강하게 탐지했습니다." : "레이저가 해커를 탐지하고 피해를 줬습니다.");
+      flashLog(wasEmpowered ? "강화 레이저가 해커를 강하게 탐지했습니다." : "레이저가 해커를 탐지했습니다.");
     }
 
     if (trap.type === "camera") {
       game.metrics.detections += 1;
       game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
+      recordTrapTrigger(game.metrics, trap.type);
       trap.detectFlash = 0.35;
       r.trapCooldowns.set(key, 1.2);
       const empoweredTraps = empowerNextTrapsByPlacementOrder(game);
@@ -143,6 +151,7 @@ function checkDefenseTraps(r, game, flashLog) {
       const delay = getShockDelay(trap);
       game.replayPause = Math.max(game.replayPause, delay);
       r.glitchTime = Math.max(r.glitchTime || 0, delay);
+      recordTrapTrigger(game.metrics, trap.type);
       r.trapCooldowns.set(key, 1.4);
       trap.empowered = false;
       flashLog(`감전패널이 해커를 ${delay.toFixed(1)}초 지연시켰습니다.`);
@@ -158,6 +167,7 @@ function checkDefenseTraps(r, game, flashLog) {
       trap.closedTime = delay;
       game.replayPause = Math.max(game.replayPause, delay);
       r.glitchTime = Math.max(r.glitchTime || 0, delay);
+      recordTrapTrigger(game.metrics, trap.type);
       r.trapCooldowns.set(key, 1.8);
       flashLog(`강화 방화벽이 닫히며 해커를 ${delay}초 지연시켰습니다.`);
     }
@@ -165,9 +175,11 @@ function checkDefenseTraps(r, game, flashLog) {
     if (trap.type === "emp") {
       const drain = trap.empowered ? 30 : 20;
       game.metrics.energyUsed += drain;
+      game.metrics.energyDrained = (game.metrics.energyDrained || 0) + drain;
+      recordTrapTrigger(game.metrics, trap.type);
       r.trapCooldowns.set(key, 1.0);
       trap.empowered = false;
-      flashLog(`EMP패널이 에너지 사용 지표를 ${drain} 증가시켰습니다.`);
+      flashLog(`EMP패널이 에너지를 ${drain} 흡수했습니다.`);
     }
   }
 }
@@ -192,13 +204,18 @@ function getCameraOrigin(box) {
   return { x: box.x + box.w - 30, y: box.y + 18 };
 }
 
-function evaluateDefenseSuccess(stage, metrics) {
-  if (stage === 2) return metrics.delay >= 2;
-  if (stage === 4) return metrics.detections >= 2;
-  if (stage === 6) return metrics.delay >= 5 || metrics.detections >= 3;
-  if (stage === 8) return metrics.delay >= 3 || metrics.detections >= 2 || metrics.energyUsed >= 25;
-  if (stage === 10) return metrics.delay >= 4 || metrics.detections >= 3;
-  return metrics.detections >= 2 || metrics.delay >= 4;
+function evaluateDefenseSuccess(game) {
+  const items = getDefenseObjectiveItems(game);
+  return items.length > 0 && items.every((item) => item.complete);
+}
+
+function normalizeTime(value) {
+  return Math.max(0, Math.round(value * 1000) / 1000);
+}
+
+function recordTrapTrigger(metrics, type) {
+  if (!metrics.trapTriggers) metrics.trapTriggers = {};
+  metrics.trapTriggers[type] = (metrics.trapTriggers[type] || 0) + 1;
 }
 
 // 수정 이유:
