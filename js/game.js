@@ -68,7 +68,8 @@ const uiModule = initUI({
 const game = {
   stage: 1,
   turn: TURN.ATTACK,
-  timer: 48,
+  timer: 30,
+  attackTimerStarted: false,
   messageCooldown: 0,
   recordTimer: 0,
   replayIndex: 0,
@@ -108,11 +109,13 @@ function flashLog(text) {
 
 function setupStage(options = {}) {
   uiModule.hideOverlay();
+  uiModule.keys.clear();
   const isAttack = isAttackStage(game.stage);
   const keepDefenseTraps = Boolean(options.keepDefenseTraps && !isAttack);
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
   game.timer = getStageTime(game.stage);
+  game.attackTimerStarted = false;
   game.metrics = createMetrics();
   game.recordTimer = 0;
   game.replayIndex = 0;

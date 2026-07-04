@@ -21,6 +21,21 @@ import {
 } from "./trap.js";
 import { recordHacker } from "./replay.js";
 
+const ATTACK_INPUT_CODES = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "ShiftLeft",
+  "ShiftRight",
+  "Space",
+]);
+const WORLD_TOP = 0;
+const WALL_GRAB_SLIDE_SPEED = 70;
+const WALL_JUMP_X_SPEED = 280;
+const WALL_JUMP_Y_SPEED = 700;
+const WALL_JUMP_BUFFER_TIME = 0.12;
+
 export function createHacker(game) {
   return {
     x: 64,
@@ -34,6 +49,11 @@ export function createHacker(game) {
     jumpPower: 620,
     facing: 1,
     onGround: false,
+    wallGrab: false,
+    wallSide: 0,
+    wallContactSide: 0,
+    wallContactTimer: 0,
+    wallJumpInputLock: false,
 
     hp: 3,
     maxHp: 3,
@@ -71,15 +91,22 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   const h = game.hacker;
   if (!h) return;
 
-  game.timer -= dt;
-  if (game.timer <= 0) {
-    endStage(false, "제한 시간이 끝났습니다.");
-    return;
+  if (!game.attackTimerStarted && hasAttackInput(keys)) {
+    game.attackTimerStarted = true;
+  }
+
+  if (game.attackTimerStarted) {
+    game.timer -= dt;
+    if (game.timer <= 0) {
+      endStage(false, "제한 시간이 끝났습니다.");
+      return;
+    }
   }
 
   h.dashCooldown = Math.max(0, h.dashCooldown - dt);
   h.invincible = Math.max(0, h.invincible - dt);
   h.dashHazardGrace = Math.max(0, h.dashHazardGrace - dt);
+  h.wallContactTimer = Math.max(0, (h.wallContactTimer || 0) - dt);
 
   h.dashTime = Math.max(0, h.dashTime - dt);
   h.isDashing = h.dashTime > 0;
@@ -117,9 +144,18 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     h.vx = approach(h.vx, 0, 1800 * dt);
   }
 
-  if (jump && h.onGround) {
+  const wallJumpSide = getWallJumpSide(h);
+  const pressingAwayFromWall = isPressingAwayFromWall(wallJumpSide, left, right);
+
+  if (jump && wallJumpSide && (!h.wallJumpInputLock || pressingAwayFromWall)) {
+    performWallJump(h, wallJumpSide);
+  } else if (jump && h.onGround) {
     h.vy = -h.jumpPower;
     h.onGround = false;
+  }
+
+  if (!jump) {
+    h.wallJumpInputLock = false;
   }
 
   if (shield && !h.shieldInputLock) {
@@ -133,9 +169,11 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.vy += 1600 * dt;
 
-  moveAndCollide(h, dt, game);
+  moveAndCollide(h, dt, game, keys);
   applyAttackHazards(h, game, flashLog);
-  recordHacker(game, dt);
+  if (game.attackTimerStarted) {
+    recordHacker(game, dt);
+  }
 
   if (rectsOverlap(h, game.core)) {
     game.metrics.reachedCore = true;
@@ -147,6 +185,36 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   if (h.hp <= 0) {
     endStage(false, "해커가 무력화되었습니다.");
   }
+}
+
+function getWallJumpSide(h) {
+  if (h.wallGrab && h.wallSide) return h.wallSide;
+  if (h.wallContactTimer > 0 && h.wallContactSide) return h.wallContactSide;
+  return 0;
+}
+
+function isPressingAwayFromWall(wallSide, left, right) {
+  if (wallSide < 0) return right;
+  if (wallSide > 0) return left;
+  return false;
+}
+
+function performWallJump(h, wallSide) {
+  h.vx = -wallSide * WALL_JUMP_X_SPEED;
+  h.vy = -WALL_JUMP_Y_SPEED;
+  h.facing = -wallSide;
+  h.wallGrab = false;
+  h.wallSide = 0;
+  h.wallContactSide = 0;
+  h.wallContactTimer = 0;
+  h.wallJumpInputLock = true;
+}
+
+function hasAttackInput(keys) {
+  for (const code of ATTACK_INPUT_CODES) {
+    if (keys.has(code)) return true;
+  }
+  return false;
 }
 
 function tryDash(game, keys, flashLog) {
@@ -207,15 +275,35 @@ export function activateShield(game, flashLog) {
   flashLog(`실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
 }
 
-function moveAndCollide(entity, dt, game) {
+function moveAndCollide(entity, dt, game, keys) {
+  const holdingLeft = keys.has("ArrowLeft");
+  const holdingRight = keys.has("ArrowRight");
+
+  entity.wallGrab = false;
+  entity.wallSide = 0;
+
   const previousX = entity.x;
   entity.x += entity.vx * dt;
+  const edgeWallSide = getEdgeWallSide(entity, holdingLeft, holdingRight);
   entity.x = clamp(entity.x, 0, 1200 - entity.w);
+  if (edgeWallSide) {
+    grabWall(entity, edgeWallSide);
+  }
+  collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRight);
   collideClosedFirewallsX(entity, previousX, game);
+
+  if (entity.wallGrab) {
+    entity.vy = WALL_GRAB_SLIDE_SPEED;
+  }
 
   const previousY = entity.y;
   entity.y += entity.vy * dt;
   entity.onGround = false;
+
+  if (entity.y < WORLD_TOP) {
+    entity.y = WORLD_TOP;
+    entity.vy = Math.max(0, entity.vy);
+  }
 
   for (const p of game.platforms) {
     if (!rectsOverlap(entity, p)) continue;
@@ -227,6 +315,10 @@ function moveAndCollide(entity, dt, game) {
       entity.y = p.y - entity.h;
       entity.vy = 0;
       entity.onGround = true;
+      entity.wallGrab = false;
+      entity.wallSide = 0;
+      entity.wallContactSide = 0;
+      entity.wallContactTimer = 0;
     } else if (entity.vy < 0 && prevTop >= p.y + p.h - 2) {
       entity.y = p.y + p.h;
       entity.vy = 0;
@@ -237,6 +329,10 @@ function moveAndCollide(entity, dt, game) {
     entity.y = 462 - entity.h;
     entity.vy = 0;
     entity.onGround = true;
+    entity.wallGrab = false;
+    entity.wallSide = 0;
+    entity.wallContactSide = 0;
+    entity.wallContactTimer = 0;
   }
 
   if (entity.y > 540 + 80) {
@@ -247,7 +343,67 @@ function moveAndCollide(entity, dt, game) {
     entity.isDashing = false;
     entity.dashTime = 0;
     entity.dashHazardGrace = 0;
+    entity.wallGrab = false;
+    entity.wallSide = 0;
+    entity.wallContactSide = 0;
+    entity.wallContactTimer = 0;
   }
+}
+
+function getEdgeWallSide(entity, holdingLeft, holdingRight) {
+  if (entity.x <= 0 && holdingLeft) return -1;
+  if (entity.x + entity.w >= 1200 && holdingRight) return 1;
+  return 0;
+}
+
+function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRight) {
+  const previousBox = {
+    x: previousX,
+    y: entity.y,
+    w: entity.w,
+    h: entity.h,
+  };
+
+  for (const platform of game.platforms || []) {
+    const wallBox = getPlatformWallBox(platform);
+    if (!rectsOverlap(entity, wallBox)) continue;
+
+    const hitLeftFace = previousBox.x + previousBox.w <= wallBox.x && entity.x + entity.w >= wallBox.x;
+    const hitRightFace = previousBox.x >= wallBox.x + wallBox.w && entity.x <= wallBox.x + wallBox.w;
+
+    if (hitLeftFace) {
+      entity.x = wallBox.x - entity.w;
+      entity.vx = Math.min(0, entity.vx);
+      if (holdingRight) grabWall(entity, 1);
+    } else if (hitRightFace) {
+      entity.x = wallBox.x + wallBox.w;
+      entity.vx = Math.max(0, entity.vx);
+      if (holdingLeft) grabWall(entity, -1);
+    }
+  }
+}
+
+function getPlatformWallBox(platform) {
+  return {
+    x: platform.x,
+    y: platform.y,
+    w: platform.w,
+    h: getPlatformWallHeight(platform),
+  };
+}
+
+function getPlatformWallHeight(platform) {
+  return Math.max(platform.h, 48);
+}
+
+function grabWall(entity, side) {
+  if (entity.onGround) return;
+  entity.wallGrab = true;
+  entity.wallSide = side;
+  entity.wallContactSide = side;
+  entity.wallContactTimer = WALL_JUMP_BUFFER_TIME;
+  entity.isDashing = false;
+  entity.dashTime = 0;
 }
 
 function applyAttackHazards(h, game, flashLog) {
