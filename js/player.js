@@ -41,6 +41,9 @@ const HACKER_SLIDE_HEIGHT = 30;
 const SLIDE_POSE_DURATION = 0.42;
 const WALL_JUMP_DASH_WINDOW = 0.7;
 const WALL_DASH_DURATION = 0.155;
+const HIT_INVINCIBLE_TIME = 0.55;
+const HIT_FLASH_TIME = 0.32;
+const BLOCK_INVINCIBLE_TIME = 0.45;
 
 export function createHacker(game) {
   return {
@@ -71,6 +74,8 @@ export function createHacker(game) {
     maxEnergy: game.mods.maxEnergy,
 
     invincible: 0,
+    damageFlashTime: 0,
+    damageFlashColor: "#ff3b67",
 
     dashCooldown: 0,
 
@@ -91,7 +96,8 @@ export function createHacker(game) {
 
     shield: false,
     shieldTime: 0,
-    shieldDuration: 3,
+    shieldBlockFlashTime: 0,
+    shieldDuration: 2,
     shieldInputLock: false,
     slowTime: 0,
     slowMultiplier: 1,
@@ -116,6 +122,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.dashCooldown = Math.max(0, h.dashCooldown - dt);
   h.invincible = Math.max(0, h.invincible - dt);
+  h.damageFlashTime = Math.max(0, (h.damageFlashTime || 0) - dt);
   h.dashHazardGrace = Math.max(0, h.dashHazardGrace - dt);
   h.wallContactTimer = Math.max(0, (h.wallContactTimer || 0) - dt);
   h.wallJumpDashTimer = Math.max(0, (h.wallJumpDashTimer || 0) - dt);
@@ -127,6 +134,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
   h.shieldTime = Math.max(0, h.shieldTime - dt);
   h.shield = h.shieldTime > 0;
+  h.shieldBlockFlashTime = Math.max(0, (h.shieldBlockFlashTime || 0) - dt);
   h.slowTime = Math.max(0, (h.slowTime || 0) - dt);
   tickBaseHazardTimers(game, dt);
 
@@ -494,6 +502,14 @@ function applyAttackHazards(h, game, flashLog) {
       continue;
     }
 
+    if (h.shield) {
+      h.invincible = BLOCK_INVINCIBLE_TIME;
+      h.damageFlashTime = 0;
+      h.shieldBlockFlashTime = BLOCK_INVINCIBLE_TIME;
+      flashLog(hazard.type === "emp" ? "실드가 EMP 충격을 막았습니다." : "실드가 함정을 막았습니다.");
+      return;
+    }
+
     if (hazard.type === "firewall") {
       h.vx = 0;
       h.isDashing = false;
@@ -501,6 +517,7 @@ function applyAttackHazards(h, game, flashLog) {
       h.dashTime = 0;
       h.slidePoseTime = 0;
       h.invincible = 0.25;
+      showDamageFlash(h, hazard.type);
       flashLog("닫힌 방화벽이 해커의 이동을 막았습니다.");
       return;
     }
@@ -509,7 +526,8 @@ function applyAttackHazards(h, game, flashLog) {
       game.metrics.detections += 1;
       game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
       const empoweredHazards = empowerNextHazardsByPlacementOrder(game);
-      h.invincible = 0.9;
+      h.invincible = HIT_INVINCIBLE_TIME;
+      showDamageFlash(h, hazard.type);
       flashLog(formatCameraAlertLog(empoweredHazards));
       return;
     }
@@ -520,18 +538,11 @@ function applyAttackHazards(h, game, flashLog) {
       h.slowTime = Math.max(h.slowTime || 0, slowTime);
       h.slowMultiplier = SHOCK_SLOW_MULTIPLIER;
       hazard.empowered = false;
-      h.invincible = 0.9;
+      h.invincible = HIT_INVINCIBLE_TIME;
+      showDamageFlash(h, hazard.type);
       flashLog(wasEmpowered
         ? `강화 감전패널이 이동속도를 ${formatSeconds(slowTime)} 동안 낮춰 이동을 지연시켰습니다.`
         : `감전패널이 이동속도를 ${formatSeconds(slowTime)} 동안 낮춰 이동을 지연시켰습니다.`);
-      return;
-    }
-
-    if (h.shield) {
-      h.shield = false;
-      h.shieldTime = 0;
-      h.invincible = 0.75;
-      flashLog(hazard.type === "emp" ? "실드가 EMP 충격을 막고 사라졌습니다." : "실드가 함정을 막고 사라졌습니다.");
       return;
     }
 
@@ -540,7 +551,8 @@ function applyAttackHazards(h, game, flashLog) {
       h.energy = Math.max(0, h.energy - drain);
       game.metrics.energyUsed += drain;
       hazard.empowered = false;
-      h.invincible = 0.9;
+      h.invincible = HIT_INVINCIBLE_TIME;
+      showDamageFlash(h, hazard.type);
       flashLog(`EMP패널이 에너지를 ${drain} 흡수했습니다.`);
       return;
     }
@@ -552,17 +564,24 @@ function applyAttackHazards(h, game, flashLog) {
 
     if (game.mods.freeHit > 0) {
       game.mods.freeHit -= 1;
-      h.invincible = 0.9;
+      h.invincible = BLOCK_INVINCIBLE_TIME;
+      showDamageFlash(h, hazard.type);
       flashLog("보호막으로 피해를 1회 무시했습니다.");
       return;
     }
 
     h.hp -= 1;
     game.metrics.hpLost += 1;
-    h.invincible = 0.9;
+    h.invincible = HIT_INVINCIBLE_TIME;
+    showDamageFlash(h, hazard.type);
     flashLog(`${TRAPS[hazard.type].name}에 걸렸습니다. 체력 -1`);
     return;
   }
+}
+
+function showDamageFlash(h, hazardType) {
+  h.damageFlashTime = HIT_FLASH_TIME;
+  h.damageFlashColor = TRAPS[hazardType]?.color || "#ff3b67";
 }
 
 function formatCameraAlertLog(empoweredHazards) {
