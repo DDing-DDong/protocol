@@ -81,6 +81,279 @@ button.secondary {
   isolation: isolate;
 }
 
+.empower-preview {
+  position: absolute;
+  z-index: 10;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 46px;
+  max-width: min(460px, calc(100% - 36px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: rgba(3, 8, 13, 0.76);
+  border: 1px solid rgba(154, 199, 214, 0.24);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: auto;
+}
+
+.empower-preview-label {
+  color: #9ac7d6;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.empower-icons {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.empower-icon {
+  --trap-color: #18e0ff;
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid color-mix(in srgb, var(--trap-color) 74%, #ffffff 26%);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--trap-color) 18%, transparent);
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--trap-color) 20%, transparent);
+  outline: none;
+}
+
+.empower-glyph {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.empower-glyph::before,
+.empower-glyph::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.empower-icon-laser .empower-glyph::before {
+  width: 5px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--trap-color);
+  box-shadow: 0 0 8px var(--trap-color);
+}
+
+.empower-icon-shock .empower-glyph::before {
+  width: 17px;
+  height: 22px;
+  background: var(--trap-color);
+  clip-path: polygon(56% 0, 20% 52%, 48% 52%, 36% 100%, 82% 40%, 54% 40%);
+  box-shadow: 0 0 8px var(--trap-color);
+}
+
+.empower-icon-camera .empower-glyph::before {
+  width: 17px;
+  height: 12px;
+  border: 2px solid var(--trap-color);
+  border-radius: 3px;
+}
+
+.empower-icon-camera .empower-glyph::after {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--trap-color);
+  border-radius: 50%;
+}
+
+.empower-icon-firewall .empower-glyph::before {
+  width: 18px;
+  height: 20px;
+  border: 2px solid var(--trap-color);
+  box-shadow: inset 0 4px 0 color-mix(in srgb, var(--trap-color) 70%, transparent),
+    inset 0 -4px 0 color-mix(in srgb, var(--trap-color) 70%, transparent);
+}
+
+.empower-icon-emp .empower-glyph::before {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--trap-color);
+  border-radius: 50%;
+}
+
+.empower-icon-emp .empower-glyph::after {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--trap-color);
+}
+
+.empower-summary {
+  position: relative;
+  min-width: 0;
+  color: #e9f8ff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: normal;
+  outline: none;
+}
+
+.empower-preview [data-tooltip]::before,
+.empower-preview [data-tooltip]::after {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 30;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.empower-preview [data-tooltip]::before {
+  content: "";
+  top: calc(100% + 3px);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid #1f3a52;
+  transform: translate(-50%, 2px);
+}
+
+.empower-preview [data-tooltip]::after {
+  content: attr(data-tooltip);
+  top: calc(100% + 10px);
+  width: max-content;
+  max-width: 300px;
+  padding: 10px 12px;
+  background: #0b1a27;
+  color: #e9f8ff;
+  border: 1px solid #1f3a52;
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  transform: translate(-50%, 4px);
+}
+
+.empower-preview [data-tooltip]:hover::before,
+.empower-preview [data-tooltip]:hover::after,
+.empower-preview [data-tooltip]:focus-visible::before,
+.empower-preview [data-tooltip]:focus-visible::after,
+.empower-preview [data-tooltip]:active::before,
+.empower-preview [data-tooltip]:active::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.objective-hud {
+  position: absolute;
+  z-index: 12;
+  top: 96px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.objective-toggle {
+  min-height: 32px;
+  padding: 7px 11px;
+  background: rgba(11, 26, 39, 0.90);
+  color: #e9f8ff;
+  border: 1px solid rgba(24, 224, 255, 0.45);
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.objective-toggle[aria-expanded="true"] {
+  background: #18e0ff;
+  color: #031018;
+}
+
+.objective-panel {
+  width: min(340px, calc(100vw - 68px));
+  padding: 10px 12px;
+  background: rgba(3, 8, 13, 0.90);
+  border: 1px solid rgba(24, 224, 255, 0.32);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+}
+
+.objective-panel-title {
+  margin-bottom: 7px;
+  color: #18e0ff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.objective-checklist {
+  display: grid;
+  gap: 5px;
+}
+
+.objective-check-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 25px;
+  color: #c4e9f4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.objective-check-box {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(154, 199, 214, 0.62);
+  border-radius: 4px;
+  position: relative;
+}
+
+.objective-check-row.complete .objective-check-box {
+  background: #27ffc8;
+  border-color: #27ffc8;
+}
+
+.objective-check-row.complete .objective-check-box::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 10px;
+  border: solid #031018;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.objective-check-label {
+  min-width: 0;
+}
+
+.objective-check-progress {
+  color: #9ac7d6;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.objective-check-row.complete .objective-check-label,
+.objective-check-row.complete .objective-check-progress {
+  color: #e9fff9;
+}
+
 #gameCanvas {
   position: relative;
   z-index: 0;
@@ -195,6 +468,21 @@ button.secondary {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1;
+}
+
+.trap-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trap-button-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 5px;
 }
 
 .laser-direction {
@@ -291,6 +579,12 @@ button.secondary {
 
 .tool-actions button {
   flex: 1;
+}
+
+.tool-actions button.selected {
+  background: #ff7040;
+  color: #031018;
+  border-color: #ffb199;
 }
 
 .controls {

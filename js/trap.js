@@ -1,13 +1,19 @@
 // trap.js
 // 책임: 함정 생성, 배치, 트랩 판정과 관련된 로직을 담당합니다.
 
-import { TURN, TRAPS, cryptoSafeId, getCameraEmpowerCount } from "./data.js";
+import { TURN, TRAPS, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js";
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return;
+
+  const objective = getDefenseObjective(game.stage);
+  if (objective?.maxTraps && game.placedTraps.length >= objective.maxTraps) {
+    flashLog(`이번 방어 목표는 함정 ${objective.maxTraps}개 이하입니다.`);
+    return;
+  }
 
   const cost = getTrapCost(selectedTrap, game);
   if (game.defenseBudget < cost) {
@@ -43,6 +49,21 @@ export function undoTrap(game) {
   if (slot) slot.occupied = false;
 
   game.defenseBudget += getTrapCost(trap.type, game);
+}
+
+export function removeTrapAtPosition(game, pos, flashLog) {
+  if (game.turn !== TURN.DEFENSE_BUILD) return false;
+
+  const trapIndex = findTrapIndexAtPosition(game, pos);
+  if (trapIndex < 0) return false;
+
+  const [trap] = game.placedTraps.splice(trapIndex, 1);
+  const slot = game.trapSlots.find((s) => s.id === trap.slotId);
+  if (slot) slot.occupied = false;
+
+  game.defenseBudget += getTrapCost(trap.type, game);
+  flashLog(`${TRAPS[trap.type].name} 삭제 완료. 남은 예산 ${game.defenseBudget}`);
+  return true;
 }
 
 export function getTrapCost(type) {
@@ -200,6 +221,35 @@ export function empowerNextTrapsByPlacementOrder(game) {
   return empowerNextTrapsInList(game, game.placedTraps, getCameraEmpowerCount(game));
 }
 
+export function previewNextTrapsByPlacementOrder(game) {
+  return previewNextItemsByPlacementOrder(game, game.placedTraps);
+}
+
+export function previewNextHazardsByPlacementOrder(game) {
+  return previewNextItemsByPlacementOrder(game, game.baseHazards);
+}
+
+function previewNextItemsByPlacementOrder(game, traps) {
+  if (!traps || traps.length === 0) return [];
+
+  const total = traps.length;
+  const preview = [];
+  let checked = 0;
+  let index = game.nextEmpowerTrapIndex % total;
+  const count = getCameraEmpowerCount(game);
+
+  while (checked < total && preview.length < count) {
+    const trap = traps[index];
+    index = (index + 1) % total;
+    checked += 1;
+
+    if (!trap || trap.type === "camera" || trap.empowered) continue;
+    preview.push(trap);
+  }
+
+  return preview;
+}
+
 export function empowerNextHazardByPlacementOrder(game) {
   return empowerNextTrapsInList(game, game.baseHazards, 1)[0] || null;
 }
@@ -249,6 +299,28 @@ function tickTrapTimers(traps, dt) {
       trap.empowered = false;
     }
   }
+}
+
+function findTrapIndexAtPosition(game, pos) {
+  for (let i = game.placedTraps.length - 1; i >= 0; i -= 1) {
+    const trap = game.placedTraps[i];
+    const box = getOrientedTrapBox(trap, game);
+    if (pointInExpandedRect(pos, box, 12)) return i;
+
+    const slot = game.trapSlots.find((s) => s.id === trap.slotId);
+    if (slot && pointInExpandedRect(pos, { x: slot.x - 16, y: slot.y - 32, w: 32, h: 32 }, 6)) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function pointInExpandedRect(point, rect, padding = 0) {
+  return point.x >= rect.x - padding &&
+    point.x <= rect.x + rect.w + padding &&
+    point.y >= rect.y - padding &&
+    point.y <= rect.y + rect.h + padding;
 }
 
 export function hasLineOfSight(from, to, blockers) {

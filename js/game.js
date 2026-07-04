@@ -17,24 +17,36 @@ import {
 import { createHacker, updateAttack, activateShield } from "./player.js";
 import { initUI } from "./ui.js";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js";
-import { placeTrapAtSlot, undoTrap, carryDefenseTrapsToNextStage, getAllowedRotation } from "./trap.js";
+import {
+  placeTrapAtSlot,
+  removeTrapAtPosition,
+  carryDefenseTrapsToNextStage,
+  getAllowedRotation,
+  getTrapCost,
+} from "./trap.js";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js";
 
 const canvas = document.getElementById("gameCanvas");
 const uiModule = initUI({
   onShield: () => activateShield(game, flashLog),
   onStartReplay: () => {
+    game.deleteMode = false;
+    uiModule.setDeleteMode(false);
     startReplayMode(game);
     uiModule.setLog("리플레이 중입니다. 해커가 이전 공격 경로를 따라갑니다.");
     uiModule.updateUI(game);
   },
-  onUndoTrap: () => {
-    undoTrap(game);
-    uiModule.updateUI(game);
+  onDeleteTrapMode: () => {
+    if (game.turn !== TURN.DEFENSE_BUILD) return false;
+    game.deleteMode = !game.deleteMode;
+    uiModule.setLog(game.deleteMode ? "삭제할 함정을 클릭/터치하세요." : "함정 삭제 모드를 해제했습니다.");
+    return game.deleteMode;
   },
   onRestart: resetGame,
   onHelp: showHelp,
   onTrapSelected: (type, wasSelected) => {
+    game.deleteMode = false;
+    uiModule.setDeleteMode(false);
     if (type === "laser" && wasSelected) {
       selectedRotation = getAllowedRotation(type, selectedRotation + 90);
       laserRotation = selectedRotation;
@@ -61,6 +73,7 @@ const game = {
   recordTimer: 0,
   replayIndex: 0,
   replayPause: 0,
+  replayStepTimer: 0,
   replayFinished: false,
   nextEmpowerTrapIndex: 0,
   currentRecording: [],
@@ -78,6 +91,8 @@ const game = {
   infiniteBest: Number(localStorage.getItem("traceProtocolBest") || 0),
   hacker: null,
   replayHacker: null,
+  deleteMode: false,
+  showFailedDefenseLayout: false,
 };
 
 let lastTime = performance.now();
@@ -91,16 +106,21 @@ function flashLog(text) {
   uiModule.setLog(text);
 }
 
-function setupStage() {
+function setupStage(options = {}) {
   uiModule.hideOverlay();
   const isAttack = isAttackStage(game.stage);
+  const keepDefenseTraps = Boolean(options.keepDefenseTraps && !isAttack);
+  const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
   game.timer = getStageTime(game.stage);
   game.metrics = createMetrics();
   game.recordTimer = 0;
   game.replayIndex = 0;
   game.replayPause = 0;
+  game.replayStepTimer = 0;
   game.replayFinished = false;
+  game.deleteMode = false;
+  game.showFailedDefenseLayout = false;
   game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
@@ -121,11 +141,60 @@ function setupStage() {
     }
     game.hacker = null;
     game.replayHacker = null;
-    game.defenseBudget = getDefenseBudget(game.stage, game);
-    uiModule.setLog("방어 턴입니다. 이전 공격 경로 위에 함정을 배치하세요.");
+    if (keepDefenseTraps) {
+      restoreDefenseTraps(preservedDefenseTraps);
+    }
+    game.defenseBudget = keepDefenseTraps ? getRemainingDefenseBudget() : getDefenseBudget(game.stage, game);
+    uiModule.setLog(
+      keepDefenseTraps
+        ? "실패한 배치를 유지했습니다. 함정을 수정한 뒤 다시 리플레이를 시작하세요."
+        : "방어 턴입니다. 이전 공격 경로 위에 함정을 배치하세요."
+    );
   }
 
+  uiModule.setDeleteMode(false);
   uiModule.updateUI(game);
+}
+
+function snapshotDefenseTraps(traps) {
+  return (traps || []).map((trap) => ({
+    id: trap.id,
+    type: trap.type,
+    rotation: trap.rotation,
+    x: trap.x,
+    y: trap.y,
+    slotId: trap.slotId,
+    empowered: false,
+    closed: false,
+    closedTime: 0,
+    detectFlash: 0,
+  }));
+}
+
+function restoreDefenseTraps(traps) {
+  const slotsById = new Map(game.trapSlots.map((slot) => [slot.id, slot]));
+
+  game.placedTraps = [];
+  for (const trap of traps) {
+    const slot = slotsById.get(trap.slotId);
+    if (!slot) continue;
+
+    slot.occupied = true;
+    game.placedTraps.push({
+      ...trap,
+      x: slot.x,
+      y: slot.y,
+      empowered: false,
+      closed: false,
+      closedTime: 0,
+      detectFlash: 0,
+    });
+  }
+}
+
+function getRemainingDefenseBudget() {
+  const spent = game.placedTraps.reduce((total, trap) => total + getTrapCost(trap.type), 0);
+  return Math.max(0, getDefenseBudget(game.stage, game) - spent);
 }
 
 function update(dt) {
@@ -144,6 +213,7 @@ function endStage(success, text) {
   const completedStage = game.stage;
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;
+  game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
   updateBest(completedStage, success);
 
   if (success && completedStage % 2 === 0) {
@@ -157,7 +227,9 @@ function endStage(success, text) {
       buttonText: "재도전",
       onButton: () => {
         game.stage = completedStage;
-        setupStage();
+        setupStage({
+          keepDefenseTraps: completedStage % 2 === 0 && completedTurn === TURN.DEFENSE_REPLAY,
+        });
       },
     });
     return;
@@ -218,6 +290,14 @@ function showHelp() {
 
 function handleCanvasClick(pos) {
   if (game.turn !== TURN.DEFENSE_BUILD) return;
+
+  if (game.deleteMode) {
+    const removed = removeTrapAtPosition(game, pos, (text) => uiModule.setLog(text));
+    if (!removed) uiModule.setLog("삭제할 함정을 클릭/터치하세요.");
+    uiModule.updateUI(game);
+    return;
+  }
+
   const slot = game.trapSlots.find((s) => (
     pos.x >= s.x - 16 &&
     pos.x <= s.x + 16 &&

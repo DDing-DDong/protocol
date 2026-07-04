@@ -25,6 +25,41 @@ export const CAMERA_NETWORK_EMPOWER_BONUS = 1;
 export const STORY_STAGE_COUNT = 11;
 export const INFINITE_STAGE_START = STORY_STAGE_COUNT + 1;
 
+export const DEFENSE_OBJECTIVE_EPSILON = 0.01;
+
+export const DEFENSE_OBJECTIVES = {
+  2: {
+    delay: 2,
+    maxTraps: 2,
+    requiredTrapTypes: ["shock"],
+  },
+  4: {
+    detections: 2,
+    delay: 1,
+    maxTraps: 3,
+    requiredTrapTypes: ["laser"],
+  },
+  6: {
+    detections: 2,
+    delay: 1.8,
+    maxTraps: 3,
+    requiredTrapTypes: ["camera", "shock"],
+  },
+  8: {
+    detections: 2,
+    delay: 1.8,
+    energyDrained: 20,
+    maxTraps: 4,
+    requiredTrapTypes: ["camera", "shock", "emp"],
+  },
+  10: {
+    detections: 2,
+    delay: 4,
+    maxTraps: 4,
+    requiredTrapTypes: ["camera", "firewall"],
+  },
+};
+
 export const rewardPool = {
   attack: [
     {
@@ -430,9 +465,11 @@ export function createMetrics() {
     alertCharge: 0,
     delay: 0,
     energyUsed: 0,
+    energyDrained: 0,
     clearTime: 0,
     reachedCore: false,
     hpLost: 0,
+    trapTriggers: createTrapTriggerCounts(),
   };
 }
 
@@ -447,24 +484,144 @@ export function getStageTime(stage) {
 }
 
 export function getObjective(stage) {
+  const defenseObjective = getDefenseObjective(stage);
+  if (defenseObjective) return "수비 목표 확인";
+
   const stageData = getStageById(stage);
   if (stageData && stageData.objective) return stageData.objective;
 
   const table = {
     1: "데이터 코어 탈취",
-    2: "해커를 2초 이상 지연",
     3: "강화 보안 구역 돌파",
-    4: "탐지 2회 이상",
     5: "제한 시간 안에 탈취",
-    6: "해커 차단 또는 5초 지연",
     7: "복합 함정 구역 돌파",
-    8: "에너지 소모 유도",
     9: "고위험 구역 침투",
-    10: "최종 접근 방해",
     11: "중앙 데이터 코어 탈취",
   };
   if (stage <= STORY_STAGE_COUNT && table[stage]) return table[stage];
-  return stage % 2 === 1 ? "무한 모드: 코어 탈취" : "무한 모드: 탐지 또는 지연";
+  return "무한 모드: 코어 탈취";
+}
+
+export function getDefenseObjective(stage) {
+  if (stage % 2 === 1) return null;
+
+  const objective = DEFENSE_OBJECTIVES[stage];
+  if (objective) return normalizeDefenseObjective(cloneDefenseObjective(objective));
+
+  const infiniteTier = Math.max(0, Math.floor((stage - INFINITE_STAGE_START) / 2));
+  const cycle = infiniteTier % 4;
+  const scale = Math.floor(infiniteTier / 4);
+  const objectives = [
+    {
+      detections: 2,
+      delay: 2,
+      maxTraps: 4,
+      requiredTrapTypes: ["laser", "shock"],
+    },
+    {
+      detections: 3,
+      delay: 2,
+      maxTraps: 4,
+      requiredTrapTypes: ["camera", "laser", "shock"],
+    },
+    {
+      detections: 3,
+      delay: 2,
+      energyDrained: 20,
+      maxTraps: 5,
+      requiredTrapTypes: ["camera", "laser", "shock", "emp"],
+    },
+    {
+      detections: 2,
+      delay: 4,
+      energyDrained: 20,
+      maxTraps: 5,
+      requiredTrapTypes: ["camera", "firewall", "emp"],
+    },
+  ];
+
+  const generated = cloneDefenseObjective(objectives[cycle]);
+  generated.maxTraps = Math.min(6, generated.maxTraps + Math.floor(scale / 2));
+  return normalizeDefenseObjective(generated);
+}
+
+export function formatDefenseObjective(objective) {
+  const parts = [];
+  if (objective.detections) parts.push(`탐지 ${objective.detections}회`);
+  if (objective.delay) parts.push(`지연 ${formatSeconds(objective.delay)}`);
+  if (objective.energyDrained) parts.push(`에너지 ${objective.energyDrained} 흡수`);
+  if (objective.maxTraps) parts.push(`함정 ${objective.maxTraps}개 이하`);
+  if (objective.requiredTrapTypes?.length) {
+    const names = objective.requiredTrapTypes.map((type) => TRAPS[type].name).join("/");
+    parts.push(`${names} 사용`);
+  }
+  return parts.join(" · ");
+}
+
+export function getDefenseObjectiveItems(game) {
+  const objective = getDefenseObjective(game.stage);
+  if (!objective) return [];
+
+  const metrics = game.metrics || createMetrics();
+  const placedTraps = game.placedTraps || [];
+  const items = [];
+
+  if (objective.detections) {
+    items.push({
+      id: "detections",
+      label: `탐지 ${objective.detections}회`,
+      progress: `${Math.min(metrics.detections || 0, objective.detections)} / ${objective.detections}`,
+      complete: (metrics.detections || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.detections,
+    });
+  }
+
+  if (objective.delay) {
+    items.push({
+      id: "delay",
+      label: `지연 ${formatSeconds(objective.delay)}`,
+      progress: `${formatSeconds(Math.min(metrics.delay || 0, objective.delay))} / ${formatSeconds(objective.delay)}`,
+      complete: (metrics.delay || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.delay,
+    });
+  }
+
+  if (objective.energyDrained) {
+    items.push({
+      id: "energyDrained",
+      label: `에너지 ${objective.energyDrained} 흡수`,
+      progress: `${Math.min(metrics.energyDrained || 0, objective.energyDrained)} / ${objective.energyDrained}`,
+      complete: (metrics.energyDrained || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.energyDrained,
+    });
+  }
+
+  if (objective.maxTraps) {
+    const count = placedTraps.length;
+    items.push({
+      id: "maxTraps",
+      label: `함정 ${objective.maxTraps}개 이하`,
+      progress: `${count} / ${objective.maxTraps}개`,
+      complete: count <= objective.maxTraps,
+    });
+  }
+
+  for (const type of objective.requiredTrapTypes || []) {
+    const triggered = metrics.trapTriggers?.[type] || 0;
+    const placed = placedTraps.some((trap) => trap.type === type);
+    items.push({
+      id: `trap-${type}`,
+      label: `${TRAPS[type].name} 사용`,
+      progress: triggered > 0 ? "작동 완료" : placed ? "배치됨" : "미배치",
+      complete: triggered > 0,
+    });
+  }
+
+  return items;
+}
+
+export function getDefenseObjectiveSummary(game) {
+  const items = getDefenseObjectiveItems(game);
+  if (items.length === 0) return "";
+  const completed = items.filter((item) => item.complete).length;
+  return `목표 ${completed}/${items.length}`;
 }
 
 export function pickRewards(type, rewardPoolList) {
@@ -497,6 +654,35 @@ export function rectsOverlap(a, b) {
 export function cryptoSafeId() {
   if (globalThis.crypto && globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
   return `trap-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createTrapTriggerCounts() {
+  return Object.fromEntries(Object.keys(TRAPS).map((type) => [type, 0]));
+}
+
+function cloneDefenseObjective(objective) {
+  return {
+    ...objective,
+    requiredTrapTypes: objective.requiredTrapTypes ? objective.requiredTrapTypes.slice() : [],
+  };
+}
+
+function normalizeDefenseObjective(objective) {
+  if (objective.energyUsed && !objective.energyDrained) {
+    objective.energyDrained = objective.energyUsed;
+    delete objective.energyUsed;
+  }
+  const required = new Set(objective.requiredTrapTypes || []);
+  if (objective.energyDrained) required.add("emp");
+  if (objective.delay >= 4 && required.has("firewall")) required.add("camera");
+  objective.requiredTrapTypes = Array.from(required);
+  objective.maxTraps = Math.max(objective.maxTraps || 0, objective.requiredTrapTypes.length);
+  return objective;
+}
+
+function formatSeconds(value) {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}초`;
 }
 
 function cloneStageData(stageData) {
