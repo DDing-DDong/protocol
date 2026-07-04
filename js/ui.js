@@ -941,11 +941,13 @@ export function initUI(callbacks) {
     ctx.fillStyle = isGhost ? "#8af2ff" : "#18e0ff";
     ctx.shadowColor = isGhost ? "#8af2ff" : "#18e0ff";
     ctx.shadowBlur = 12;
-    ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
+    const bodyW = h.isSliding ? h.w + 18 : h.w;
+    const bodyH = h.h;
+    ctx.fillRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH);
     ctx.fillStyle = "#071019";
-    ctx.fillRect(2, -14, 9, 6);
+    ctx.fillRect(2, h.isSliding ? -5 : -14, 9, 6);
     ctx.fillStyle = "#e9f8ff";
-    ctx.fillRect(9, -8, 16, 4);
+    ctx.fillRect(9, h.isSliding ? 1 : -8, 16, 4);
 
     if (h.shield) {
       ctx.strokeStyle = "#27ffc8";

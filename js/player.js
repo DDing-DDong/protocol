@@ -35,13 +35,21 @@ const WALL_GRAB_SLIDE_SPEED = 70;
 const WALL_JUMP_X_SPEED = 280;
 const WALL_JUMP_Y_SPEED = 700;
 const WALL_JUMP_BUFFER_TIME = 0.12;
+const WALL_MIN_CONTACT_HEIGHT = 16;
+const HACKER_STAND_HEIGHT = 54;
+const HACKER_SLIDE_HEIGHT = 30;
+const SLIDE_POSE_DURATION = 0.42;
+const WALL_JUMP_DASH_WINDOW = 0.7;
+const WALL_DASH_DURATION = 0.155;
 
 export function createHacker(game) {
   return {
     x: 64,
     y: 388,
     w: 30,
-    h: 54,
+    h: HACKER_STAND_HEIGHT,
+    standHeight: HACKER_STAND_HEIGHT,
+    slideHeight: HACKER_SLIDE_HEIGHT,
     vx: 0,
     vy: 0,
 
@@ -54,6 +62,7 @@ export function createHacker(game) {
     wallContactSide: 0,
     wallContactTimer: 0,
     wallJumpInputLock: false,
+    wallJumpDashTimer: 0,
 
     hp: 3,
     maxHp: 3,
@@ -67,12 +76,14 @@ export function createHacker(game) {
 
     // 대시 거리 조정: 약 4칸 정도 이동하도록 속도/시간을 낮춤
     dashSpeed: 580,
-    dashDuration: 0.16,
+    dashDuration: 0.18,
 
     dashCost: 18,
     dashInputLock: false,
     isDashing: false,
+    isSliding: false,
     dashTime: 0,
+    slidePoseTime: 0,
     dashDirection: 1,
 
     // 대시 직후 장애물 끝부분에 걸리는 문제 방지
@@ -107,9 +118,12 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   h.invincible = Math.max(0, h.invincible - dt);
   h.dashHazardGrace = Math.max(0, h.dashHazardGrace - dt);
   h.wallContactTimer = Math.max(0, (h.wallContactTimer || 0) - dt);
+  h.wallJumpDashTimer = Math.max(0, (h.wallJumpDashTimer || 0) - dt);
 
   h.dashTime = Math.max(0, h.dashTime - dt);
   h.isDashing = h.dashTime > 0;
+  h.slidePoseTime = Math.max(0, (h.slidePoseTime || 0) - dt);
+  updateSlidePose(h);
 
   h.shieldTime = Math.max(0, h.shieldTime - dt);
   h.shield = h.shieldTime > 0;
@@ -135,10 +149,10 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   if (h.isDashing) {
     h.vx = h.dashDirection * h.dashSpeed;
   } else if (left && !right) {
-    h.vx = -moveSpeed;
+    h.vx = h.vx < -moveSpeed ? approach(h.vx, -moveSpeed, 1800 * dt) : -moveSpeed;
     h.facing = -1;
   } else if (right && !left) {
-    h.vx = moveSpeed;
+    h.vx = h.vx > moveSpeed ? approach(h.vx, moveSpeed, 1800 * dt) : moveSpeed;
     h.facing = 1;
   } else {
     h.vx = approach(h.vx, 0, 1800 * dt);
@@ -148,7 +162,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   const pressingAwayFromWall = isPressingAwayFromWall(wallJumpSide, left, right);
 
   if (jump && wallJumpSide && (!h.wallJumpInputLock || pressingAwayFromWall)) {
-    performWallJump(h, wallJumpSide);
+    performWallJump(h, wallJumpSide, dash && pressingAwayFromWall);
   } else if (jump && h.onGround) {
     h.vy = -h.jumpPower;
     h.onGround = false;
@@ -199,15 +213,26 @@ function isPressingAwayFromWall(wallSide, left, right) {
   return false;
 }
 
-function performWallJump(h, wallSide) {
-  h.vx = -wallSide * WALL_JUMP_X_SPEED;
+function performWallJump(h, wallSide, useSlideBoost = false) {
+  endSlide(h);
+  const jumpDirection = -wallSide;
+  h.vx = jumpDirection * (useSlideBoost ? h.dashSpeed : WALL_JUMP_X_SPEED);
   h.vy = -WALL_JUMP_Y_SPEED;
-  h.facing = -wallSide;
+  h.facing = jumpDirection;
   h.wallGrab = false;
   h.wallSide = 0;
   h.wallContactSide = 0;
   h.wallContactTimer = 0;
+  h.wallJumpDashTimer = WALL_JUMP_DASH_WINDOW;
   h.wallJumpInputLock = true;
+
+  if (useSlideBoost) {
+    h.dashDirection = jumpDirection;
+    h.isDashing = true;
+    h.dashTime = WALL_DASH_DURATION;
+    h.slidePoseTime = SLIDE_POSE_DURATION;
+    startSlide(h);
+  }
 }
 
 function hasAttackInput(keys) {
@@ -248,10 +273,38 @@ function tryDash(game, keys, flashLog) {
   h.dashCooldown = game.mods.dashCooldown;
 
   h.isDashing = true;
-  h.dashTime = h.dashDuration;
+  h.dashTime = !h.onGround && h.wallJumpDashTimer > 0 ? WALL_DASH_DURATION : h.dashDuration;
+  h.slidePoseTime = SLIDE_POSE_DURATION;
+  startSlide(h);
 
   // 대시 중 + 대시 직후까지 짧게 장애물 판정을 무시
   h.dashHazardGrace = h.dashDuration + 0.22;
+}
+
+function updateSlidePose(h) {
+  if (h.isDashing || h.slidePoseTime > 0) {
+    startSlide(h);
+  } else {
+    endSlide(h);
+  }
+}
+
+function startSlide(h) {
+  if (h.isSliding) return;
+  setHackerHeight(h, h.slideHeight || HACKER_SLIDE_HEIGHT);
+  h.isSliding = true;
+}
+
+function endSlide(h) {
+  if (!h.isSliding) return;
+  setHackerHeight(h, h.standHeight || HACKER_STAND_HEIGHT);
+  h.isSliding = false;
+}
+
+function setHackerHeight(h, nextHeight) {
+  const feetY = h.y + h.h;
+  h.h = nextHeight;
+  h.y = feetY - h.h;
 }
 
 export function activateShield(game, flashLog) {
@@ -319,6 +372,7 @@ function moveAndCollide(entity, dt, game, keys) {
       entity.wallSide = 0;
       entity.wallContactSide = 0;
       entity.wallContactTimer = 0;
+      entity.wallJumpDashTimer = 0;
     } else if (entity.vy < 0 && prevTop >= p.y + p.h - 2) {
       entity.y = p.y + p.h;
       entity.vy = 0;
@@ -333,20 +387,25 @@ function moveAndCollide(entity, dt, game, keys) {
     entity.wallSide = 0;
     entity.wallContactSide = 0;
     entity.wallContactTimer = 0;
+    entity.wallJumpDashTimer = 0;
   }
 
   if (entity.y > 540 + 80) {
+    setHackerHeight(entity, entity.standHeight || HACKER_STAND_HEIGHT);
     entity.x = 64;
     entity.y = 320;
     entity.vx = 0;
     entity.vy = 0;
     entity.isDashing = false;
+    entity.isSliding = false;
     entity.dashTime = 0;
+    entity.slidePoseTime = 0;
     entity.dashHazardGrace = 0;
     entity.wallGrab = false;
     entity.wallSide = 0;
     entity.wallContactSide = 0;
     entity.wallContactTimer = 0;
+    entity.wallJumpDashTimer = 0;
   }
 }
 
@@ -367,6 +426,7 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
   for (const platform of game.platforms || []) {
     const wallBox = getPlatformWallBox(platform);
     if (!rectsOverlap(entity, wallBox)) continue;
+    if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
 
     const hitLeftFace = previousBox.x + previousBox.w <= wallBox.x && entity.x + entity.w >= wallBox.x;
     const hitRightFace = previousBox.x >= wallBox.x + wallBox.w && entity.x <= wallBox.x + wallBox.w;
@@ -381,6 +441,10 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
       if (holdingLeft) grabWall(entity, -1);
     }
   }
+}
+
+function getVerticalOverlap(a, b) {
+  return Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
 }
 
 function getPlatformWallBox(platform) {
@@ -402,8 +466,12 @@ function grabWall(entity, side) {
   entity.wallSide = side;
   entity.wallContactSide = side;
   entity.wallContactTimer = WALL_JUMP_BUFFER_TIME;
+  entity.wallJumpDashTimer = 0;
   entity.isDashing = false;
+  entity.isSliding = false;
   entity.dashTime = 0;
+  entity.slidePoseTime = 0;
+  setHackerHeight(entity, entity.standHeight || HACKER_STAND_HEIGHT);
 }
 
 function applyAttackHazards(h, game, flashLog) {
@@ -429,7 +497,9 @@ function applyAttackHazards(h, game, flashLog) {
     if (hazard.type === "firewall") {
       h.vx = 0;
       h.isDashing = false;
+      endSlide(h);
       h.dashTime = 0;
+      h.slidePoseTime = 0;
       h.invincible = 0.25;
       flashLog("닫힌 방화벽이 해커의 이동을 막았습니다.");
       return;
@@ -535,6 +605,8 @@ function collideClosedFirewallsX(entity, previousX, game) {
     }
     entity.vx = 0;
     entity.isDashing = false;
+    endSlide(entity);
     entity.dashTime = 0;
+    entity.slidePoseTime = 0;
   }
 }

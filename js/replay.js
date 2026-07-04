@@ -23,13 +23,14 @@ import {
 const REPLAY_PLAYBACK_SPEED = 1.5;
 
 export function createReplayHacker(game) {
-  const first = game.lastAttackRecording[0] || { x: 64, y: 388, facing: 1 };
+  const first = game.lastAttackRecording[0] || { x: 64, y: 388, h: 54, facing: 1 };
   return {
     x: first.x,
     y: first.y,
     w: 30,
-    h: 54,
+    h: first.h || 54,
     facing: first.facing || 1,
+    isSliding: Boolean(first.isSliding),
     hp: 3,
     glitchTime: 0,
     trapCooldowns: new Map(),
@@ -47,7 +48,9 @@ export function recordHacker(game, dt) {
     t: getStageTime(game.stage) - game.timer,
     x: h.x,
     y: h.y,
+    h: h.h,
     facing: h.facing,
+    isSliding: Boolean(h.isSliding),
     shield: h.shield,
     energyUsed: game.metrics.energyUsed,
   });
@@ -98,7 +101,9 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
   const sample = path[game.replayIndex];
   r.x = sample.x;
   r.y = sample.y;
+  r.h = sample.h || 54;
   r.facing = sample.facing || r.facing;
+  r.isSliding = Boolean(sample.isSliding);
   game.metrics.energyUsed = Math.max(game.metrics.energyUsed, sample.energyUsed || 0);
 
   checkDefenseTraps(r, game, flashLog);
