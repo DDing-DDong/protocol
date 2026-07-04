@@ -440,6 +440,9 @@ button.secondary {
   min-width: 142px;
   min-height: 48px;
   padding: 9px 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
   background: rgba(3, 8, 13, 0.82);
   border: 1px solid rgba(24, 224, 255, 0.54);
   border-radius: 6px;
@@ -481,6 +484,21 @@ button.secondary {
   font-size: 26px;
   line-height: 1;
   text-shadow: 0 0 12px rgba(24, 224, 255, 0.55);
+}
+
+.timer-pause-btn {
+  min-width: 82px;
+}
+
+.timer-pause-btn.active {
+  background: #18e0ff;
+  color: #031018;
+  border-color: #8af2ff;
+  box-shadow: 0 0 14px rgba(24, 224, 255, 0.34);
+}
+
+.timer-pause-btn:disabled {
+  opacity: 0.35;
 }
 
 .meter {
@@ -881,7 +899,7 @@ kbd {
   .play-timer {
     top: 10px;
     right: 10px;
-    min-width: 114px;
+    min-width: 112px;
     min-height: 40px;
     padding: 7px 10px;
   }
@@ -892,5 +910,9 @@ kbd {
 
   .play-timer strong {
     font-size: 21px;
+  }
+
+  .timer-pause-btn {
+    min-width: 0;
   }
 }

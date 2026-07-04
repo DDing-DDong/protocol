@@ -15,6 +15,7 @@
       </div>
       <div class="topbar-actions">
         <button id="restartBtn" class="secondary" type="button">처음부터</button>
+        <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
         <button id="helpBtn" class="secondary" type="button">도움말</button>
       </div>
     </header>
@@ -27,7 +28,10 @@
           <button id="objectiveToggle" class="objective-toggle" type="button" aria-expanded="false">목표 확인</button>
           <div id="objectivePanel" class="objective-panel hidden" aria-label="수비 목표 체크리스트"></div>
         </div>
-        <div class="stat-row stat-time play-timer"><span>시간</span><strong id="timerLabel">48.0</strong></div>
+        <div class="stat-row stat-time play-timer">
+          <span>시간</span>
+          <strong id="timerLabel">48.0</strong>
+        </div>
 
         <div id="overlay" class="overlay hidden">
           <div class="overlay-card">

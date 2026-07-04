@@ -96,6 +96,7 @@ export function initUI(callbacks) {
     rewardList: document.getElementById("rewardList"),
     startReplayBtn: document.getElementById("startReplayBtn"),
     deleteTrapBtn: document.getElementById("deleteTrapBtn"),
+    pauseAttackBtn: document.getElementById("pauseAttackBtn"),
     restartBtn: document.getElementById("restartBtn"),
     helpBtn: document.getElementById("helpBtn"),
   };
@@ -103,6 +104,15 @@ export function initUI(callbacks) {
   let overlayAction = null;
   let objectivePanelOpen = false;
   const keys = new Set();
+  const attackResumeKeys = new Set([
+    "Space",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ShiftLeft",
+    "ShiftRight",
+  ]);
 
   function setLog(text) {
     ui.logText.textContent = text;
@@ -162,6 +172,10 @@ export function initUI(callbacks) {
     ui.defenseTools.classList.toggle("hidden", game.turn !== TURN.DEFENSE_BUILD);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
+    ui.pauseAttackBtn.disabled = game.turn !== TURN.ATTACK;
+    ui.pauseAttackBtn.textContent = game.attackPaused ? "재개" : "일시정지";
+    ui.pauseAttackBtn.setAttribute("aria-pressed", game.attackPaused ? "true" : "false");
+    ui.pauseAttackBtn.classList.toggle("active", Boolean(game.attackPaused));
     setDeleteMode(Boolean(game.deleteMode && game.turn === TURN.DEFENSE_BUILD));
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
     updateEmpowerPreview(game);
@@ -1148,19 +1162,24 @@ export function initUI(callbacks) {
     initializeTrapButtonIcons();
 
     window.addEventListener("keydown", (event) => {
+      if (event.repeat && !keys.has(event.code)) {
+        if (attackResumeKeys.has(event.code) || event.code === "KeyS") {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (event.code === "KeyS" && !event.repeat) {
+        event.preventDefault();
+        callbacks.onToggleAttackPause();
+        return;
+      }
 
       keys.add(event.code);
 
-      if (
-        [
-          "Space",
-          "ArrowUp",
-          "ArrowDown",
-          "ArrowLeft",
-          "ArrowRight",
-        ].includes(event.code)
-      ) {
+      if (attackResumeKeys.has(event.code)) {
         event.preventDefault();
+        callbacks.onResumeAttackPause();
       }
     });
 
@@ -1196,6 +1215,12 @@ export function initUI(callbacks) {
       "click",
       () => setDeleteMode(callbacks.onDeleteTrapMode())
     );
+
+    ui.pauseAttackBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      callbacks.onToggleAttackPause();
+    });
 
     ui.objectiveToggle?.addEventListener("click", (event) => {
       event.preventDefault();
