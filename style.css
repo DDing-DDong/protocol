@@ -68,10 +68,10 @@ button.secondary {
 }
 
 .game-layout {
-  max-width: 1560px;
+  max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
@@ -79,6 +79,12 @@ button.secondary {
   position: relative;
   min-width: 0;
   isolation: isolate;
+  padding: 0 10px 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #091521 0%, #050a10 100%);
+  border: 1px solid #1e3b55;
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(24, 224, 255, 0.12);
 }
 
 .empower-preview {
@@ -360,16 +366,16 @@ button.secondary {
   width: 100%;
   aspect-ratio: 16 / 9;
   background: linear-gradient(180deg, #091521 0%, #050a10 100%);
-  border: 1px solid #1e3b55;
-  border-radius: 8px;
-  box-shadow: 0 0 30px rgba(24, 224, 255, 0.12);
+  border: 0;
+  border-radius: 7px 7px 0 0;
   display: block;
 }
 
 .side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
 }
 
 .panel-block {
@@ -377,6 +383,24 @@ button.secondary {
   border: 1px solid #1e3b55;
   border-radius: 8px;
   padding: 14px;
+}
+
+.in-game-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, auto)) minmax(220px, 1fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: -58px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(11, 26, 39, 0.96), rgba(5, 14, 22, 0.96));
+  border-color: rgba(154, 199, 214, 0.34);
+  box-shadow: inset 0 1px 0 rgba(233, 248, 255, 0.08), 0 10px 28px rgba(0, 0, 0, 0.28);
+  position: relative;
+  z-index: 8;
+}
+
+.in-game-status h2 {
+  display: none;
 }
 
 .panel-block h2 {
@@ -394,6 +418,37 @@ button.secondary {
   font-size: 14px;
 }
 
+.in-game-status .stat-row {
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  background: rgba(3, 8, 13, 0.42);
+  border: 1px solid rgba(154, 199, 214, 0.16);
+  border-radius: 6px;
+}
+
+.in-game-status .stat-objective {
+  min-width: 190px;
+}
+
+.play-timer {
+  position: absolute;
+  z-index: 16;
+  top: 16px;
+  right: 18px;
+  min-width: 142px;
+  min-height: 48px;
+  padding: 9px 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  background: rgba(3, 8, 13, 0.82);
+  border: 1px solid rgba(24, 224, 255, 0.54);
+  border-radius: 6px;
+  box-shadow: 0 0 20px rgba(24, 224, 255, 0.18), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+}
+
 .stat-row span {
   color: #9ac7d6;
 }
@@ -402,8 +457,61 @@ button.secondary {
   text-align: right;
 }
 
+.in-game-status .stat-row span {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.in-game-status .stat-row strong {
+  min-width: 0;
+  color: #e9f8ff;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-timer span {
+  color: #18e0ff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.play-timer strong {
+  color: #e9f8ff;
+  font-size: 26px;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(24, 224, 255, 0.55);
+}
+
+.timer-pause-btn {
+  min-width: 82px;
+}
+
+.timer-pause-btn.active {
+  background: #18e0ff;
+  color: #031018;
+  border-color: #8af2ff;
+  box-shadow: 0 0 14px rgba(24, 224, 255, 0.34);
+}
+
+.timer-pause-btn:disabled {
+  opacity: 0.35;
+}
+
 .meter {
   margin: 10px 0;
+}
+
+.in-game-status .meter {
+  min-width: 0;
+  margin: 0;
+  padding: 5px 8px 7px;
+  background: rgba(3, 8, 13, 0.42);
+  border: 1px solid rgba(154, 199, 214, 0.16);
+  border-radius: 6px;
 }
 
 .meter-label {
@@ -414,11 +522,29 @@ button.secondary {
   margin-bottom: 5px;
 }
 
+.in-game-status .meter-label {
+  align-items: center;
+  margin-bottom: 4px;
+  color: #d4f4ff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .meter-bar {
   height: 10px;
   background: #132234;
   border-radius: 999px;
   overflow: hidden;
+}
+
+.in-game-status .meter-bar {
+  height: 14px;
+  padding: 2px;
+  background: linear-gradient(180deg, #031018, #132234);
+  border: 1px solid rgba(233, 248, 255, 0.36);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.65);
 }
 
 #hpBar,
@@ -427,6 +553,22 @@ button.secondary {
   width: 100%;
   background: #18e0ff;
   border-radius: inherit;
+}
+
+.in-game-status #hpBar,
+.in-game-status #energyBar {
+  position: relative;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 10px rgba(24, 224, 255, 0.18);
+}
+
+.in-game-status #hpBar::after,
+.in-game-status #energyBar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.04) 45%, rgba(0, 0, 0, 0.18));
+  pointer-events: none;
 }
 
 #hpBar {
@@ -667,13 +809,16 @@ kbd {
 }
 
 @media (max-width: 1040px) {
-  .game-layout {
-    grid-template-columns: 1fr;
+  .side-panel {
+    grid-template-columns: 1fr 1fr;
   }
 
-  .side-panel {
-    grid-template-columns: repeat(2, 1fr);
-    display: grid;
+  .in-game-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .in-game-status .meter {
+    grid-column: span 1;
   }
 }
 
@@ -687,7 +832,87 @@ kbd {
     align-items: flex-start;
   }
 
+  .topbar h1 {
+    font-size: 22px;
+    letter-spacing: 2px;
+  }
+
+  .topbar p {
+    display: none;
+  }
+
+  .topbar-actions {
+    width: 100%;
+  }
+
+  .topbar-actions button {
+    flex: 1;
+  }
+
   .side-panel {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .in-game-status {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: -46px;
+    padding: 7px;
+  }
+
+  .in-game-status .stat-row {
+    min-height: 28px;
+    padding: 5px 6px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .in-game-status .stat-row span,
+  .in-game-status .meter-label {
+    font-size: 10px;
+  }
+
+  .in-game-status .stat-row strong {
+    width: 100%;
+    text-align: left;
+    font-size: 12px;
+  }
+
+  .in-game-status .stat-objective {
+    grid-column: span 2;
+    min-width: 0;
+  }
+
+  .in-game-status .meter {
+    grid-column: span 2;
+    padding: 5px 6px 6px;
+  }
+
+  .in-game-status .meter-bar {
+    height: 13px;
+  }
+
+  .play-timer {
+    top: 10px;
+    right: 10px;
+    min-width: 112px;
+    min-height: 40px;
+    padding: 7px 10px;
+  }
+
+  .play-timer span {
+    font-size: 11px;
+  }
+
+  .play-timer strong {
+    font-size: 21px;
+  }
+
+  .timer-pause-btn {
+    min-width: 0;
   }
 }

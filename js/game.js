@@ -63,12 +63,16 @@ const uiModule = initUI({
   },
   onCanvasClick: handleCanvasClick,
   onApplyReward: applyReward,
+  onToggleAttackPause: toggleAttackPause,
+  onResumeAttackPause: resumeAttackPause,
 });
 
 const game = {
   stage: 1,
   turn: TURN.ATTACK,
-  timer: 48,
+  timer: 30,
+  attackTimerStarted: false,
+  attackPaused: false,
   messageCooldown: 0,
   recordTimer: 0,
   replayIndex: 0,
@@ -108,11 +112,14 @@ function flashLog(text) {
 
 function setupStage(options = {}) {
   uiModule.hideOverlay();
+  uiModule.keys.clear();
   const isAttack = isAttackStage(game.stage);
   const keepDefenseTraps = Boolean(options.keepDefenseTraps && !isAttack);
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
   game.timer = getStageTime(game.stage);
+  game.attackTimerStarted = false;
+  game.attackPaused = false;
   game.metrics = createMetrics();
   game.recordTimer = 0;
   game.replayIndex = 0;
@@ -200,12 +207,37 @@ function getRemainingDefenseBudget() {
 function update(dt) {
   game.messageCooldown = Math.max(0, game.messageCooldown - dt);
   if (game.turn === TURN.ATTACK) {
-    updateAttack(game, dt, uiModule.keys, flashLog, endStage);
+    if (!game.attackPaused) {
+      updateAttack(game, dt, uiModule.keys, flashLog, endStage);
+    }
   }
   if (game.turn === TURN.DEFENSE_REPLAY) {
     updateDefenseReplay(game, dt, flashLog, endStage);
   }
   uiModule.updateUI(game);
+}
+
+function toggleAttackPause() {
+  if (game.turn !== TURN.ATTACK || game.turn === TURN.ENDING) return false;
+
+  game.attackPaused = !game.attackPaused;
+  if (game.attackPaused) {
+    uiModule.keys.clear();
+    uiModule.setLog("공격 턴을 일시정지했습니다.");
+  } else {
+    uiModule.setLog("공격 턴을 재개했습니다.");
+  }
+  uiModule.updateUI(game);
+  return game.attackPaused;
+}
+
+function resumeAttackPause() {
+  if (game.turn !== TURN.ATTACK || !game.attackPaused) return false;
+
+  game.attackPaused = false;
+  uiModule.setLog("공격 턴을 재개했습니다.");
+  uiModule.updateUI(game);
+  return true;
 }
 
 function endStage(success, text) {
@@ -282,7 +314,7 @@ function showHelp() {
 
   uiModule.showOverlay({
     title: "조작법",
-    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 실드를 사용합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
+    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 실드, S 일시정지를 사용합니다. 일시정지 중에는 이동/대시/실드 입력으로 바로 재개합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });

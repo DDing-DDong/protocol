@@ -96,6 +96,7 @@ export function initUI(callbacks) {
     rewardList: document.getElementById("rewardList"),
     startReplayBtn: document.getElementById("startReplayBtn"),
     deleteTrapBtn: document.getElementById("deleteTrapBtn"),
+    pauseAttackBtn: document.getElementById("pauseAttackBtn"),
     restartBtn: document.getElementById("restartBtn"),
     helpBtn: document.getElementById("helpBtn"),
   };
@@ -103,6 +104,15 @@ export function initUI(callbacks) {
   let overlayAction = null;
   let objectivePanelOpen = false;
   const keys = new Set();
+  const attackResumeKeys = new Set([
+    "Space",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ShiftLeft",
+    "ShiftRight",
+  ]);
 
   function setLog(text) {
     ui.logText.textContent = text;
@@ -162,6 +172,10 @@ export function initUI(callbacks) {
     ui.defenseTools.classList.toggle("hidden", game.turn !== TURN.DEFENSE_BUILD);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
+    ui.pauseAttackBtn.disabled = game.turn !== TURN.ATTACK;
+    ui.pauseAttackBtn.textContent = game.attackPaused ? "재개" : "일시정지";
+    ui.pauseAttackBtn.setAttribute("aria-pressed", game.attackPaused ? "true" : "false");
+    ui.pauseAttackBtn.classList.toggle("active", Boolean(game.attackPaused));
     setDeleteMode(Boolean(game.deleteMode && game.turn === TURN.DEFENSE_BUILD));
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
     updateEmpowerPreview(game);
@@ -934,30 +948,91 @@ export function initUI(callbacks) {
 
   function drawHacker(ctx, h, isGhost) {
     ctx.save();
-    ctx.globalAlpha = isGhost ? 0.72 : 1;
+    const isHitFlashing = !isGhost && (h.damageFlashTime || 0) > 0;
+    const isShieldBlocking = !isGhost && (h.shieldBlockFlashTime || 0) > 0;
+    const isInvincibleBlink = !isGhost && (h.invincible || 0) > 0 && !isShieldBlocking;
+    ctx.globalAlpha = isGhost ? 0.72 : getHackerAlpha(h, isInvincibleBlink);
     if (isGhost && h.glitchTime > 0) drawGlitchAura(ctx, h);
+    if (isHitFlashing) drawDamageFlash(ctx, h);
     ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
     ctx.scale(h.facing || 1, 1);
-    ctx.fillStyle = isGhost ? "#8af2ff" : "#18e0ff";
-    ctx.shadowColor = isGhost ? "#8af2ff" : "#18e0ff";
+    const damageColor = h.damageFlashColor || "#ff3b67";
+    ctx.fillStyle = isHitFlashing ? damageColor : isGhost ? "#8af2ff" : "#18e0ff";
+    ctx.shadowColor = isHitFlashing ? damageColor : isGhost ? "#8af2ff" : "#18e0ff";
     ctx.shadowBlur = 12;
-    ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
+    const bodyW = h.isSliding ? h.w + 18 : h.w;
+    const bodyH = h.h;
+    if (!isGhost && h.isSliding) drawSlideTrail(ctx, bodyW, bodyH);
+    ctx.fillRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH);
     ctx.fillStyle = "#071019";
-    ctx.fillRect(2, -14, 9, 6);
+    ctx.fillRect(2, h.isSliding ? -5 : -14, 9, 6);
     ctx.fillStyle = "#e9f8ff";
-    ctx.fillRect(9, -8, 16, 4);
+    ctx.fillRect(9, h.isSliding ? 1 : -8, 16, 4);
 
     if (h.shield) {
-      ctx.strokeStyle = "#27ffc8";
-      ctx.lineWidth = 3;
+      const shieldFlash = getShieldFlash(h);
+      ctx.globalAlpha = shieldFlash.alpha;
+      ctx.strokeStyle = shieldFlash.color;
+      ctx.lineWidth = shieldFlash.lineWidth;
       ctx.beginPath();
       ctx.arc(0, 0, 38, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.globalAlpha = isGhost ? 0.72 : 1;
 
       drawShieldTimer(ctx, h);
     }
 
     ctx.restore();
+  }
+
+  function getHackerAlpha(h, isInvincibleBlink) {
+    if (!isInvincibleBlink) return 1;
+    return Math.floor((h.invincible || 0) * 18) % 2 === 0 ? 0.45 : 1;
+  }
+
+  function drawSlideTrail(ctx, bodyW, bodyH) {
+    const t = performance.now() / 1000;
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = "round";
+
+    for (let i = 0; i < 4; i += 1) {
+      const phase = (t * 18 + i * 0.7) % 1;
+      const length = 18 + i * 7;
+      const x = -bodyW / 2 - 8 - phase * 18 - i * 4;
+      const y = bodyH / 2 - 7 - i * 4;
+      ctx.globalAlpha = 0.32 * (1 - phase);
+      ctx.strokeStyle = i % 2 === 0 ? "#e9f8ff" : "#27ffc8";
+      ctx.lineWidth = Math.max(1, 3 - i * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - length, y + 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawDamageFlash(ctx, h) {
+    const progress = Math.max(0, Math.min(1, (h.damageFlashTime || 0) / 0.32));
+    ctx.save();
+    ctx.globalAlpha = 0.34 * progress;
+    ctx.fillStyle = h.damageFlashColor || "#ff3b67";
+    ctx.fillRect(h.x - 8, h.y - 8, h.w + 16, h.h + 16);
+    ctx.restore();
+  }
+
+  function getShieldFlash(h) {
+    if ((h.shieldBlockFlashTime || 0) <= 0) {
+      return { alpha: 1, color: "#27ffc8", lineWidth: 3 };
+    }
+
+    const pulse = Math.floor((h.shieldBlockFlashTime || 0) * 22) % 2 === 0;
+    return {
+      alpha: pulse ? 1 : 0.35,
+      color: pulse ? "#e9fff8" : "#27ffc8",
+      lineWidth: pulse ? 5 : 3,
+    };
   }
 
   function drawGlitchAura(ctx, h) {
@@ -1087,19 +1162,24 @@ export function initUI(callbacks) {
     initializeTrapButtonIcons();
 
     window.addEventListener("keydown", (event) => {
+      if (event.repeat && !keys.has(event.code)) {
+        if (attackResumeKeys.has(event.code) || event.code === "KeyS") {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (event.code === "KeyS" && !event.repeat) {
+        event.preventDefault();
+        callbacks.onToggleAttackPause();
+        return;
+      }
 
       keys.add(event.code);
 
-      if (
-        [
-          "Space",
-          "ArrowUp",
-          "ArrowDown",
-          "ArrowLeft",
-          "ArrowRight",
-        ].includes(event.code)
-      ) {
+      if (attackResumeKeys.has(event.code)) {
         event.preventDefault();
+        callbacks.onResumeAttackPause();
       }
     });
 
@@ -1135,6 +1215,12 @@ export function initUI(callbacks) {
       "click",
       () => setDeleteMode(callbacks.onDeleteTrapMode())
     );
+
+    ui.pauseAttackBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      callbacks.onToggleAttackPause();
+    });
 
     ui.objectiveToggle?.addEventListener("click", (event) => {
       event.preventDefault();

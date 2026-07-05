@@ -15,6 +15,7 @@
       </div>
       <div class="topbar-actions">
         <button id="restartBtn" class="secondary" type="button">처음부터</button>
+        <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
         <button id="helpBtn" class="secondary" type="button">도움말</button>
       </div>
     </header>
@@ -27,6 +28,10 @@
           <button id="objectiveToggle" class="objective-toggle" type="button" aria-expanded="false">목표 확인</button>
           <div id="objectivePanel" class="objective-panel hidden" aria-label="수비 목표 체크리스트"></div>
         </div>
+        <div class="stat-row stat-time play-timer">
+          <span>시간</span>
+          <strong id="timerLabel">48.0</strong>
+        </div>
 
         <div id="overlay" class="overlay hidden">
           <div class="overlay-card">
@@ -36,15 +41,12 @@
             <button id="overlayButton" type="button">확인</button>
           </div>
         </div>
-      </section>
 
-      <aside class="side-panel">
-        <div class="panel-block">
+        <div class="panel-block in-game-status">
           <h2>상태</h2>
-          <div class="stat-row"><span>스테이지</span><strong id="stageLabel">1</strong></div>
-          <div class="stat-row"><span>턴</span><strong id="turnLabel">해커 공격</strong></div>
-          <div class="stat-row"><span>목표</span><strong id="objectiveLabel">데이터 코어 탈취</strong></div>
-          <div class="stat-row"><span>시간</span><strong id="timerLabel">48.0</strong></div>
+          <div class="stat-row stat-stage"><span>스테이지</span><strong id="stageLabel">1</strong></div>
+          <div class="stat-row stat-turn"><span>턴</span><strong id="turnLabel">해커 공격</strong></div>
+          <div class="stat-row stat-objective"><span>목표</span><strong id="objectiveLabel">데이터 코어 탈취</strong></div>
           <div class="meter">
             <div class="meter-label"><span>체력</span><span id="hpLabel">3 / 3</span></div>
             <div class="meter-bar"><div id="hpBar"></div></div>
@@ -53,11 +55,13 @@
             <div class="meter-label"><span>에너지</span><span id="energyLabel">100 / 100</span></div>
             <div class="meter-bar"><div id="energyBar"></div></div>
           </div>
-          <div class="stat-row"><span>방어 예산</span><strong id="budgetLabel">-</strong></div>
-          <div class="stat-row"><span>탐지</span><strong id="detectLabel">0</strong></div>
-          <div class="stat-row"><span>지연</span><strong id="delayLabel">0.0s</strong></div>
+          <div class="stat-row stat-budget"><span>방어 예산</span><strong id="budgetLabel">-</strong></div>
+          <div class="stat-row stat-detect"><span>탐지</span><strong id="detectLabel">0</strong></div>
+          <div class="stat-row stat-delay"><span>지연</span><strong id="delayLabel">0.0s</strong></div>
         </div>
+      </section>
 
+      <aside class="side-panel">
         <div id="defenseTools" class="panel-block hidden">
           <h2>함정 배치</h2>
           <p class="hint">함정을 선택한 뒤 맵의 슬롯을 클릭하세요. 삭제를 켜면 배치된 함정을 직접 제거할 수 있습니다.</p>
