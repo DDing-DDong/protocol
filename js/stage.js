@@ -1,10 +1,13 @@
 ﻿// stage.js
 // 책임: 스테이지 로딩과 맵 생성만 담당합니다.
 
-import { GROUND_Y, INFINITE_STAGE_START, WIDTH, getStageById } from "./data.js";
+import { GROUND_Y, INFINITE_STAGE_START, LASER_BASE_LENGTH, WIDTH, getFirewallBlockTime, getStageById } from "./data.js";
 import { getOrientedTrapBox } from "./trap.js";
 
 const TRAP_SLOT_SPACING = 48;
+const START_SLOT_BLOCK_X = 150;
+const START_SLOT_BLOCK_Y = 96;
+const HACKER_START_HEIGHT = 54;
 
 let currentStageId = null;
 
@@ -71,9 +74,7 @@ export function createBaseHazards(stage, game) {
     if (stage >= INFINITE_STAGE_START) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
   }
 
-  const normalizedHazards = hazards.map((hazard) => (
-    hazard.type === "camera" ? normalizeStageCameraHazard(hazard, game.platforms) : hazard
-  ));
+  const normalizedHazards = hazards.map((hazard) => normalizeStageHazard(hazard, game.platforms));
   normalizedHazards.push(...getCarriedHazards(stage, game));
   return normalizedHazards;
 }
@@ -84,7 +85,7 @@ export function getCarriedHazards(stage, game) {
 }
 
 export function trapToAttackHazard(trap, game) {
-  return {
+  const hazard = {
     type: trap.type,
     ...getOrientedTrapBox(trap, game),
     carried: true,
@@ -92,6 +93,12 @@ export function trapToAttackHazard(trap, game) {
     closed: trap.closed,
     closedTime: trap.closedTime,
   };
+
+  if (hazard.type === "firewall" && hazard.closedTime > 0) {
+    hazard.closedTime = Math.min(hazard.closedTime, getFirewallBlockTime(game));
+  }
+
+  return hazard;
 }
 
 export function createTrapSlots(stage, game) {
@@ -111,6 +118,7 @@ export function createTrapSlots(stage, game) {
       const y = platform.y;
       if (x < 80 || x > WIDTH - 70) continue;
       if (Math.abs(x - game.core.x) < 46 && y >= GROUND_Y - 4) continue;
+      if (isNearPlayerStartSlot(stage, x, y)) continue;
       slots.push({ x, y, id, occupied: false });
       id += 1;
     }
@@ -244,6 +252,32 @@ function cloneTrapNodes(trapNodes) {
   }));
 }
 
+function normalizeStageHazard(hazard, platforms) {
+  if (hazard.type === "laser") return normalizeStageLaserHazard(hazard);
+  if (hazard.type === "camera") return normalizeStageCameraHazard(hazard, platforms);
+  return hazard;
+}
+
+function normalizeStageLaserHazard(laser) {
+  const width = Number(laser.w);
+  const height = Number(laser.h);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return laser;
+
+  if (height >= width) {
+    return {
+      ...laser,
+      y: laser.y + height - LASER_BASE_LENGTH,
+      h: LASER_BASE_LENGTH,
+    };
+  }
+
+  return {
+    ...laser,
+    x: laser.x + (width - LASER_BASE_LENGTH) / 2,
+    w: LASER_BASE_LENGTH,
+  };
+}
+
 function normalizeStageCameraHazard(camera, platforms) {
   const anchorX = Number.isFinite(camera.w) ? camera.x + camera.w / 2 : camera.x;
   const anchorY = findCameraPlatformY(camera, anchorX, platforms) ?? (
@@ -274,6 +308,14 @@ function findCameraPlatformY(camera, anchorX, platforms) {
   return bestPlatform ? bestPlatform.y : null;
 }
 
+function isNearPlayerStartSlot(stage, x, y) {
+  const stageData = getStageById(stage);
+  const playerStart = stageData?.playerStart || { x: 64, y: 388 };
+  const startFeetY = playerStart.y + HACKER_START_HEIGHT;
+  return Math.abs(x - playerStart.x) <= START_SLOT_BLOCK_X &&
+    Math.abs(y - startFeetY) <= START_SLOT_BLOCK_Y;
+}
+
 // 수정 이유:
-// - 수비턴에서 설치한 EMP와 방화벽 상태를 다음 공격턴 hazard로 넘길 때 타입별 상태를 유지하기 위함
+// - 수비턴에서 설치한 EMP와 방화벽을 다음 공격턴 hazard로 넘길 때 타입별 판정을 유지하기 위함
 // - 스테이지 기본 카메라를 유저 설치 카메라와 같은 플랫폼 anchor 방식으로 정규화하기 위함

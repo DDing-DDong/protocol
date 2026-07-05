@@ -84,9 +84,9 @@ export function initUI(callbacks) {
     objectiveHud: document.getElementById("objectiveHud"),
     objectiveToggle: document.getElementById("objectiveToggle"),
     objectivePanel: document.getElementById("objectivePanel"),
+    trapToolsToggle: document.getElementById("trapToolsToggle"),
+    trapToolsPanel: document.getElementById("trapToolsPanel"),
     budgetLabel: document.getElementById("budgetLabel"),
-    detectLabel: document.getElementById("detectLabel"),
-    delayLabel: document.getElementById("delayLabel"),
     defenseTools: document.getElementById("defenseTools"),
     logText: document.getElementById("logText"),
     overlay: document.getElementById("overlay"),
@@ -103,6 +103,7 @@ export function initUI(callbacks) {
 
   let overlayAction = null;
   let objectivePanelOpen = false;
+  let trapToolsPanelOpen = false;
   const keys = new Set();
   const attackResumeKeys = new Set([
     "Space",
@@ -129,8 +130,10 @@ export function initUI(callbacks) {
     for (const reward of rewards) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "reward-card";
-      btn.innerHTML = `<strong>${escapeHTML(reward.name)}</strong><span>${escapeHTML(reward.desc)}</span>`;
+      btn.className = `reward-card${reward.recommended ? " recommended selected" : ""}`;
+      btn.innerHTML = reward.recommended
+        ? `<strong>${escapeHTML(reward.name)} <em class="reward-badge">선택됨</em></strong><span>${escapeHTML(reward.desc)}</span>`
+        : `<strong>${escapeHTML(reward.name)}</strong><span>${escapeHTML(reward.desc)}</span>`;
       btn.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -167,9 +170,11 @@ export function initUI(callbacks) {
     ui.budgetLabel.textContent = game.turn === TURN.DEFENSE_BUILD
       ? String(game.defenseBudget)
       : game.turn === TURN.DEFENSE_REPLAY ? "리플레이 중" : "-";
-    ui.detectLabel.textContent = String(game.metrics.detections);
-    ui.delayLabel.textContent = `${game.metrics.delay.toFixed(1)}s`;
-    ui.defenseTools.classList.toggle("hidden", game.turn !== TURN.DEFENSE_BUILD);
+    const showDefenseTools = game.turn === TURN.DEFENSE_BUILD;
+    if (!showDefenseTools) trapToolsPanelOpen = false;
+    ui.defenseTools?.classList.toggle("hidden", !showDefenseTools);
+    ui.trapToolsToggle?.setAttribute("aria-expanded", showDefenseTools && trapToolsPanelOpen ? "true" : "false");
+    ui.trapToolsPanel?.classList.toggle("hidden", !showDefenseTools || !trapToolsPanelOpen);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.pauseAttackBtn.disabled = game.turn !== TURN.ATTACK;
@@ -436,7 +441,8 @@ export function initUI(callbacks) {
 
     const showDefenseLayout = game?.turn === TURN.DEFENSE_BUILD ||
       game?.turn === TURN.DEFENSE_REPLAY ||
-      game?.showFailedDefenseLayout;
+      game?.showFailedDefenseLayout ||
+      game?.showSuccessDefenseLayout;
 
     if (showDefenseLayout) {
       drawSafely(ctx, () => drawReplayPath(ctx, game?.lastAttackRecording));
@@ -449,6 +455,11 @@ export function initUI(callbacks) {
     }
     if (showDefenseLayout && game?.replayHacker) {
       drawSafely(ctx, () => drawHacker(ctx, game.replayHacker, true));
+    }
+
+    if (showDefenseLayout) {
+      drawSafely(ctx, () => drawTrapEffects(ctx, game?.placedTraps, game));
+      drawSafely(ctx, () => drawObjectiveSpark(ctx, game));
     }
 
     drawSafely(ctx, () => drawStageBanner(ctx, game));
@@ -825,7 +836,7 @@ export function initUI(callbacks) {
       if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "camera") {
-        const cameraBox = getCameraHazardBox(hazard);
+        const cameraBox = getCameraHazardBox(hazard, game);
         box = cameraBox;
         drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h);
       }
@@ -841,25 +852,86 @@ export function initUI(callbacks) {
       const xCenter = Number(slot?.x);
       const yTop = Number(slot?.y);
       if (!Number.isFinite(xCenter) || !Number.isFinite(yTop)) continue;
+      if (slot.occupied) continue;
 
       ctx.save();
       const x = Math.round(xCenter - VISUAL_SLOT_W / 2);
       const y = Math.round(yTop - VISUAL_SLOT_H - 2);
-      ctx.strokeStyle = slot.occupied ? "rgba(255,255,255,0.12)" : "rgba(24,224,255,0.42)";
-      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.045)" : "rgba(24,224,255,0.055)";
-      ctx.lineWidth = 1;
+      if (slot.blocked) {
+        ctx.strokeStyle = "rgba(255, 43, 139, 0.92)";
+        ctx.fillStyle = "rgba(255, 43, 139, 0.24)";
+      } else if (slot.costDiscount) {
+        ctx.strokeStyle = "rgba(55, 255, 150, 0.92)";
+        ctx.fillStyle = "rgba(55, 255, 150, 0.20)";
+      } else {
+        ctx.strokeStyle = "rgba(24,224,255,0.42)";
+        ctx.fillStyle = "rgba(24,224,255,0.055)";
+      }
+      if (slot.blocked || slot.costDiscount) {
+        drawSlotGlitch(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H, slot.blocked ? "blocked" : "discount");
+      }
+
+      ctx.lineWidth = slot.blocked || slot.costDiscount ? 2 : 1;
       roundRect(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H, 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.09)" : "rgba(24,224,255,0.16)";
+      ctx.fillStyle = slot.blocked
+        ? "rgba(233, 248, 255, 0.42)"
+        : slot.costDiscount ? "rgba(233, 248, 255, 0.44)" : "rgba(24,224,255,0.16)";
       ctx.fillRect(x + 7, y + 3, VISUAL_SLOT_W - 14, 1);
-      ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.060)" : "rgba(39,255,200,0.085)";
+      ctx.fillStyle = slot.blocked
+        ? "rgba(24, 224, 255, 0.58)"
+        : slot.costDiscount ? "rgba(255, 245, 105, 0.62)" : "rgba(39,255,200,0.085)";
       ctx.fillRect(x + 12, y + VISUAL_SLOT_H - 3, VISUAL_SLOT_W - 24, 1);
       ctx.restore();
     }
   }
 
+  function drawSlotGlitch(ctx, x, y, w, h, variant) {
+    const t = performance.now() / 1000;
+    const pulse = 0.45 + Math.sin(t * 18 + x * 0.05) * 0.14;
+    const jitter = Math.round(Math.sin(t * 31 + x * 0.11) * 2);
+    const isBlocked = variant === "blocked";
+    const primary = isBlocked ? "rgba(255, 43, 139," : "rgba(55, 255, 150,";
+    const secondary = isBlocked ? "rgba(24, 224, 255," : "rgba(255, 245, 105,";
+
+    ctx.save();
+    ctx.shadowColor = isBlocked ? "#ff2b8b" : "#37ff96";
+    ctx.shadowBlur = 13;
+    ctx.strokeStyle = `${primary} ${Math.min(0.95, pulse + 0.28)})`;
+    ctx.lineWidth = 2;
+    roundRect(ctx, x - 3 + jitter, y - 5, w + 6, h + 10, 3);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = `${secondary} 0.64)`;
+    ctx.fillRect(x - 5 - jitter, y - 2, 12, 2);
+    ctx.fillRect(x + w - 8 + jitter, y + h + 1, 13, 2);
+    ctx.fillStyle = `${primary} 0.44)`;
+    ctx.fillRect(x + 5 + jitter, y - 6, w - 10, 1);
+    ctx.fillRect(x + 11 - jitter, y + h + 5, w - 22, 1);
+
+    ctx.strokeStyle = `${secondary} 0.70)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (isBlocked) {
+      ctx.moveTo(x + 9 + jitter, y - 3);
+      ctx.lineTo(x + w - 9 - jitter, y + h + 4);
+      ctx.moveTo(x + w - 10 - jitter, y - 3);
+      ctx.lineTo(x + 10 + jitter, y + h + 4);
+    } else {
+      ctx.moveTo(x + 10 + jitter, y + h + 4);
+      ctx.lineTo(x + 18 + jitter, y - 3);
+      ctx.moveTo(x + 22 - jitter, y + h + 4);
+      ctx.lineTo(x + 30 - jitter, y - 3);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawPlacedTraps(ctx, placedTraps, game) {
+    if (!Array.isArray(placedTraps)) return;
     for (const trap of placedTraps) {
       const box = getOrientedTrapBox(trap, game);
       if (trap.type === "laser") drawLaser(ctx, box.x, box.y, box.w, box.h);
@@ -868,6 +940,15 @@ export function initUI(callbacks) {
       if (trap.type === "firewall") drawFirewall(ctx, box.x, box.y, box.w, box.h, trap.closed || trap.empowered);
       if (trap.type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h);
       if (trap.empowered) drawEmpoweredMark(ctx, box);
+    }
+  }
+
+  function drawTrapEffects(ctx, placedTraps, game) {
+    if (!Array.isArray(placedTraps)) return;
+    for (const trap of placedTraps) {
+      const box = getOrientedTrapBox(trap, game);
+      drawTrapTriggerTimer(ctx, trap, box);
+      drawTrapObjectiveSpark(ctx, trap, box);
     }
   }
 
@@ -976,6 +1057,138 @@ export function initUI(callbacks) {
     ctx.font = "bold 11px system-ui";
     ctx.fillText("BOOST", box.x, box.y - 8);
     ctx.restore();
+  }
+
+  function drawTrapTriggerTimer(ctx, trap, box) {
+    const effect = trap?.triggerEffect;
+    if (!effect || effect.timer <= 0) return;
+
+    const duration = Math.max(0.1, effect.duration || effect.timer);
+    const remaining = Math.max(0, effect.timer);
+    const progress = clamp01(remaining / duration);
+    const age = duration - remaining;
+    const alpha = Math.min(1, age * 5) * Math.max(0.18, progress);
+    const { x, y } = getTrapEffectAnchor(box);
+    const colors = getTriggerEffectColors(effect.kind);
+    const label = effect.label || "발동";
+    const timerText = formatEffectTimer(remaining);
+    ctx.save();
+    ctx.font = "bold 12px system-ui";
+    const labelW = Math.max(82, ctx.measureText(label).width + 70);
+    const h = 28;
+    const left = Math.max(8, Math.min(CANVAS_WIDTH - labelW - 8, x - labelW / 2));
+    const top = y - 36 - (1 - progress) * 5;
+
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = colors.glow;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "rgba(3, 8, 13, 0.84)";
+    ctx.strokeStyle = colors.stroke;
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, left, top, labelW, h, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = colors.text;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, left + 10, top + h / 2);
+
+    const cx = left + labelW - 18;
+    const cy = top + h / 2;
+    ctx.strokeStyle = "rgba(233, 248, 255, 0.20)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = colors.stroke;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    ctx.stroke();
+    ctx.fillStyle = "#e9f8ff";
+    ctx.font = "bold 9px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(timerText, cx, cy + 0.5);
+    ctx.restore();
+  }
+
+  function drawTrapObjectiveSpark(ctx, trap, box) {
+    if (!trap?.objectiveSparkTimer || trap.objectiveSparkTimer <= 0) return;
+
+    const duration = Math.max(0.1, trap.objectiveSparkDuration || trap.objectiveSparkTimer);
+    const progress = 1 - clamp01(trap.objectiveSparkTimer / duration);
+    const { x, y } = getTrapEffectAnchor(box);
+    drawSparkBurst(ctx, x, y - 10, progress, trap.objectiveSparkLabel || "조건 완료", "#27ffc8");
+  }
+
+  function drawObjectiveSpark(ctx, game) {
+    if (!game?.objectiveSparkTimer || game.objectiveSparkTimer <= 0) return;
+
+    const duration = Math.max(0.1, game.objectiveSparkDuration || game.objectiveSparkTimer);
+    const progress = 1 - clamp01(game.objectiveSparkTimer / duration);
+    drawSparkBurst(ctx, CANVAS_WIDTH / 2, 92, progress, game.objectiveSparkLabel || "목표 완료", "#e9fff8");
+  }
+
+  function drawSparkBurst(ctx, x, y, progress, label, color) {
+    const pulse = Math.sin(progress * Math.PI);
+    const radius = 18 + progress * 34;
+    const alpha = Math.max(0, 1 - progress * 0.72);
+    const t = performance.now() / 1000;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16;
+    ctx.lineWidth = 2;
+
+    for (let i = 0; i < 10; i += 1) {
+      const angle = (Math.PI * 2 * i) / 10 + t * 0.8;
+      const inner = radius * 0.28;
+      const outer = radius * (0.68 + pulse * 0.24);
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+      ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = Math.min(1, alpha + 0.2);
+    ctx.beginPath();
+    ctx.arc(x, y, 10 + pulse * 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.font = "bold 13px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x, y - 26 - pulse * 4);
+    ctx.restore();
+  }
+
+  function getTrapEffectAnchor(box) {
+    return {
+      x: Math.max(34, Math.min(CANVAS_WIDTH - 34, box.x + box.w / 2)),
+      y: Math.max(64, Math.min(CANVAS_HEIGHT - 24, box.y)),
+    };
+  }
+
+  function getTriggerEffectColors(kind) {
+    if (kind === "delay") {
+      return { stroke: "#ffcc33", glow: "#ffcc33", text: "#fff4b8" };
+    }
+    if (kind === "mixed") {
+      return { stroke: "#27ffc8", glow: "#bb5cff", text: "#e9fff8" };
+    }
+    return { stroke: "#8af2ff", glow: "#18e0ff", text: "#dff9ff" };
+  }
+
+  function formatEffectTimer(value) {
+    const rounded = Math.max(0, Math.ceil(value * 10) / 10);
+    return rounded >= 10 ? String(Math.ceil(rounded)) : rounded.toFixed(1);
+  }
+
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
   }
 
   function drawReplayPath(ctx, path) {
@@ -1274,6 +1487,14 @@ export function initUI(callbacks) {
       objectivePanelOpen = !objectivePanelOpen;
       ui.objectiveToggle.setAttribute("aria-expanded", objectivePanelOpen ? "true" : "false");
       ui.objectivePanel.classList.toggle("hidden", !objectivePanelOpen);
+    });
+
+    ui.trapToolsToggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      trapToolsPanelOpen = !trapToolsPanelOpen;
+      ui.trapToolsToggle.setAttribute("aria-expanded", trapToolsPanelOpen ? "true" : "false");
+      ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
     });
 
     ui.restartBtn.addEventListener(

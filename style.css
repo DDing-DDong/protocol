@@ -297,6 +297,79 @@ button.secondary {
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
 }
 
+.defense-tools-hud {
+  position: absolute;
+  z-index: 12;
+  top: 96px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.defense-tools-toggle {
+  min-height: 32px;
+  padding: 7px 11px;
+  background: rgba(11, 26, 39, 0.90);
+  color: #e9f8ff;
+  border: 1px solid rgba(39, 255, 200, 0.45);
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.defense-tools-toggle[aria-expanded="true"] {
+  background: #27ffc8;
+  color: #031018;
+}
+
+.defense-tools-panel {
+  width: min(380px, calc(100vw - 68px));
+  padding: 10px 12px;
+  background: rgba(3, 8, 13, 0.92);
+  border: 1px solid rgba(39, 255, 200, 0.34);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+}
+
+.defense-tools-panel h2 {
+  margin-bottom: 7px;
+  color: #27ffc8;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.defense-tools-panel .hint {
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+.trap-budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  margin-bottom: 9px;
+  padding: 6px 8px;
+  background: rgba(39, 255, 200, 0.08);
+  border: 1px solid rgba(39, 255, 200, 0.24);
+  border-radius: 6px;
+  color: #c4e9f4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trap-budget-row strong {
+  min-width: 38px;
+  color: #27ffc8;
+  font-size: 16px;
+  text-align: right;
+  text-shadow: 0 0 10px rgba(39, 255, 200, 0.36);
+}
+
 .objective-panel-title {
   margin-bottom: 7px;
   color: #18e0ff;
@@ -373,7 +446,7 @@ button.secondary {
 
 .side-panel {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   align-items: stretch;
 }
@@ -786,6 +859,7 @@ kbd {
   margin: 0 0 14px;
   color: #c4e9f4;
   line-height: 1.5;
+  white-space: pre-line;
 }
 
 .reward-list {
@@ -802,10 +876,33 @@ kbd {
   border: 1px solid #31556f;
 }
 
+.reward-card.recommended {
+  border-color: #ffcc33;
+  background: linear-gradient(180deg, rgba(255, 204, 51, 0.18), rgba(19, 34, 52, 0.96));
+  box-shadow: 0 0 18px rgba(255, 204, 51, 0.22);
+}
+
 .reward-card strong {
   display: block;
   color: #18e0ff;
   margin-bottom: 3px;
+}
+
+.reward-card.recommended strong {
+  color: #ffcc33;
+}
+
+.reward-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 204, 51, 0.7);
+  border-radius: 999px;
+  color: #ffeaa3;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.2;
+  vertical-align: 2px;
 }
 
 @media (max-width: 1040px) {
@@ -853,6 +950,24 @@ kbd {
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .objective-hud {
+    top: 78px;
+    left: 10px;
+  }
+
+  .objective-panel {
+    width: min(300px, calc(100vw - 24px));
+  }
+
+  .defense-tools-hud {
+    top: 78px;
+    right: 10px;
+  }
+
+  .defense-tools-panel {
+    width: min(330px, calc(100vw - 24px));
   }
 
   .in-game-status {

@@ -24,12 +24,26 @@ export const SHOCK_EMPOWERED_DURATION_BONUS = 0.8;
 export const CAMERA_NETWORK_EMPOWER_BONUS = 1;
 export const STORY_STAGE_COUNT = 11;
 export const INFINITE_STAGE_START = STORY_STAGE_COUNT + 1;
+export const REWARD_TURN_MIN = 1;
+export const REWARD_TURN_MAX = 2;
+export const REWARD_MAX_TURN_STAGE_STEP = 5;
+export const REWARD_MIN_TURN_STAGE_STEP = 10;
+export const CAMERA_RANGE_SCALE_BONUS = 0.1;
+export const SHOCK_DEFENSE_DELAY_BONUS = 1;
+export const DISCOUNT_SLOT_COST_REDUCTION = 1;
+export const CAMERA_DELAY_BONUS = 0.35;
+export const SHOCK_SLOW_REDUCTION = 0.6;
+export const SKILL_ENERGY_COST_REDUCTION = 0.15;
+export const DASH_DURATION_BONUS = 0.05;
+export const FIREWALL_BLOCK_REDUCTION = 1.5;
+export const LASER_BASE_LENGTH = 83;
+export const LASER_LENGTH_REWARD_BONUS = 24;
 
 export const DEFENSE_OBJECTIVE_EPSILON = 0.01;
 
 export const DEFENSE_OBJECTIVES = {
   2: {
-    delay: 2,
+    delay: 3,
     maxTraps: 2,
     requiredTrapTypes: ["shock"],
   },
@@ -62,48 +76,147 @@ export const DEFENSE_OBJECTIVES = {
 
 export const rewardPool = {
   attack: [
-    {
-      name: "방어 예산 +2",
-      desc: "다음 방어 턴에서 함정을 더 배치할 수 있습니다.",
-      apply: (game) => { game.mods.defenseBudgetBonus += 2; },
-    },
-    {
+    createEffectReward({
+      name: "함정 토큰 +2",
+      desc: "다음 방어 턴에서 함정 토큰이 2개 증가합니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.defenseBudgetBonus += 2; },
+    }),
+    createEffectReward({
       name: "감시 네트워크",
       desc: "카메라 탐지 시 다음 함정 1개를 추가로 강화합니다.",
-      apply: (game) => { game.mods.cameraNetworkBonus += CAMERA_NETWORK_EMPOWER_BONUS; },
-    },
-    {
-      name: "레이저 강화",
-      desc: "방어 턴 레이저의 판정 높이가 증가합니다.",
-      apply: (game) => { game.mods.laserBoost += 18; },
-    },
-    {
+      target: "defense",
+      applyEffect: (game) => { game.mods.cameraNetworkBonus += CAMERA_NETWORK_EMPOWER_BONUS; },
+    }),
+    createEffectReward({
+      name: "레이저 길이 증가",
+      desc: "방어 턴 레이저의 길이가 증가합니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.laserBoost += LASER_LENGTH_REWARD_BONUS; },
+    }),
+    createEffectReward({
       name: "방화벽 강화",
       desc: "방화벽의 차단 시간이 1초 증가합니다.",
-      apply: (game) => { game.mods.firewallDelay += FIREWALL_REWARD_BLOCK_BONUS; },
-    },
+      target: "defense",
+      applyEffect: (game) => { game.mods.firewallDelay += FIREWALL_REWARD_BLOCK_BONUS; },
+    }),
+    createEffectReward({
+      name: "카메라 범위 확장",
+      desc: "카메라 탐지 판정의 좌우 범위가 10% 증가합니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.cameraRangeScale += CAMERA_RANGE_SCALE_BONUS; },
+    }),
+    createEffectReward({
+      name: "첫 함정 무료",
+      desc: "방어 준비 때 처음 설치하는 함정 1개의 비용이 0이 됩니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.freeTrapPlacements += 1; },
+    }),
+    createEffectReward({
+      id: "shock_delay_bonus",
+      name: "감전패널에 닿은 해커 지연 시간 +1초",
+      desc: "감전패널에 닿은 해커의 지연 시간이 1초 증가합니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.shockDelayBonus += SHOCK_DEFENSE_DELAY_BONUS; },
+    }),
+    createEffectReward({
+      name: "할인 설치 슬롯",
+      desc: "방어 준비 때 무작위 슬롯 1칸의 설치 비용이 1 감소합니다.",
+      target: "defense",
+      applyEffect: (game) => {
+        game.mods.discountSlotCount += 1;
+        game.mods.discountSlotCostReduction += DISCOUNT_SLOT_COST_REDUCTION;
+      },
+    }),
+    createEffectReward({
+      name: "카메라 지연 모듈",
+      desc: "카메라 탐지에 짧은 지연 효과가 추가됩니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.cameraDelay += CAMERA_DELAY_BONUS; },
+    }),
+    createDynamicEffectReward({
+      target: "defense",
+      createChoice: () => {
+        const trapType = pickRandomTrapType();
+        return {
+          name: `${TRAPS[trapType].name} 추가 배치권`,
+          desc: `함정 토큰은 소모하지만 ${TRAPS[trapType].name} 1개를 함정 개수 제한에 포함하지 않고 추가로 배치합니다.`,
+          data: { trapType },
+          applyEffect: (game, effect) => {
+            const type = effect.data.trapType;
+            game.mods.extraTrapUsesByType[type] = (game.mods.extraTrapUsesByType[type] || 0) + 1;
+          },
+        };
+      },
+    }),
   ],
   defense: [
-    {
+    createEffectReward({
       name: "최대 에너지 +20",
       desc: "다음 공격 턴의 에너지 최대치가 증가합니다.",
-      apply: (game) => { game.mods.maxEnergy += 20; },
-    },
-    {
+      target: "attack",
+      applyEffect: (game) => { game.mods.maxEnergy += 20; },
+    }),
+    createEffectReward({
       name: "대시 쿨다운 감소",
       desc: "공격 턴에서 대시를 더 자주 사용할 수 있습니다.",
-      apply: (game) => { game.mods.dashCooldown = Math.max(0.45, game.mods.dashCooldown - 0.12); },
-    },
-    {
+      target: "attack",
+      applyEffect: (game) => { game.mods.dashCooldown = Math.max(0.45, game.mods.dashCooldown - 0.12); },
+    }),
+    createEffectReward({
       name: "실드 효율 증가",
       desc: "실드가 소모하는 에너지가 줄어듭니다.",
-      apply: (game) => { game.mods.shieldDrain = Math.max(28, game.mods.shieldDrain - 6); },
-    },
-    {
+      target: "attack",
+      applyEffect: (game) => { game.mods.shieldDrain = Math.max(28, game.mods.shieldDrain - 6); },
+    }),
+    createEffectReward({
       name: "보호막 1회",
       desc: "공격 턴에서 함정 피해를 한 번 무시합니다.",
-      apply: (game) => { game.mods.freeHit += 1; },
-    },
+      target: "attack",
+      applyEffect: (game) => { game.mods.freeHit += 1; },
+    }),
+    createEffectReward({
+      name: "첫 실드 무료",
+      desc: "공격 턴에서 첫 실드 사용의 에너지 소모가 0이 됩니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.freeShieldUses += 1; },
+    }),
+    createEffectReward({
+      name: "감전 저항",
+      desc: "공격 턴에서 감전패널의 감속 지속 시간이 감소합니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.shockSlowReduction += SHOCK_SLOW_REDUCTION; },
+    }),
+    createEffectReward({
+      name: "스킬 절전",
+      desc: "대시와 실드의 에너지 비용이 15% 감소합니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.skillEnergyCostMultiplier *= 1 - SKILL_ENERGY_COST_REDUCTION; },
+    }),
+    createEffectReward({
+      name: "슬라이딩 거리 증가",
+      desc: "공격 턴 대시 지속 시간이 증가해 더 멀리 이동합니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.dashDurationBonus += DASH_DURATION_BONUS; },
+    }),
+    createEffectReward({
+      name: "방화벽 약화",
+      desc: "공격 턴에서 방화벽 차단 시간이 감소합니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.firewallBlockReduction += FIREWALL_BLOCK_REDUCTION; },
+    }),
+    createEffectReward({
+      name: "카메라 은폐",
+      desc: "공격 턴에서 카메라 탐지 1회를 무시합니다.",
+      target: "attack",
+      applyEffect: (game) => { game.mods.cameraIgnoreUses += 1; },
+    }),
+    createEffectReward({
+      name: "랜덤 슬롯 폐쇄",
+      desc: "다음 방어 준비 때 무작위 함정 슬롯 1칸이 설치 불가칸이 됩니다.",
+      target: "defense",
+      applyEffect: (game) => { game.mods.blockedSlotCount += 1; },
+    }),
   ],
 };
 
@@ -276,10 +389,10 @@ export const stages = [
       role: "defense-tutorial",
       learningGoals: ["replay-analysis", "limited-budget", "delay", "laser", "shock", "wall-surface"],
       difficulty: 2,
-      description: "Replay를 완전히 막기보다 Laser 또는 Shock로 2초 이상 늦추는 첫 방어 튜토리얼 관문",
+      description: "Replay를 완전히 막기보다 Laser 또는 Shock로 3초 이상 늦추는 첫 방어 튜토리얼 관문",
       pacing: {
         start: "Stage 1에서 기록된 이동 경로를 다시 관찰하고 초반 바닥 슬롯의 방어 가치를 판단하게 한다.",
-        middle: "중앙 방화벽 관문 주변에 제한된 예산으로 Laser와 Shock 중 무엇을 놓을지 선택하게 한다.",
+        middle: "중앙 방화벽 관문 주변에 제한된 함정 토큰으로 Laser와 Shock 중 무엇을 놓을지 선택하게 한다.",
         end: "Goal 직전 서버 패널 구간에서 Replay Delay가 누적되면 방어 목표가 달성된다는 점을 확인시킨다.",
       },
     },
@@ -289,7 +402,7 @@ export const stages = [
       front: ["large-square-tile", "platform-floor", "gate-frame", "glow-line"],
       fx: ["scan-line", "warning-pulse"],
     },
-    objective: "해커를 2초 이상 지연",
+    objective: "해커를 3초 이상 지연",
     timeLimit: 48,
     playerStart: {
       x: 72,
@@ -340,7 +453,7 @@ export const stages = [
         w: 180,
         h: 18,
         role: "delay-confirmation",
-        intent: "Goal 직전 마지막 방어 슬롯의 의미를 보여주고 2초 지연 달성을 확인시키는 접근 발판",
+        intent: "Goal 직전 마지막 방어 슬롯의 의미를 보여주고 3초 지연 달성을 확인시키는 접근 발판",
       },
     ],
     trapNodes: [
@@ -362,7 +475,7 @@ export const stages = [
         y: 344,
         w: 15,
         h: 118,
-        intent: "Goal 접근 전 수직 Laser로 Replay 경로를 압박하고 Shock와 조합해 2초 지연을 노리게 한다.",
+        intent: "Goal 접근 전 수직 Laser로 Replay 경로를 압박하고 Shock와 조합해 3초 지연을 노리게 한다.",
         recommendedTrap: "laser",
         teaches: ["vertical-threat", "route-read", "timing"],
       },
@@ -373,7 +486,7 @@ export const stages = [
         y: 448,
         w: 84,
         h: 14,
-        intent: "예산이 제한된 상황에서 두 번째 Shock를 선택하면 지연 목표가 더 안정적으로 달성됨을 보여주는 후보 위치",
+        intent: "함정 토큰이 제한된 상황에서 두 번째 Shock를 선택하면 지연 목표가 더 안정적으로 달성됨을 보여주는 후보 위치",
         recommendedTrap: "shock",
         teaches: ["delay-stack", "late-route", "limited-budget"],
       },
@@ -440,19 +553,35 @@ export function createDefaultMods() {
     cameraNetworkBonus: 0,
     laserBoost: 0,
     firewallDelay: 0,
+    firewallBlockReduction: 0,
+    cameraRangeScale: 1,
+    freeTrapPlacements: 0,
+    shockDelayBonus: 0,
+    discountSlotCount: 0,
+    discountSlotCostReduction: 0,
+    cameraDelay: 0,
+    extraTrapUsesByType: createTrapTriggerCounts(),
+    freeShieldUses: 0,
+    shockSlowReduction: 0,
+    skillEnergyCostMultiplier: 1,
+    dashDurationBonus: 0,
+    cameraIgnoreUses: 0,
+    blockedSlotCount: 0,
   };
 }
 
 export function getFirewallBlockTime(game) {
-  return FIREWALL_BLOCK_TIME + (game?.mods?.firewallDelay || 0);
+  const mods = game?.mods || {};
+  return Math.max(1, FIREWALL_BLOCK_TIME + (mods.firewallDelay || 0) - (mods.firewallBlockReduction || 0));
 }
 
-export function getShockSlowTime(trap) {
-  return SHOCK_SLOW_TIME + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0);
+export function getShockSlowTime(trap, game) {
+  const mods = game?.mods || {};
+  return Math.max(0.4, SHOCK_SLOW_TIME + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0) - (mods.shockSlowReduction || 0));
 }
 
-export function getShockDelay(trap) {
-  return 1 + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0);
+export function getShockDelay(trap, game) {
+  return 1 + (trap?.empowered ? SHOCK_EMPOWERED_DURATION_BONUS : 0) + (game?.mods?.shockDelayBonus || 0);
 }
 
 export function getCameraEmpowerCount(game) {
@@ -596,11 +725,12 @@ export function getDefenseObjectiveItems(game) {
   }
 
   if (objective.maxTraps) {
-    const count = placedTraps.length;
+    const count = placedTraps.filter((trap) => !trap.extraUse).length;
+    const extraCount = placedTraps.length - count;
     items.push({
       id: "maxTraps",
       label: `함정 ${objective.maxTraps}개 이하`,
-      progress: `${count} / ${objective.maxTraps}개`,
+      progress: extraCount > 0 ? `${count} / ${objective.maxTraps}개 (+${extraCount})` : `${count} / ${objective.maxTraps}개`,
       complete: count <= objective.maxTraps,
     });
   }
@@ -626,10 +756,87 @@ export function getDefenseObjectiveSummary(game) {
   return `목표 ${completed}/${items.length}`;
 }
 
-export function pickRewards(type, rewardPoolList) {
+export function pickRewards(type, rewardPoolList, stage = 1, options = {}) {
   const pool = rewardPoolList[type].slice();
+  const preferredIndex = options.preferredRewardId
+    ? pool.findIndex((reward) => reward.id === options.preferredRewardId)
+    : -1;
+  const preferredReward = preferredIndex >= 0 ? pool.splice(preferredIndex, 1)[0] : null;
   shuffle(pool);
-  return pool.slice(0, 3);
+  const selectedRewards = preferredReward
+    ? [preferredReward, ...pool].slice(0, 3)
+    : pool.slice(0, 3);
+
+  return selectedRewards.map((reward, index) => {
+    const choice = materializeRewardChoice(reward, stage);
+    if (preferredReward && index === 0 && options.markPreferred) {
+      choice.recommended = true;
+    }
+    return choice;
+  });
+}
+
+function createEffectReward(config) {
+  return {
+    ...config,
+    apply: addActiveRewardEffect,
+  };
+}
+
+function createDynamicEffectReward(config) {
+  return createEffectReward(config);
+}
+
+function materializeRewardChoice(template, stage) {
+  const dynamic = typeof template.createChoice === "function" ? template.createChoice() : {};
+  const reward = {
+    ...template,
+    ...dynamic,
+  };
+  const turnRange = getRewardTurnRange(stage);
+  const minTurns = reward.minTurns || turnRange.min;
+  const maxTurns = reward.maxTurns || turnRange.max;
+  const durationTurns = randomInt(minTurns, Math.max(minTurns, maxTurns));
+  const baseDesc = reward.desc;
+  return {
+    ...reward,
+    baseDesc,
+    durationTurns,
+    desc: `${baseDesc} (${durationTurns}턴 지속)`,
+  };
+}
+
+export function getRewardTurnRange(stage) {
+  const stageNumber = Math.max(1, Number(stage) || 1);
+  const maxBonus = Math.floor((stageNumber - 1) / REWARD_MAX_TURN_STAGE_STEP);
+  const minBonus = Math.floor((stageNumber - 1) / REWARD_MIN_TURN_STAGE_STEP);
+  const min = REWARD_TURN_MIN + minBonus;
+  const max = Math.max(min, REWARD_TURN_MAX + maxBonus);
+  return { min, max };
+}
+
+function addActiveRewardEffect(game, reward) {
+  if (!game.activeEffects) game.activeEffects = [];
+  game.activeEffects.push({
+    id: cryptoSafeId(),
+    name: reward.name,
+    desc: reward.baseDesc || reward.desc,
+    target: reward.target,
+    remainingTurns: reward.durationTurns || 1,
+    data: reward.data ? { ...reward.data } : {},
+    applyEffect: reward.applyEffect,
+  });
+}
+
+function randomInt(min, max) {
+  const low = Math.ceil(min);
+  const high = Math.floor(max);
+  return low + Math.floor(Math.random() * (high - low + 1));
+}
+
+function pickRandomTrapType() {
+  const types = Object.keys(TRAPS);
+  return types[Math.floor(Math.random() * types.length)];
 }
 
 export function shuffle(arr) {
