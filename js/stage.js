@@ -98,7 +98,11 @@ export function createTrapSlots(stage, game) {
   const slots = [];
   let id = 0;
 
+  if (!Array.isArray(game?.platforms)) return slots;
+
   for (const platform of game.platforms) {
+    if (!isValidPlatformRect(platform)) continue;
+
     const cols = Math.floor(platform.w / TRAP_SLOT_SPACING);
     if (cols <= 0) continue;
 
@@ -113,6 +117,16 @@ export function createTrapSlots(stage, game) {
   }
 
   return slots;
+}
+
+function isValidPlatformRect(platform) {
+  return platform &&
+    Number.isFinite(platform.x) &&
+    Number.isFinite(platform.y) &&
+    Number.isFinite(platform.w) &&
+    Number.isFinite(platform.h) &&
+    platform.w > 0 &&
+    platform.h > 0;
 }
 
 export function getWallTrapSlots(stageId) {
