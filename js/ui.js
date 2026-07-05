@@ -426,33 +426,49 @@ export function initUI(callbacks) {
 
   function draw(game) {
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    drawBackground(ctx, game);
-    drawPlatforms(ctx, game.platforms);
-    drawCore(ctx, game.core);
-    drawBaseHazards(ctx, game);
+    if (!ctx) return;
 
-    const showDefenseLayout = game.turn === TURN.DEFENSE_BUILD ||
-      game.turn === TURN.DEFENSE_REPLAY ||
-      game.showFailedDefenseLayout;
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    drawSafely(ctx, () => drawBackground(ctx, game));
+    drawSafely(ctx, () => drawPlatforms(ctx, game?.platforms));
+    drawSafely(ctx, () => drawCore(ctx, game?.core));
+    drawSafely(ctx, () => drawBaseHazards(ctx, game));
+
+    const showDefenseLayout = game?.turn === TURN.DEFENSE_BUILD ||
+      game?.turn === TURN.DEFENSE_REPLAY ||
+      game?.showFailedDefenseLayout;
 
     if (showDefenseLayout) {
-      drawReplayPath(ctx, game.lastAttackRecording);
-      drawTrapSlots(ctx, game.trapSlots);
-      drawPlacedTraps(ctx, game.placedTraps, game);
+      drawSafely(ctx, () => drawReplayPath(ctx, game?.lastAttackRecording));
+      drawSafely(ctx, () => drawTrapSlots(ctx, game?.trapSlots));
+      drawSafely(ctx, () => drawPlacedTraps(ctx, game?.placedTraps, game));
     }
 
-    if (game.turn === TURN.ATTACK && game.hacker) drawHacker(ctx, game.hacker, false);
-    if (showDefenseLayout && game.replayHacker) {
-      drawHacker(ctx, game.replayHacker, true);
+    if (game?.turn === TURN.ATTACK && game.hacker) {
+      drawSafely(ctx, () => drawHacker(ctx, game.hacker, false));
+    }
+    if (showDefenseLayout && game?.replayHacker) {
+      drawSafely(ctx, () => drawHacker(ctx, game.replayHacker, true));
     }
 
-    drawStageBanner(ctx, game);
+    drawSafely(ctx, () => drawStageBanner(ctx, game));
+  }
+
+  function drawSafely(ctx, drawStep) {
+    ctx.save();
+    try {
+      drawStep();
+    } catch {
+      // Keep the rest of the frame rendering if one visual layer receives unexpected data.
+    } finally {
+      ctx.restore();
+    }
   }
 
   function drawBackground(ctx, game) {
-    const stageData = getStageById(game.stage);
-    const visualTheme = getStageVisualTheme(game.stage, stageData);
+    const stage = Number.isFinite(Number(game?.stage)) ? Number(game.stage) : 1;
+    const stageData = getStageById(stage);
+    const visualTheme = getStageVisualTheme(stage, stageData);
     const colors = getVisualThemeColors(visualTheme.theme.palette);
 
     ctx.save();
@@ -472,18 +488,23 @@ export function initUI(callbacks) {
 
   function getStageVisualTheme(stage, stageData) {
     const fallback = getFallbackVisualTheme(stage);
+    const backgroundLayers = stageData?.backgroundLayers || {};
     return {
       theme: {
         ...fallback.theme,
         ...(stageData?.theme || {}),
       },
       backgroundLayers: {
-        far: stageData?.backgroundLayers?.far?.length ? stageData.backgroundLayers.far : fallback.backgroundLayers.far,
-        mid: stageData?.backgroundLayers?.mid?.length ? stageData.backgroundLayers.mid : fallback.backgroundLayers.mid,
-        front: stageData?.backgroundLayers?.front?.length ? stageData.backgroundLayers.front : fallback.backgroundLayers.front,
-        fx: stageData?.backgroundLayers?.fx?.length ? stageData.backgroundLayers.fx : fallback.backgroundLayers.fx,
+        far: normalizeLayerList(backgroundLayers.far, fallback.backgroundLayers.far),
+        mid: normalizeLayerList(backgroundLayers.mid, fallback.backgroundLayers.mid),
+        front: normalizeLayerList(backgroundLayers.front, fallback.backgroundLayers.front),
+        fx: normalizeLayerList(backgroundLayers.fx, fallback.backgroundLayers.fx),
       },
     };
+  }
+
+  function normalizeLayerList(layerList, fallback) {
+    return Array.isArray(layerList) && layerList.length > 0 ? layerList : fallback;
   }
 
   function getFallbackVisualTheme(stage) {
@@ -518,7 +539,8 @@ export function initUI(callbacks) {
   }
 
   function drawFarLayer(ctx, visualTheme, colors) {
-    if (!visualTheme.backgroundLayers.far.includes("future-city")) return;
+    const layers = visualTheme?.backgroundLayers?.far || [];
+    if (!layers.includes("future-city")) return;
 
     ctx.save();
     ctx.fillStyle = `rgba(${colors.skyline}, 0.88)`;
@@ -555,7 +577,7 @@ export function initUI(callbacks) {
   }
 
   function drawMidLayer(ctx, visualTheme, colors) {
-    const layers = visualTheme.backgroundLayers.mid || [];
+    const layers = visualTheme?.backgroundLayers?.mid || [];
     if (layers.length === 0) return;
 
     ctx.save();
@@ -610,7 +632,7 @@ export function initUI(callbacks) {
   }
 
   function drawFrontLayer(ctx, visualTheme, colors) {
-    const layers = visualTheme.backgroundLayers.front || [];
+    const layers = visualTheme?.backgroundLayers?.front || [];
     if (layers.length === 0) return;
 
     ctx.save();
@@ -642,7 +664,7 @@ export function initUI(callbacks) {
   }
 
   function drawFxLayer(ctx, visualTheme, colors) {
-    const layers = visualTheme.backgroundLayers.fx || [];
+    const layers = visualTheme?.backgroundLayers?.fx || [];
     if (layers.length === 0) return;
 
     ctx.save();
@@ -671,27 +693,33 @@ export function initUI(callbacks) {
   }
 
   function drawPlatforms(ctx, platforms) {
+    if (!Array.isArray(platforms)) return;
     for (const platform of platforms) {
       drawTilePlatform(ctx, platform);
     }
   }
 
   function drawTilePlatform(ctx, platform) {
-    const visualH = Math.max(VISUAL_TILE_SIZE, Math.ceil(platform.h / VISUAL_TILE_SIZE) * VISUAL_TILE_SIZE);
-    const visualW = getPlatformVisualTileWidth(platform);
+    const rect = getRenderableRect(platform);
+    if (!rect) return;
+
+    const visualH = Math.max(VISUAL_TILE_SIZE, Math.ceil(rect.h / VISUAL_TILE_SIZE) * VISUAL_TILE_SIZE);
+    const visualW = getPlatformVisualTileWidth(rect);
+    if (visualW <= 0) return;
+
     const cols = Math.ceil(visualW / VISUAL_TILE_SIZE);
     const rows = Math.ceil(visualH / VISUAL_TILE_SIZE);
-    const visualX = Math.round(platform.x);
+    const visualX = Math.round(rect.x);
 
     ctx.save();
     ctx.beginPath();
-    ctx.rect(platform.x - VISUAL_TILE_SIZE / 2, platform.y, platform.w + VISUAL_TILE_SIZE, visualH);
+    ctx.rect(rect.x, rect.y, rect.w, visualH);
     ctx.clip();
 
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const x = visualX + col * VISUAL_TILE_SIZE;
-        const y = platform.y + row * VISUAL_TILE_SIZE;
+        const y = rect.y + row * VISUAL_TILE_SIZE;
         drawSquareMetalTile(ctx, x, y, row === 0);
       }
     }
@@ -700,27 +728,37 @@ export function initUI(callbacks) {
     ctx.lineWidth = 1;
     for (let x = visualX; x <= visualX + visualW; x += VISUAL_TILE_SIZE) {
       ctx.beginPath();
-      ctx.moveTo(x + 0.5, platform.y);
-      ctx.lineTo(x + 0.5, platform.y + visualH);
+      ctx.moveTo(x + 0.5, rect.y);
+      ctx.lineTo(x + 0.5, rect.y + visualH);
       ctx.stroke();
     }
-    for (let y = platform.y; y <= platform.y + visualH; y += VISUAL_TILE_SIZE) {
+    for (let y = rect.y; y <= rect.y + visualH; y += VISUAL_TILE_SIZE) {
       ctx.beginPath();
-      ctx.moveTo(platform.x, y + 0.5);
-      ctx.lineTo(platform.x + platform.w, y + 0.5);
+      ctx.moveTo(rect.x, y + 0.5);
+      ctx.lineTo(rect.x + rect.w, y + 0.5);
       ctx.stroke();
     }
     ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
-    ctx.fillRect(platform.x, platform.y, platform.w, 2);
+    ctx.fillRect(rect.x, rect.y, rect.w, 2);
     ctx.fillStyle = "rgba(24, 224, 255, 0.12)";
-    ctx.fillRect(platform.x, platform.y + 2, platform.w, 1);
+    ctx.fillRect(rect.x, rect.y + 2, rect.w, 1);
     ctx.restore();
   }
 
   function getPlatformVisualTileWidth(platform) {
-    if (platform.w <= VISUAL_TILE_SIZE) return VISUAL_TILE_SIZE;
-    const tileCount = Math.max(1, Math.round(platform.w / VISUAL_TILE_SIZE));
+    const tileCount = Math.floor(platform.w / VISUAL_TILE_SIZE);
+    if (tileCount <= 0) return 0;
     return tileCount * VISUAL_TILE_SIZE;
+  }
+
+  function getRenderableRect(rect) {
+    if (!rect) return null;
+    const x = Math.round(Number(rect.x));
+    const y = Math.round(Number(rect.y));
+    const w = Math.round(Number(rect.w));
+    const h = Math.round(Number(rect.h));
+    if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return null;
+    return { x, y, w, h };
   }
 
   function drawSquareMetalTile(ctx, x, y, isTopRow) {
@@ -763,22 +801,25 @@ export function initUI(callbacks) {
   }
 
   function drawCore(ctx, core) {
+    const rect = getRenderableRect(core);
+    if (!rect) return;
+
     ctx.save();
     ctx.fillStyle = "#27ffc8";
     ctx.shadowColor = "#27ffc8";
     ctx.shadowBlur = 18;
-    ctx.fillRect(core.x, core.y, core.w, core.h);
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.shadowBlur = 0;
     ctx.fillStyle = "#06251f";
-    ctx.fillRect(core.x + 10, core.y + 12, core.w - 20, core.h - 24);
+    ctx.fillRect(rect.x + 10, rect.y + 12, rect.w - 20, rect.h - 24);
     ctx.fillStyle = "#27ffc8";
     ctx.font = "12px monospace";
-    ctx.fillText("CORE", core.x + 5, core.y - 8);
+    ctx.fillText("CORE", rect.x + 5, rect.y - 8);
     ctx.restore();
   }
 
   function drawBaseHazards(ctx, game) {
-    if (!game.baseHazards || game.baseHazards.length === 0) return;
+    if (!Array.isArray(game?.baseHazards) || game.baseHazards.length === 0) return;
     for (const hazard of game.baseHazards) {
       let box = hazard;
       if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
@@ -795,10 +836,15 @@ export function initUI(callbacks) {
   }
 
   function drawTrapSlots(ctx, trapSlots) {
+    if (!Array.isArray(trapSlots)) return;
     for (const slot of trapSlots) {
+      const xCenter = Number(slot?.x);
+      const yTop = Number(slot?.y);
+      if (!Number.isFinite(xCenter) || !Number.isFinite(yTop)) continue;
+
       ctx.save();
-      const x = Math.round(slot.x - VISUAL_SLOT_W / 2);
-      const y = Math.round(slot.y - VISUAL_SLOT_H - 2);
+      const x = Math.round(xCenter - VISUAL_SLOT_W / 2);
+      const y = Math.round(yTop - VISUAL_SLOT_H - 2);
       ctx.strokeStyle = slot.occupied ? "rgba(255,255,255,0.12)" : "rgba(24,224,255,0.42)";
       ctx.fillStyle = slot.occupied ? "rgba(255,255,255,0.045)" : "rgba(24,224,255,0.055)";
       ctx.lineWidth = 1;
