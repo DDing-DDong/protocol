@@ -100,10 +100,13 @@ export function initUI(callbacks) {
     restartBtn: document.getElementById("restartBtn"),
     helpBtn: document.getElementById("helpBtn"),
   };
+  prepareStatusBar(ui);
+  prepareAttackSkillPanel(ui, canvas);
 
   let overlayAction = null;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
+  let attackSkillsPanelOpen = false;
   const keys = new Set();
   const attackResumeKeys = new Set([
     "Space",
@@ -117,6 +120,69 @@ export function initUI(callbacks) {
 
   function setLog(text) {
     ui.logText.textContent = text;
+  }
+
+  function prepareStatusBar(ui) {
+    const statusBar = document.querySelector(".in-game-status");
+    if (!statusBar) return;
+
+    statusBar.querySelectorAll(".stat-stage, .stat-turn, .stat-objective")
+      .forEach((node) => node.remove());
+
+    if (!ui.logText || ui.logText.closest(".in-game-status")) return;
+
+    const oldLogPanel = ui.logText.closest(".panel-block");
+    const logBox = document.createElement("div");
+    logBox.className = "status-log";
+
+    const label = document.createElement("span");
+    label.textContent = "로그";
+    logBox.append(label, ui.logText);
+
+    statusBar.append(logBox);
+    oldLogPanel?.remove();
+  }
+
+  function prepareAttackSkillPanel(ui, canvas) {
+    const hud = document.createElement("div");
+    hud.id = "attackSkills";
+    hud.className = "attack-skills-hud hidden";
+
+    const toggle = document.createElement("button");
+    toggle.id = "attackSkillsToggle";
+    toggle.className = "attack-skills-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "스킬 정보";
+
+    const panel = document.createElement("div");
+    panel.id = "attackSkillsPanel";
+    panel.className = "attack-skills-panel hidden";
+    panel.setAttribute("aria-label", "공격 스킬 정보");
+
+    panel.innerHTML = `
+      <h2>스킬 정보</h2>
+      <div class="skill-info-grid">
+        <div class="skill-info-row">
+          <strong>대시</strong>
+          <span class="keycap">SHIFT</span>
+          <span class="skill-targets">감전패널 · EMP <em>통과</em></span>
+          <span class="skill-effect">대시 거리 : 53</span>
+        </div>
+        <div class="skill-info-row">
+          <strong>해킹</strong>
+          <span class="keycap">SPACE BAR</span>
+          <span class="skill-targets">레이저 · 카메라 <em>무력화</em></span>
+          <span class="skill-effect">지속 시간 : 1초</span>
+        </div>
+      </div>
+    `;
+
+    hud.append(toggle, panel);
+    canvas.parentElement?.appendChild(hud);
+    ui.attackSkills = hud;
+    ui.attackSkillsToggle = toggle;
+    ui.attackSkillsPanel = panel;
   }
 
   function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton }) {
@@ -175,6 +241,11 @@ export function initUI(callbacks) {
     ui.defenseTools?.classList.toggle("hidden", !showDefenseTools);
     ui.trapToolsToggle?.setAttribute("aria-expanded", showDefenseTools && trapToolsPanelOpen ? "true" : "false");
     ui.trapToolsPanel?.classList.toggle("hidden", !showDefenseTools || !trapToolsPanelOpen);
+    const showAttackSkills = game.turn === TURN.ATTACK;
+    if (!showAttackSkills) attackSkillsPanelOpen = false;
+    ui.attackSkills?.classList.toggle("hidden", !showAttackSkills);
+    ui.attackSkillsToggle?.setAttribute("aria-expanded", showAttackSkills && attackSkillsPanelOpen ? "true" : "false");
+    ui.attackSkillsPanel?.classList.toggle("hidden", !showAttackSkills || !attackSkillsPanelOpen);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.pauseAttackBtn.disabled = game.turn !== TURN.ATTACK;
@@ -831,16 +902,17 @@ export function initUI(callbacks) {
     if (!Array.isArray(game?.baseHazards) || game.baseHazards.length === 0) return;
     for (const hazard of game.baseHazards) {
       let box = hazard;
-      if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
+      if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard);
       if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.type === "camera") {
         const cameraBox = getCameraHazardBox(hazard, game);
         box = cameraBox;
-        drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h);
+        drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h, hazard);
       }
       if (hazard.type === "firewall") drawFirewall(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard.closed || hazard.empowered);
       if (hazard.type === "emp") drawEmp(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
       if (hazard.empowered) drawEmpoweredMark(ctx, box);
+      drawHackStatus(ctx, hazard, box);
     }
   }
 
@@ -950,14 +1022,19 @@ export function initUI(callbacks) {
     }
   }
 
-  function drawLaser(ctx, x, y, w, h) {
+  function drawLaser(ctx, x, y, w, h, state = null) {
+    const hacked = (state?.hackedTime || 0) > 0;
+    const pending = (state?.hackPendingTime || 0) > 0;
+    const flicker = getHackFlicker(state);
     ctx.save();
-    ctx.fillStyle = "rgba(255, 59, 103, 0.22)";
+    ctx.globalAlpha = hacked || pending ? flicker.alpha : 1;
+    ctx.fillStyle = hacked ? "rgba(39, 255, 200, 0.12)" : "rgba(255, 59, 103, 0.22)";
     ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = "#ff3b67";
-    ctx.shadowColor = "#ff3b67";
-    ctx.shadowBlur = 12;
+    ctx.fillStyle = hacked ? "#27ffc8" : "#ff3b67";
+    ctx.shadowColor = pending ? "#e9fff8" : hacked ? "#27ffc8" : "#ff3b67";
+    ctx.shadowBlur = pending || hacked ? 18 : 12;
     ctx.fillRect(x + w / 2 - 2, y, 4, h);
+    if (pending || hacked) drawHackGlitchLines(ctx, x, y, w, h, flicker.jitter);
     ctx.restore();
   }
 
@@ -993,7 +1070,7 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawCamera(ctx, x, y, w, h) {
+  function drawCamera(ctx, x, y, w, h, state = null) {
     const bodyW = Math.min(56, w * 0.5);
     const bodyH = Math.min(36, h * 0.32);
     const bodyX = x + w - bodyW - 2;
@@ -1003,8 +1080,13 @@ export function initUI(callbacks) {
     const coneBottomRight = { x: coneTopRight.x, y: y + h };
     const coneBottomLeft = { x: x + 8, y: y + h };
 
+    const hacked = (state?.hackedTime || 0) > 0;
+    const pending = (state?.hackPendingTime || 0) > 0;
+    const flicker = getHackFlicker(state);
+
     ctx.save();
-    ctx.fillStyle = "rgba(187, 92, 255, 0.24)";
+    ctx.globalAlpha = hacked || pending ? flicker.alpha : 1;
+    ctx.fillStyle = hacked ? "rgba(39, 255, 200, 0.10)" : "rgba(187, 92, 255, 0.24)";
     ctx.beginPath();
     ctx.moveTo(coneTopLeft.x, coneTopLeft.y);
     ctx.lineTo(coneTopRight.x, coneTopRight.y);
@@ -1016,17 +1098,66 @@ export function initUI(callbacks) {
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.setLineDash([7, 7]);
-    ctx.strokeStyle = "rgba(187, 92, 255, 0.78)";
+    ctx.strokeStyle = hacked ? "rgba(39, 255, 200, 0.70)" : "rgba(187, 92, 255, 0.78)";
     ctx.beginPath();
     ctx.moveTo(bodyX + bodyW / 2, bodyY + bodyH);
     ctx.lineTo((coneBottomLeft.x + coneBottomRight.x) / 2, coneBottomLeft.y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = "#bb5cff";
-    ctx.shadowColor = "#bb5cff";
-    ctx.shadowBlur = 10;
+    ctx.fillStyle = hacked ? "#27ffc8" : "#bb5cff";
+    ctx.shadowColor = pending ? "#e9fff8" : hacked ? "#27ffc8" : "#bb5cff";
+    ctx.shadowBlur = pending || hacked ? 18 : 10;
     roundRect(ctx, bodyX, bodyY, bodyW, bodyH, 8);
     ctx.fill();
+    if (pending || hacked) drawHackGlitchLines(ctx, x, y, w, h, flicker.jitter);
+    ctx.restore();
+  }
+
+  function getHackFlicker(state) {
+    if (!state || ((state.hackedTime || 0) <= 0 && (state.hackPendingTime || 0) <= 0)) {
+      return { alpha: 1, jitter: 0 };
+    }
+
+    const t = performance.now() / 1000;
+    const blink = Math.floor(t * 16) % 2 === 0;
+    return {
+      alpha: blink ? 0.28 : 0.86,
+      jitter: Math.round(Math.sin(t * 45) * 3),
+    };
+  }
+
+  function drawHackGlitchLines(ctx, x, y, w, h, jitter = 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(39, 255, 200, 0.82)";
+    ctx.fillRect(x - 5 + jitter, y + h * 0.22, Math.min(34, w + 10), 2);
+    ctx.fillRect(x + w - Math.min(32, w) - jitter, y + h * 0.62, Math.min(38, w + 8), 2);
+    ctx.strokeStyle = "rgba(233, 255, 248, 0.78)";
+    ctx.setLineDash([4, 5]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - 4 - jitter, y - 4, w + 8, h + 8);
+    ctx.restore();
+  }
+
+  function drawHackStatus(ctx, hazard, box) {
+    const pending = hazard?.hackPendingTime || 0;
+    const hacked = hazard?.hackedTime || 0;
+    if (pending <= 0 && hacked <= 0) return;
+
+    const label = pending > 0 ? "HACK" : "OFF";
+    const t = performance.now() / 1000;
+    const x = box.x + box.w / 2;
+    const y = Math.max(28, box.y - 12);
+
+    ctx.save();
+    ctx.globalAlpha = pending > 0 ? 0.9 : 0.72;
+    ctx.fillStyle = "#27ffc8";
+    ctx.shadowColor = "#27ffc8";
+    ctx.shadowBlur = 12;
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(label, x + Math.sin(t * 26) * 2, y);
     ctx.restore();
   }
 
@@ -1206,8 +1337,7 @@ export function initUI(callbacks) {
   function drawHacker(ctx, h, isGhost) {
     ctx.save();
     const isHitFlashing = !isGhost && (h.damageFlashTime || 0) > 0;
-    const isShieldBlocking = !isGhost && (h.shieldBlockFlashTime || 0) > 0;
-    const isInvincibleBlink = !isGhost && (h.invincible || 0) > 0 && !isShieldBlocking;
+    const isInvincibleBlink = !isGhost && (h.invincible || 0) > 0;
     ctx.globalAlpha = isGhost ? 0.72 : getHackerAlpha(h, isInvincibleBlink);
     if (isGhost && h.glitchTime > 0) drawGlitchAura(ctx, h);
     if (isHitFlashing) drawDamageFlash(ctx, h);
@@ -1220,23 +1350,17 @@ export function initUI(callbacks) {
     const bodyW = h.isSliding ? h.w + 18 : h.w;
     const bodyH = h.h;
     if (!isGhost && h.isSliding) drawSlideTrail(ctx, bodyW, bodyH);
+    if (!isGhost && (h.wallGrab || (h.wallAttachEffectTime || 0) > 0 || (h.wallSlideEffectTime || 0) > 0)) {
+      drawWallMoveEffect(ctx, h, bodyW, bodyH);
+    }
     ctx.fillRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH);
     ctx.fillStyle = "#071019";
     ctx.fillRect(2, h.isSliding ? -5 : -14, 9, 6);
     ctx.fillStyle = "#e9f8ff";
     ctx.fillRect(9, h.isSliding ? 1 : -8, 16, 4);
 
-    if (h.shield) {
-      const shieldFlash = getShieldFlash(h);
-      ctx.globalAlpha = shieldFlash.alpha;
-      ctx.strokeStyle = shieldFlash.color;
-      ctx.lineWidth = shieldFlash.lineWidth;
-      ctx.beginPath();
-      ctx.arc(0, 0, 38, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = isGhost ? 0.72 : 1;
-
-      drawShieldTimer(ctx, h);
+    if (!isGhost && ((h.hackChargeTime || 0) > 0 || (h.hackEffectTime || 0) > 0)) {
+      drawHackCastEffect(ctx, h);
     }
 
     ctx.restore();
@@ -1279,17 +1403,100 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function getShieldFlash(h) {
-    if ((h.shieldBlockFlashTime || 0) <= 0) {
-      return { alpha: 1, color: "#27ffc8", lineWidth: 3 };
+  function drawHackCastEffect(ctx, h) {
+    const t = performance.now() / 1000;
+    const remaining = h.hackChargeTime || h.hackEffectTime || 0;
+    const duration = h.hackChargeDuration || 0.5;
+    const progress = 1 - clamp01(remaining / duration);
+    const originX = h.w / 2 + 8;
+    const originY = h.isSliding ? -2 : -8;
+
+    ctx.save();
+    ctx.strokeStyle = "#27ffc8";
+    ctx.fillStyle = "#e9fff8";
+    ctx.shadowColor = "#27ffc8";
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 2;
+
+    for (let i = 0; i < 3; i += 1) {
+      const radius = 10 + i * 9 + progress * 16;
+      ctx.globalAlpha = Math.max(0.12, 0.72 - i * 0.16 - progress * 0.28);
+      ctx.beginPath();
+      ctx.arc(originX + radius * 0.5, originY + Math.sin(t * 18 + i) * 3, radius, -0.65, 0.65);
+      ctx.stroke();
     }
 
-    const pulse = Math.floor((h.shieldBlockFlashTime || 0) * 22) % 2 === 0;
-    return {
-      alpha: pulse ? 1 : 0.35,
-      color: pulse ? "#e9fff8" : "#27ffc8",
-      lineWidth: pulse ? 5 : 3,
-    };
+    ctx.globalAlpha = 0.95;
+    ctx.font = "bold 10px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText("EXEC", originX + 16, originY - 18);
+    ctx.restore();
+  }
+
+  function drawWallMoveEffect(ctx, h, bodyW, bodyH) {
+    const t = performance.now() / 1000;
+    const facing = h.facing || 1;
+    const wallSide = h.wallSide || h.wallStickSide || facing;
+    const localSide = wallSide * facing;
+    const handX = localSide > 0 ? bodyW / 2 + 4 : -bodyW / 2 - 4;
+    const handY = h.isSliding ? 0 : -bodyH * 0.22;
+    const wallOutward = localSide > 0 ? 1 : -1;
+    const slideOutward = -1;
+    const sticking = h.wallGrab && (h.wallStickTimer || 0) > 0;
+    const sliding = h.wallGrab && !sticking;
+    const attachPower = clamp01((h.wallAttachEffectTime || 0) / 0.24);
+    const slidePower = sliding ? 1 : clamp01((h.wallSlideEffectTime || 0) / 0.28);
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = "round";
+
+    for (let i = 0; i < 5; i += 1) {
+      const phase = (t * (sliding ? 20 : 13) + i * 0.31) % 1;
+      const y = sticking
+        ? handY + (i - 2) * 4 + Math.sin(t * 18 + i) * 1.5
+        : -bodyH / 2 + 8 + i * (bodyH - 16) / 4 + Math.sin(t * 12 + i) * 2;
+      const length = sticking ? 6 + attachPower * 10 : 18 + i * 4;
+      const drop = sliding ? 12 + phase * 24 : 2 + attachPower * 5;
+      const outward = sticking ? wallOutward : slideOutward;
+      const alpha = (sticking ? 0.24 : 0.34) * (1 - phase * 0.5) + attachPower * 0.12;
+
+      ctx.globalAlpha = Math.min(0.82, alpha * Math.max(0.45, slidePower));
+      ctx.strokeStyle = i % 2 === 0 ? "#e9f8ff" : "#27ffc8";
+      ctx.lineWidth = Math.max(1.2, 3 - i * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(handX, y);
+      ctx.lineTo(handX + outward * length, y + drop);
+      ctx.stroke();
+    }
+
+    if (attachPower > 0) {
+      ctx.globalAlpha = 0.78 * attachPower;
+      ctx.strokeStyle = "#27ffc8";
+      ctx.fillStyle = "#e9fff8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(handX + wallOutward * 3, handY, 4 + attachPower * 7, -0.9, 0.9);
+      ctx.stroke();
+
+      for (let i = 0; i < 4; i += 1) {
+        const spread = (i - 1.5) * 0.42;
+        const startX = handX + wallOutward * 2;
+        const startY = handY + spread * 10;
+        ctx.globalAlpha = 0.68 * attachPower;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(startX + wallOutward * (7 + attachPower * 8), startY + spread * 6);
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 0.95 * attachPower;
+      ctx.beginPath();
+      ctx.arc(handX + wallOutward * 2, handY, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   function drawGlitchAura(ctx, h) {
@@ -1306,59 +1513,17 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawShieldTimer(ctx, h) {
-    const shieldTime =
-      typeof h.shieldTimer === "number"
-        ? h.shieldTimer
-        : typeof h.shieldTime === "number"
-          ? h.shieldTime
-          : typeof h.shieldDuration === "number"
-            ? h.shieldDuration
-            : null;
-
-    if (shieldTime === null) return;
-
-    const remainSeconds = Math.max(0, Math.ceil(shieldTime));
-
-    ctx.save();
-    ctx.scale(h.facing || 1, 1);
-
-    const x = -14;
-    const y = -h.h / 2 - 34;
-
-    ctx.strokeStyle = "#27ffc8";
-    ctx.fillStyle = "rgba(39, 255, 200, 0.08)";
-    ctx.lineWidth = 2;
-
-    ctx.beginPath();
-    ctx.moveTo(x, y + 2);
-    ctx.quadraticCurveTo(x + 10, y - 3, x + 20, y + 2);
-    ctx.lineTo(x + 18, y + 15);
-    ctx.quadraticCurveTo(x + 10, y + 23, x + 2, y + 15);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = "#27ffc8";
-    ctx.shadowColor = "#27ffc8";
-    ctx.shadowBlur = 8;
-    ctx.font = "bold 15px system-ui";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`${remainSeconds}s`, x + 30, y + 11);
-
-    ctx.restore();
-  }
 
   function drawStageBanner(ctx, game) {
+    const bannerTurn = getStageBannerTurn(game);
     ctx.save();
     ctx.fillStyle = "rgba(3, 8, 13, 0.66)";
     ctx.fillRect(16, 16, 390, 54);
-    ctx.fillStyle = "#18e0ff";
+    ctx.fillStyle = bannerTurn === TURN.ATTACK ? "#ff446a" : "#18e0ff";
     ctx.font = "bold 16px system-ui";
     ctx.fillText(
       `STAGE ${game.stage} / ${
-        game.turn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
+        bannerTurn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
       }`,
       30,
       40
@@ -1372,16 +1537,12 @@ export function initUI(callbacks) {
       ctx.fillText(`INFINITE MODE · BEST ${game.infiniteBest}`, 700, 40);
     }
 
-    // ===== 기존 상단 실드 타이머 삭제 =====
-    // 아래 코드가 있었다면 전부 삭제
-    //
-    // if (game.hacker?.shield) {
-    //    ctx.fillText(...);
-    // }
-    //
-    // ===================================
-
     ctx.restore();
+  }
+
+  function getStageBannerTurn(game) {
+    if (game?.turn === TURN.ENDING && game?.bannerTurn) return game.bannerTurn;
+    return game?.turn;
   }
 
   function roundRect(context, x, y, w, h, r) {
@@ -1493,6 +1654,14 @@ export function initUI(callbacks) {
       trapToolsPanelOpen = !trapToolsPanelOpen;
       ui.trapToolsToggle.setAttribute("aria-expanded", trapToolsPanelOpen ? "true" : "false");
       ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
+    });
+
+    ui.attackSkillsToggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      attackSkillsPanelOpen = !attackSkillsPanelOpen;
+      ui.attackSkillsToggle.setAttribute("aria-expanded", attackSkillsPanelOpen ? "true" : "false");
+      ui.attackSkillsPanel?.classList.toggle("hidden", !attackSkillsPanelOpen);
     });
 
     ui.restartBtn.addEventListener(

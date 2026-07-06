@@ -164,8 +164,8 @@ export const rewardPool = {
       applyEffect: (game) => { game.mods.dashCooldown = Math.max(0.45, game.mods.dashCooldown - 0.12); },
     }),
     createEffectReward({
-      name: "실드 효율 증가",
-      desc: "실드가 소모하는 에너지가 줄어듭니다.",
+      name: "해킹 효율 증가",
+      desc: "해킹이 소모하는 에너지가 줄어듭니다.",
       target: "attack",
       applyEffect: (game) => { game.mods.shieldDrain = Math.max(28, game.mods.shieldDrain - 6); },
     }),
@@ -176,8 +176,8 @@ export const rewardPool = {
       applyEffect: (game) => { game.mods.freeHit += 1; },
     }),
     createEffectReward({
-      name: "첫 실드 무료",
-      desc: "공격 턴에서 첫 실드 사용의 에너지 소모가 0이 됩니다.",
+      name: "첫 해킹 무료",
+      desc: "공격 턴에서 첫 해킹 사용의 에너지 소모가 0이 됩니다.",
       target: "attack",
       applyEffect: (game) => { game.mods.freeShieldUses += 1; },
     }),
@@ -189,7 +189,7 @@ export const rewardPool = {
     }),
     createEffectReward({
       name: "스킬 절전",
-      desc: "대시와 실드의 에너지 비용이 15% 감소합니다.",
+      desc: "대시와 해킹의 에너지 비용이 15% 감소합니다.",
       target: "attack",
       applyEffect: (game) => { game.mods.skillEnergyCostMultiplier *= 1 - SKILL_ENERGY_COST_REDUCTION; },
     }),

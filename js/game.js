@@ -15,7 +15,7 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js";
-import { createHacker, updateAttack, activateShield } from "./player.js";
+import { createHacker, updateAttack, activateHack } from "./player.js";
 import { initUI } from "./ui.js";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js";
 import {
@@ -29,7 +29,7 @@ import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js
 
 const canvas = document.getElementById("gameCanvas");
 const uiModule = initUI({
-  onShield: () => activateShield(game, flashLog),
+  onShield: () => activateHack(game, flashLog),
   onStartReplay: () => {
     game.deleteMode = false;
     uiModule.setDeleteMode(false);
@@ -71,6 +71,7 @@ const uiModule = initUI({
 const game = {
   stage: 1,
   turn: TURN.ATTACK,
+  bannerTurn: TURN.ATTACK,
   timer: 30,
   attackTimerStarted: false,
   attackPaused: false,
@@ -118,7 +119,7 @@ const STAGE_ONE_HACKER_DIALOGUE = [
   "좋아, 여기까지는 깔끔하네.",
   "이제부터 삐끗하면 내 기록이 통째로 날아가겠지만.",
   "데이터 코어로 진입해서 정보를 빼내야 해.\n\n침투기록이 남을테니 최대한 빨리 움직여야지.",
-  "하던대로 움직이면 돼. 방향키로 이동하고\n\nShift로 슬라이딩. Space로 해킹툴을 사용해서 실드를 켜면 되겠지.",
+  "하던대로 움직이면 돼. 방향키로 이동하고\n\nShift로 슬라이딩. Space로 전방의 레이저나 카메라를 해킹하면 되겠지.",
 ];
 
 const STAGE_ONE_REWARD_DIALOGUE = [
@@ -231,6 +232,7 @@ function setupStage(options = {}) {
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   const preservedTrapSlotEffects = keepDefenseTraps ? snapshotTrapSlotEffects(game.trapSlots) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
+  game.bannerTurn = game.turn;
   applyActiveEffectsForStage(isAttack ? "attack" : "defense");
   game.stageState = createStageState(game.mods);
   game.timer = getStageTime(game.stage);
@@ -413,6 +415,7 @@ function endStage(success, text) {
   const completedStage = game.stage;
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;
+  game.bannerTurn = completedTurn;
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
   game.showSuccessDefenseLayout = success && completedTurn === TURN.DEFENSE_REPLAY;
   updateBest(completedStage, success);
@@ -515,7 +518,7 @@ function showHelp() {
 
   uiModule.showOverlay({
     title: "조작법",
-    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 실드, S 일시정지를 사용합니다. 일시정지 중에는 이동/대시/실드 입력으로 바로 재개합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
+    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 해킹, S 일시정지를 사용합니다. 일시정지 중에는 이동/대시/해킹 입력으로 바로 재개합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });

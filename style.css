@@ -297,7 +297,8 @@ button.secondary {
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
 }
 
-.defense-tools-hud {
+.defense-tools-hud,
+.attack-skills-hud {
   position: absolute;
   z-index: 12;
   top: 96px;
@@ -308,7 +309,8 @@ button.secondary {
   gap: 8px;
 }
 
-.defense-tools-toggle {
+.defense-tools-toggle,
+.attack-skills-toggle {
   min-height: 32px;
   padding: 7px 11px;
   background: rgba(11, 26, 39, 0.90);
@@ -320,12 +322,23 @@ button.secondary {
   font-weight: 900;
 }
 
+.attack-skills-toggle {
+  border-color: rgba(255, 68, 106, 0.48);
+}
+
 .defense-tools-toggle[aria-expanded="true"] {
   background: #27ffc8;
   color: #031018;
 }
 
-.defense-tools-panel {
+.attack-skills-toggle[aria-expanded="true"] {
+  background: #ff446a;
+  color: #031018;
+  border-color: #ff8aa2;
+}
+
+.defense-tools-panel,
+.attack-skills-panel {
   width: min(380px, calc(100vw - 68px));
   padding: 10px 12px;
   background: rgba(3, 8, 13, 0.92);
@@ -334,16 +347,99 @@ button.secondary {
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
 }
 
-.defense-tools-panel h2 {
+.attack-skills-panel {
+  width: min(456px, calc(100vw - 68px));
+  border-color: rgba(255, 68, 106, 0.34);
+}
+
+.defense-tools-panel h2,
+.attack-skills-panel h2 {
   margin-bottom: 7px;
-  color: #27ffc8;
   font-size: 13px;
   letter-spacing: 0;
+}
+
+.defense-tools-panel h2 {
+  color: #27ffc8;
+}
+
+.attack-skills-panel h2 {
+  color: #ff8aa2;
 }
 
 .defense-tools-panel .hint {
   margin-bottom: 9px;
   font-size: 12px;
+}
+
+.skill-info-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-info-row {
+  display: grid;
+  grid-template-columns: 48px 92px minmax(116px, 1fr) minmax(86px, 0.7fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: rgba(3, 8, 13, 0.46);
+  border: 1px solid rgba(154, 199, 214, 0.16);
+  border-radius: 6px;
+  color: #d4f4ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.skill-info-row strong {
+  color: #e9f8ff;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  background: linear-gradient(180deg, rgba(255, 68, 106, 0.22), rgba(3, 8, 13, 0.82));
+  border: 1px solid rgba(255, 138, 162, 0.72);
+  border-radius: 5px;
+  color: #fff0f4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 12px rgba(255, 68, 106, 0.14);
+  font: 900 11px/1 system-ui;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.skill-targets {
+  min-width: 0;
+  color: #c4e9f4;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skill-targets em {
+  display: inline;
+  margin-left: 5px;
+  color: #27ffc8;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.skill-effect {
+  min-width: 0;
+  color: #ffcad4;
+  font-size: 11.5px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .trap-budget-row {
@@ -460,7 +556,7 @@ button.secondary {
 
 .in-game-status {
   display: grid;
-  grid-template-columns: repeat(3, minmax(90px, auto)) minmax(220px, 1fr) minmax(220px, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: 8px 12px;
   margin-top: -58px;
@@ -473,6 +569,43 @@ button.secondary {
 }
 
 .in-game-status h2 {
+  display: none;
+}
+
+.in-game-status .stat-stage,
+.in-game-status .stat-turn,
+.in-game-status .stat-objective {
+  display: none;
+}
+
+.status-log {
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 9px;
+  background: rgba(3, 8, 13, 0.42);
+  border: 1px solid rgba(154, 199, 214, 0.16);
+  border-radius: 6px;
+}
+
+.status-log > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #18e0ff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.status-log .log-text {
+  min-height: 0;
+  max-height: 30px;
+  overflow: hidden;
+  color: #d4f4ff;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.side-panel .panel-block:nth-child(2) {
   display: none;
 }
 
@@ -649,6 +782,7 @@ button.secondary {
 }
 
 #defenseTools.hidden,
+#attackSkills.hidden,
 .hidden,
 .overlay.hidden {
   display: none;
@@ -911,7 +1045,7 @@ kbd {
   }
 
   .in-game-status {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .in-game-status .meter {
@@ -961,17 +1095,28 @@ kbd {
     width: min(300px, calc(100vw - 24px));
   }
 
-  .defense-tools-hud {
+  .defense-tools-hud,
+  .attack-skills-hud {
     top: 78px;
     right: 10px;
   }
 
-  .defense-tools-panel {
+  .defense-tools-panel,
+  .attack-skills-panel {
     width: min(330px, calc(100vw - 24px));
   }
 
+  .skill-info-row {
+    grid-template-columns: 44px 82px 1fr;
+  }
+
+  .skill-effect {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
   .in-game-status {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     margin-top: -46px;
     padding: 7px;
@@ -997,13 +1142,8 @@ kbd {
     font-size: 12px;
   }
 
-  .in-game-status .stat-objective {
-    grid-column: span 2;
-    min-width: 0;
-  }
-
   .in-game-status .meter {
-    grid-column: span 2;
+    grid-column: span 1;
     padding: 5px 6px 6px;
   }
 
