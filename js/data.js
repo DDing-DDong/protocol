@@ -527,6 +527,466 @@ export const stages = [
   },
 ];
 
+export const STAGE_ONE_LAYOUT_PRESETS = [
+  {
+    id: "server-rack-bypass",
+    name: "Server Rack Bypass",
+    description: "중앙 서버 랙을 기준으로 좌우 우회 루트와 바닥 지연 지점을 만드는 Stage 1 프리셋",
+    platforms: [
+      {
+        id: "stage-1-a-ground",
+        x: 0,
+        y: 462,
+        w: 1200,
+        h: 78,
+        role: "main-route",
+        mapObject: "research-lab-floor",
+        trapSlots: [14, 15, 20, 21],
+        defenseTrapSlots: [13, 14, 15, 20, 21],
+        intent: "중앙 Choke Point 전후의 바닥 이동과 방어 슬롯을 모두 받쳐주는 기준 바닥",
+      },
+      {
+        id: "stage-1-a-entry-step",
+        x: 240,
+        y: 366,
+        w: 144,
+        h: 48,
+        role: "entry-step",
+        mapObject: "server-rack-step",
+        trapSlots: [1],
+        defenseTrapSlots: [1, 2],
+        intent: "중앙 서버 랙에 진입하기 전 기본 점프와 착지를 유도하는 진입 발판",
+      },
+      {
+        id: "stage-1-a-left-bypass",
+        x: 384,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "low-bypass",
+        mapObject: "cooling-unit",
+        trapSlots: [1, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Wall Jump 없이도 중앙 기둥 왼쪽에서 낮은 우회 루트를 탈 수 있게 하는 보조 발판",
+      },
+      {
+        id: "stage-1-a-security-pillar",
+        x: 576,
+        y: 222,
+        w: 48,
+        h: 144,
+        role: "chokepoint-wall",
+        mapObject: "security-pillar",
+        trapSlots: false,
+        intent: "상단 빠른 루트와 하단 우회 루트를 나누는 중앙 랜드마크로 이동 선택과 벽면 함정 설치 이유를 만든다.",
+      },
+      {
+        id: "stage-1-a-wall-jump-landing",
+        x: 624,
+        y: 270,
+        w: 144,
+        h: 48,
+        role: "wall-jump-fast-route",
+        mapObject: "data-bridge",
+        trapSlots: [0, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Wall Jump를 사용한 플레이어가 중앙 기둥을 넘어 빠르게 착지하는 상단 연결 발판",
+      },
+      {
+        id: "stage-1-a-right-bypass",
+        x: 720,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "exit-step",
+        mapObject: "server-rack-step",
+        trapSlots: [0, 1],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "중앙 기둥을 넘거나 돌아 나온 플레이어가 Goal 방향으로 회복하는 우측 발판",
+      },
+      {
+        id: "stage-1-a-goal-approach",
+        x: 912,
+        y: 318,
+        w: 144,
+        h: 48,
+        role: "goal-approach",
+        mapObject: "data-bridge",
+        trapSlots: [0, 1],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Goal 직전 마지막 점프 흐름을 유지하면서 Replay 경로를 조금 더 길게 만든다.",
+      },
+    ],
+    trapNodes: [
+      {
+        id: "stage-1-a-laser-entry",
+        type: "laser",
+        x: 336,
+        y: 354,
+        w: 15,
+        h: 108,
+        intent: "진입 발판 이후 타이밍 학습은 유지하되 중앙 Choke Point 전에 속도를 조절하게 한다.",
+        recommendedTrap: "laser",
+        teaches: ["timing", "vertical-threat"],
+      },
+      {
+        id: "stage-1-a-shock-choke-exit",
+        type: "shock",
+        x: 744,
+        y: 400,
+        w: 96,
+        h: 14,
+        intent: "중앙 기둥을 우회한 뒤 착지하기 쉬운 바닥에 지연 위험을 배치한다.",
+        recommendedTrap: "shock",
+        teaches: ["ground-threat", "route-choice"],
+      },
+      {
+        id: "stage-1-a-camera-pillar",
+        type: "camera",
+        x: 528,
+        y: 150,
+        w: 144,
+        h: 72,
+        intent: "중앙 서버 랙 상단 루트와 벽면 접근을 감시해 방어 턴의 Trap 설치 후보를 읽게 한다.",
+        recommendedTrap: "camera",
+        teaches: ["detection", "platform-risk", "wall-surface"],
+      },
+    ],
+    wallTrapSlots: [
+      {
+        id: "stage-1-a-wall-entry",
+        x: 408,
+        y: 336,
+        surface: "entry-server-rack",
+        allowedTraps: ["laser", "camera"],
+        intent: "초반 발판과 중앙 랙 사이를 읽는 벽면 감시 후보 위치",
+      },
+      {
+        id: "stage-1-a-wall-pillar-left",
+        x: 564,
+        y: 210,
+        surface: "security-pillar-left",
+        allowedTraps: ["laser", "shock", "emp"],
+        intent: "중앙 Choke Point 왼쪽 면에 방해형 함정을 붙일 수 있는 핵심 벽면 슬롯",
+      },
+      {
+        id: "stage-1-a-wall-pillar-right",
+        x: 630,
+        y: 210,
+        surface: "security-pillar-right",
+        allowedTraps: ["camera", "firewall"],
+        intent: "기둥을 넘어 나온 Replay를 다시 압박하는 우측 벽면 슬롯",
+      },
+    ],
+  },
+  {
+    id: "offset-firewall-gate",
+    name: "Offset Firewall Gate",
+    description: "오른쪽으로 치우친 방화벽 기둥과 작은 보조 플랫폼으로 바닥/상단 선택을 만드는 Stage 1 프리셋",
+    platforms: [
+      {
+        id: "stage-1-b-ground",
+        x: 0,
+        y: 462,
+        w: 1200,
+        h: 78,
+        role: "main-route",
+        mapObject: "research-lab-floor",
+        trapSlots: [14, 15, 20, 21],
+        defenseTrapSlots: [13, 14, 15, 20, 21],
+        intent: "오른쪽으로 밀린 Choke Point 때문에 Replay가 더 오래 관찰되는 기준 바닥",
+      },
+      {
+        id: "stage-1-b-entry-step",
+        x: 240,
+        y: 366,
+        w: 144,
+        h: 48,
+        role: "entry-step",
+        mapObject: "server-rack-step",
+        trapSlots: [1],
+        defenseTrapSlots: [1, 2],
+        intent: "기존 초반 점프 감각을 유지하면서 중앙 진입 각도를 조금 바꾼다.",
+      },
+      {
+        id: "stage-1-b-aux-platform",
+        x: 432,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "aux-bypass",
+        mapObject: "cooling-unit",
+        trapSlots: [1, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "일반 점프로 오른쪽 기둥을 돌아갈 수 있게 하는 작은 보조 플랫폼",
+      },
+      {
+        id: "stage-1-b-firewall-barrier",
+        x: 624,
+        y: 222,
+        w: 48,
+        h: 144,
+        role: "chokepoint-wall",
+        mapObject: "firewall-barrier",
+        trapSlots: false,
+        intent: "오른쪽으로 치우친 수직 충돌면으로 하단 우회와 상단 빠른 루트를 분리하는 병목을 만든다.",
+      },
+      {
+        id: "stage-1-b-high-route",
+        x: 672,
+        y: 270,
+        w: 144,
+        h: 48,
+        role: "fast-exit",
+        mapObject: "data-bridge",
+        trapSlots: [0, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "벽면을 활용한 플레이어가 더 빠르게 Goal 쪽으로 빠지는 상단 Wall Jump 루트",
+      },
+      {
+        id: "stage-1-b-low-exit",
+        x: 720,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "low-route-exit",
+        mapObject: "server-rack-step",
+        trapSlots: [0, 1],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Wall Jump를 쓰지 않는 플레이어가 방화벽 아래를 지나 Goal 접근 발판으로 이어지는 하단 출구",
+      },
+      {
+        id: "stage-1-b-goal-approach",
+        x: 912,
+        y: 318,
+        w: 144,
+        h: 48,
+        role: "goal-approach",
+        mapObject: "server-rack-step",
+        trapSlots: [0, 1],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "상단 루트와 바닥 우회 루트를 Goal 앞에서 다시 합류시킨다.",
+      },
+    ],
+    trapNodes: [
+      {
+        id: "stage-1-b-laser-gate",
+        type: "laser",
+        x: 600,
+        y: 344,
+        w: 15,
+        h: 118,
+        intent: "오프셋 기둥 진입 전에 세로 압박을 만들어 Wall Jump와 바닥 우회 선택을 분리한다.",
+        recommendedTrap: "laser",
+        teaches: ["timing", "vertical-threat", "route-choice"],
+      },
+      {
+        id: "stage-1-b-shock-low-route",
+        type: "shock",
+        x: 744,
+        y: 400,
+        w: 96,
+        h: 14,
+        intent: "Wall Jump를 쓰지 않는 바닥 우회 경로에 작은 지연 위험을 제공한다.",
+        recommendedTrap: "shock",
+        teaches: ["ground-threat", "delay"],
+      },
+      {
+        id: "stage-1-b-camera-high-route",
+        type: "camera",
+        x: 672,
+        y: 198,
+        w: 144,
+        h: 72,
+        intent: "상단 빠른 루트를 감시해 방어 턴에서 카메라와 Shock 조합을 고민하게 한다.",
+        recommendedTrap: "camera",
+        teaches: ["detection", "platform-risk"],
+      },
+    ],
+    wallTrapSlots: [
+      {
+        id: "stage-1-b-wall-barrier-left",
+        x: 612,
+        y: 210,
+        surface: "firewall-barrier-left",
+        allowedTraps: ["laser", "shock", "emp"],
+        intent: "오프셋 기둥 왼쪽 면에서 진입 Replay를 늦추는 핵심 벽면 슬롯",
+      },
+      {
+        id: "stage-1-b-wall-barrier-right",
+        x: 678,
+        y: 210,
+        surface: "firewall-barrier-right",
+        allowedTraps: ["camera", "firewall"],
+        intent: "기둥을 통과한 뒤 상단 루트와 바닥 루트를 동시에 읽을 수 있는 벽면 슬롯",
+      },
+      {
+        id: "stage-1-b-wall-goal-panel",
+        x: 1032,
+        y: 288,
+        surface: "goal-server-panel",
+        allowedTraps: ["laser", "camera"],
+        intent: "Goal 직전 합류 지점에서 마지막 압박을 줄 수 있는 후보 슬롯",
+      },
+    ],
+  },
+  {
+    id: "core-pillar-overpass",
+    name: "Core Pillar Overpass",
+    description: "중앙 기둥과 상단 발판으로 Wall Jump 빠른 루트와 일반 우회 루트를 함께 제공하는 Stage 1 프리셋",
+    platforms: [
+      {
+        id: "stage-1-c-ground",
+        x: 0,
+        y: 462,
+        w: 1200,
+        h: 78,
+        role: "main-route",
+        mapObject: "research-lab-floor",
+        trapSlots: [15, 16, 20, 21],
+        defenseTrapSlots: [14, 15, 16, 20, 21],
+        intent: "Wall Jump 루트 실패 시에도 정상 클리어 가능한 바닥 우회 루트를 유지한다.",
+      },
+      {
+        id: "stage-1-c-entry-step",
+        x: 240,
+        y: 366,
+        w: 144,
+        h: 48,
+        role: "entry-step",
+        mapObject: "server-rack-step",
+        trapSlots: [1],
+        defenseTrapSlots: [1, 2],
+        intent: "중앙 상단 루트와 일반 우회 루트로 갈라지기 전 안정적인 진입 발판",
+      },
+      {
+        id: "stage-1-c-low-bypass",
+        x: 384,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "low-bypass",
+        mapObject: "cooling-unit",
+        trapSlots: [1, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Wall Jump 없이도 중앙 기둥을 돌아갈 수 있게 하는 낮은 보조 발판",
+      },
+      {
+        id: "stage-1-c-ai-core-pillar",
+        x: 576,
+        y: 174,
+        w: 48,
+        h: 192,
+        role: "chokepoint-wall",
+        mapObject: "ai-core-pillar",
+        trapSlots: false,
+        intent: "프리셋 중 가장 강한 수직 랜드마크로 벽점프 접촉면과 Trap 설치 이유를 동시에 확보한다.",
+      },
+      {
+        id: "stage-1-c-overpass",
+        x: 624,
+        y: 222,
+        w: 144,
+        h: 48,
+        role: "wall-jump-fast-route",
+        mapObject: "data-overpass",
+        trapSlots: [0, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Wall Jump를 활용하면 빠르게 올라탈 수 있는 상단 발판",
+      },
+      {
+        id: "stage-1-c-exit-step",
+        x: 720,
+        y: 414,
+        w: 144,
+        h: 48,
+        role: "exit-step",
+        mapObject: "server-rack-step",
+        trapSlots: [1, 2],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "상단 빠른 루트와 낮은 우회 루트가 다시 합쳐지는 출구 발판",
+      },
+      {
+        id: "stage-1-c-goal-approach",
+        x: 912,
+        y: 318,
+        w: 144,
+        h: 48,
+        role: "goal-approach",
+        mapObject: "data-bridge",
+        trapSlots: [0, 1],
+        defenseTrapSlots: [0, 1, 2],
+        intent: "Goal 직전 접근을 조금 더 길게 만들어 Defense 분석 시간을 늘린다.",
+      },
+    ],
+    trapNodes: [
+      {
+        id: "stage-1-c-laser-pillar",
+        type: "laser",
+        x: 672,
+        y: 344,
+        w: 15,
+        h: 118,
+        intent: "상단 발판에서 내려오는 빠른 루트와 낮은 우회 루트 사이에 수직 위협을 둔다.",
+        recommendedTrap: "laser",
+        teaches: ["vertical-threat", "route-choice"],
+      },
+      {
+        id: "stage-1-c-shock-bypass",
+        type: "shock",
+        x: 768,
+        y: 400,
+        w: 96,
+        h: 14,
+        intent: "일반 우회 루트의 착지 지점에 지연 위험을 만들어 Wall Jump 빠른 루트의 가치를 만든다.",
+        recommendedTrap: "shock",
+        teaches: ["ground-threat", "delay"],
+      },
+      {
+        id: "stage-1-c-camera-overpass",
+        type: "camera",
+        x: 600,
+        y: 150,
+        w: 144,
+        h: 72,
+        intent: "상단 발판과 중앙 기둥 접촉면을 감시해 벽점프 루트를 방어 분석 대상으로 만든다.",
+        recommendedTrap: "camera",
+        teaches: ["detection", "wall-surface", "platform-risk"],
+      },
+    ],
+    wallTrapSlots: [
+      {
+        id: "stage-1-c-wall-pillar-left",
+        x: 564,
+        y: 186,
+        surface: "ai-core-pillar-left",
+        allowedTraps: ["laser", "shock", "emp"],
+        intent: "상단 발판으로 오르려는 접촉면을 직접 압박하는 벽면 슬롯",
+      },
+      {
+        id: "stage-1-c-wall-pillar-right",
+        x: 630,
+        y: 186,
+        surface: "ai-core-pillar-right",
+        allowedTraps: ["camera", "firewall"],
+        intent: "기둥을 넘어 나온 빠른 루트 Replay를 읽는 우측 벽면 슬롯",
+      },
+      {
+        id: "stage-1-c-wall-overpass-panel",
+        x: 684,
+        y: 210,
+        surface: "data-overpass-panel",
+        allowedTraps: ["laser", "camera"],
+        intent: "상단 발판 출구에서 빠른 루트와 Goal 접근을 연결해 감시하는 후보 슬롯",
+      },
+    ],
+  },
+];
+
+const STAGE_ONE_LAYOUT_PRESET_BY_ID = new Map(
+  STAGE_ONE_LAYOUT_PRESETS.map((preset) => [preset.id, preset])
+);
+
 export const WIDTH = 1200;
 export const HEIGHT = 540;
 export const GRAVITY = 1600;
@@ -538,9 +998,21 @@ export const SHIELD_DURATION = 2.5;
 export const HIT_INVINCIBLE_TIME = 0.9;
 export const SHIELD_BLOCK_INVINCIBLE_TIME = 0.75;
 
-export function getStageById(stageId) {
+export function getStageOneLayoutPresetIds() {
+  return STAGE_ONE_LAYOUT_PRESETS.map((preset) => preset.id);
+}
+
+export function pickStageOneLayoutPresetId(random = Math.random) {
+  const index = Math.floor(clamp(random(), 0, 0.999999) * STAGE_ONE_LAYOUT_PRESETS.length);
+  return STAGE_ONE_LAYOUT_PRESETS[index]?.id || STAGE_ONE_LAYOUT_PRESETS[0].id;
+}
+
+export function getStageById(stageId, options = {}) {
   const stageData = stages.find((stage) => stage.id === Number(stageId));
-  return stageData ? cloneStageData(stageData) : null;
+  if (!stageData) return null;
+
+  const clonedStage = cloneStageData(stageData);
+  return applyStageLayoutPreset(clonedStage, options);
 }
 
 export function createDefaultMods() {
@@ -894,6 +1366,70 @@ function formatSeconds(value) {
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}초`;
 }
 
+function applyStageLayoutPreset(stageData, options) {
+  if (!usesStageOneLayoutPreset(stageData.id)) return stageData;
+
+  const preset = STAGE_ONE_LAYOUT_PRESET_BY_ID.get(options.layoutId);
+  if (!preset) return stageData;
+
+  return {
+    ...stageData,
+    layoutId: preset.id,
+    layoutName: preset.name,
+    mapIntent: {
+      ...stageData.mapIntent,
+      selectedLayoutId: preset.id,
+      selectedLayoutName: preset.name,
+      description: stageData.id === 1 ? preset.description : stageData.mapIntent.description,
+    },
+    platforms: cloneLayoutPlatforms(preset.platforms, stageData.id),
+    trapNodes: cloneLayoutTrapNodes(preset.trapNodes, stageData.id),
+    wallTrapSlots: cloneLayoutWallTrapSlots(preset.wallTrapSlots, stageData.id),
+  };
+}
+
+function usesStageOneLayoutPreset(stageId) {
+  return Number(stageId) === 1 || Number(stageId) === 2;
+}
+
+function cloneLayoutPlatforms(platforms, stageId) {
+  return platforms.map((platform) => ({
+    ...platform,
+    id: retargetStageOneId(platform.id, stageId),
+    trapSlots: cloneTrapSlotSetting(platform.trapSlots),
+    defenseTrapSlots: cloneTrapSlotSetting(platform.defenseTrapSlots),
+  }));
+}
+
+function cloneLayoutTrapNodes(trapNodes, stageId) {
+  return trapNodes.map((trapNode) => ({
+    ...trapNode,
+    id: retargetStageOneId(trapNode.id, stageId),
+    teaches: trapNode.teaches ? trapNode.teaches.slice() : [],
+  }));
+}
+
+function cloneLayoutWallTrapSlots(wallTrapSlots, stageId) {
+  return wallTrapSlots.map((slot) => ({
+    ...slot,
+    id: retargetStageOneId(slot.id, stageId),
+    allowedTraps: slot.allowedTraps ? slot.allowedTraps.slice() : [],
+  }));
+}
+
+function retargetStageOneId(id, stageId) {
+  return Number(stageId) === 2 ? String(id).replace("stage-1", "stage-2") : id;
+}
+
+function cloneTrapSlotSetting(trapSlots) {
+  if (Array.isArray(trapSlots)) {
+    return trapSlots.map((slot) => (
+      slot && typeof slot === "object" ? { ...slot } : slot
+    ));
+  }
+  return trapSlots;
+}
+
 function cloneStageData(stageData) {
   return {
     ...stageData,
@@ -923,7 +1459,11 @@ function cloneStageData(stageData) {
     },
     playerStart: { ...stageData.playerStart },
     goal: { ...stageData.goal },
-    platforms: stageData.platforms.map((platform) => ({ ...platform })),
+    platforms: stageData.platforms.map((platform) => ({
+      ...platform,
+      trapSlots: cloneTrapSlotSetting(platform.trapSlots),
+      defenseTrapSlots: cloneTrapSlotSetting(platform.defenseTrapSlots),
+    })),
     trapNodes: stageData.trapNodes.map((trapNode) => ({
       ...trapNode,
       teaches: trapNode.teaches ? trapNode.teaches.slice() : [],

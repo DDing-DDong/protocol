@@ -8,6 +8,24 @@ const TRAP_SLOT_SPACING = 48;
 const START_SLOT_BLOCK_X = 150;
 const START_SLOT_BLOCK_Y = 96;
 const HACKER_START_HEIGHT = 54;
+const OVERHEAD_SLOT_BLOCK_DISTANCE = 56;
+const OVERHEAD_SLOT_BLOCK_MARGIN = 4;
+const ROUTE_HINT_RADIUS = 112;
+const CHOKE_HINT_RADIUS = 132;
+const REPLAY_SLOT_X_RADIUS = 104;
+const REPLAY_SLOT_Y_RADIUS = 136;
+const HACKER_REPLAY_WIDTH = 30;
+
+const STAGE_LAYOUT_GUIDE_ROLES = new Set([
+  "entry-step",
+  "low-bypass",
+  "aux-bypass",
+  "wall-jump-fast-route",
+  "fast-exit",
+  "low-route-exit",
+  "exit-step",
+  "goal-approach",
+]);
 
 let currentStageId = null;
 
@@ -39,8 +57,8 @@ export function getDefenseBudget(stage, game) {
   return base;
 }
 
-export function createPlatforms(stage) {
-  const stageData = getStageById(stage);
+export function createPlatforms(stage, game) {
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
   if (stageData) return cloneRects(stageData.platforms);
 
   const platforms = [
@@ -58,7 +76,7 @@ export function createPlatforms(stage) {
 export function createBaseHazards(stage, game) {
   if (!isAttackStage(stage)) return [];
 
-  const stageData = getStageById(stage);
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
   const hazards = stageData
     ? cloneTrapNodes(stageData.trapNodes)
     : [
@@ -107,24 +125,152 @@ export function createTrapSlots(stage, game) {
 
   if (!Array.isArray(game?.platforms)) return slots;
 
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
+
   for (const platform of game.platforms) {
     if (!isValidPlatformRect(platform)) continue;
+    if (!canCreateTrapSlotsOnPlatform(platform)) continue;
 
     const cols = Math.floor(platform.w / TRAP_SLOT_SPACING);
     if (cols <= 0) continue;
 
-    for (let col = 0; col < cols; col += 1) {
+    for (const col of getTrapSlotColumns(platform, cols, stageData)) {
       const x = platform.x + col * TRAP_SLOT_SPACING + TRAP_SLOT_SPACING / 2;
       const y = platform.y;
       if (x < 80 || x > WIDTH - 70) continue;
       if (Math.abs(x - game.core.x) < 46 && y >= GROUND_Y - 4) continue;
-      if (isNearPlayerStartSlot(stage, x, y)) continue;
+      if (isSlotBlockedByNoSlotPlatform(x, y, game.platforms)) continue;
+      if (!isStrategicTrapSlot({
+        stageData,
+        platform,
+        x,
+        y,
+        platforms: game.platforms,
+        replayPath: game.lastAttackRecording,
+      })) continue;
+      if (isNearPlayerStartSlot(stage, x, y, game)) continue;
       slots.push({ x, y, id, occupied: false });
       id += 1;
     }
   }
 
   return slots;
+}
+
+function canCreateTrapSlotsOnPlatform(platform) {
+  if (platform.trapSlots === false) return false;
+  if (platform.role === "chokepoint-wall") return false;
+  return platform.h < TRAP_SLOT_SPACING * 2;
+}
+
+function getTrapSlotColumns(platform, cols, stageData) {
+  const slotSetting = getTrapSlotSetting(platform, stageData);
+  if (!Array.isArray(slotSetting)) {
+    return Array.from({ length: cols }, (_, col) => col);
+  }
+
+  const columns = [];
+  for (const slot of slotSetting) {
+    const col = Number.isFinite(slot) ? slot : Number(slot?.index);
+    if (!Number.isInteger(col) || col < 0 || col >= cols) continue;
+    columns.push(col);
+  }
+  return columns;
+}
+
+function getTrapSlotSetting(platform, stageData) {
+  if (Number(stageData?.id) % 2 === 0 && Array.isArray(platform.defenseTrapSlots)) {
+    return platform.defenseTrapSlots;
+  }
+  return platform.trapSlots;
+}
+
+function isSlotBlockedByNoSlotPlatform(x, y, platforms) {
+  for (const platform of platforms || []) {
+    if (canCreateTrapSlotsOnPlatform(platform)) continue;
+
+    const blocksSameSurface = y >= platform.y + platform.h - 1;
+    const overlapsFootprint = x >= platform.x - TRAP_SLOT_SPACING / 2 &&
+      x <= platform.x + platform.w + TRAP_SLOT_SPACING / 2;
+    if (blocksSameSurface && overlapsFootprint) return true;
+  }
+
+  return false;
+}
+
+function isStrategicTrapSlot({ stageData, platform, x, y, platforms, replayPath }) {
+  if (!usesStageLayoutGuideFilter(stageData)) return true;
+  if (isSlotCoveredByOverheadSolid(x, y, platform, platforms)) return false;
+  if (Array.isArray(getTrapSlotSetting(platform, stageData))) return true;
+  if (!isOnStrategicPlatform(platform)) return false;
+  if (usesReplayPathGuideFilter(stageData, replayPath) && !isNearReplayPath(x, y, replayPath)) return false;
+  if (platform.role === "main-route") return isNearRouteHint(x, stageData);
+  return true;
+}
+
+function usesStageLayoutGuideFilter(stageData) {
+  return Number(stageData?.id) === 1 || Number(stageData?.id) === 2;
+}
+
+function usesReplayPathGuideFilter(stageData, replayPath) {
+  return Number(stageData?.id) % 2 === 0 && Array.isArray(replayPath) && replayPath.length >= 2;
+}
+
+function isOnStrategicPlatform(platform) {
+  return platform.role === "main-route" || STAGE_LAYOUT_GUIDE_ROLES.has(platform.role);
+}
+
+function isSlotCoveredByOverheadSolid(x, y, currentPlatform, platforms) {
+  for (const platform of platforms || []) {
+    if (platform === currentPlatform || !isValidPlatformRect(platform)) continue;
+    if (platform.y >= y) continue;
+
+    const verticalGap = y - (platform.y + platform.h);
+    if (verticalGap < 0 || verticalGap > OVERHEAD_SLOT_BLOCK_DISTANCE) continue;
+
+    const horizontallyCovered = x >= platform.x - OVERHEAD_SLOT_BLOCK_MARGIN &&
+      x <= platform.x + platform.w + OVERHEAD_SLOT_BLOCK_MARGIN;
+    if (horizontallyCovered) return true;
+  }
+
+  return false;
+}
+
+function isNearReplayPath(x, y, replayPath) {
+  for (const sample of replayPath || []) {
+    const sampleX = sample.x + HACKER_REPLAY_WIDTH / 2;
+    const sampleFeetY = sample.y + (sample.h || HACKER_START_HEIGHT);
+    const nearX = Math.abs(x - sampleX) <= REPLAY_SLOT_X_RADIUS;
+    const nearY = Math.abs(y - sampleFeetY) <= REPLAY_SLOT_Y_RADIUS;
+    if (nearX && nearY) return true;
+  }
+
+  return false;
+}
+
+function isNearRouteHint(x, stageData) {
+  const routeHints = getRouteHintXPositions(stageData);
+  return routeHints.some((hintX) => Math.abs(x - hintX) <= ROUTE_HINT_RADIUS);
+}
+
+function getRouteHintXPositions(stageData) {
+  const hints = [];
+
+  for (const trapNode of stageData?.trapNodes || []) {
+    if (trapNode.type !== "shock" && trapNode.type !== "laser") continue;
+    hints.push(trapNode.x + (trapNode.w || 0) / 2);
+  }
+
+  for (const platform of stageData?.platforms || []) {
+    if (platform.role !== "chokepoint-wall") continue;
+    const centerX = platform.x + platform.w / 2;
+    hints.push(centerX - CHOKE_HINT_RADIUS / 2, centerX + CHOKE_HINT_RADIUS / 2);
+  }
+
+  const goal = stageData?.goal;
+  if (goal) hints.push(goal.x + goal.w / 2);
+
+  return hints;
 }
 
 function isValidPlatformRect(platform) {
@@ -137,8 +283,8 @@ function isValidPlatformRect(platform) {
     platform.h > 0;
 }
 
-export function getWallTrapSlots(stageId) {
-  const stageData = getStageById(stageId);
+export function getWallTrapSlots(stageId, game) {
+  const stageData = getStageById(stageId, getLayoutOptions(stageId, game));
   if (!stageData || !stageData.wallTrapSlots) return [];
   return stageData.wallTrapSlots.map((slot) => ({
     ...slot,
@@ -175,6 +321,7 @@ function createPlatformElement(platform) {
   element.className = "stage-platform";
   setDatasetValue(element, "platformId", platform.id);
   setDatasetValue(element, "platformRole", platform.role);
+  setDatasetValue(element, "mapObject", platform.mapObject);
   setDatasetValue(element, "intent", platform.intent);
   applyRectStyle(element, platform);
   return element;
@@ -308,8 +455,15 @@ function findCameraPlatformY(camera, anchorX, platforms) {
   return bestPlatform ? bestPlatform.y : null;
 }
 
-function isNearPlayerStartSlot(stage, x, y) {
-  const stageData = getStageById(stage);
+function getLayoutOptions(stage, game) {
+  if (Number(stage) !== 1 && Number(stage) !== 2) return {};
+
+  const layoutId = game?.stageLayoutSelections?.[1];
+  return layoutId ? { layoutId } : {};
+}
+
+function isNearPlayerStartSlot(stage, x, y, game) {
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
   const playerStart = stageData?.playerStart || { x: 64, y: 388 };
   const startFeetY = playerStart.y + HACKER_START_HEIGHT;
   return Math.abs(x - playerStart.x) <= START_SLOT_BLOCK_X &&
