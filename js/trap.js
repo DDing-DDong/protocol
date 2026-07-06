@@ -336,6 +336,24 @@ export function tickBaseHazardTimers(game, dt) {
 
 function tickTrapTimers(traps, dt) {
   for (const trap of traps || []) {
+    if (trap.hackPendingTime > 0) {
+      trap.hackPendingTime = Math.max(0, trap.hackPendingTime - dt);
+      if (trap.hackPendingTime <= 0) {
+        delete trap.hackPendingTime;
+        delete trap.hackPendingDuration;
+      }
+    }
+
+    if (trap.hackedTime > 0) {
+      trap.hackedTime = Math.max(0, trap.hackedTime - dt);
+      trap.hackEffectTime = Math.max(0, (trap.hackEffectTime || 0) - dt);
+      if (trap.hackedTime <= 0) {
+        delete trap.hackedTime;
+        delete trap.hackedDuration;
+        delete trap.hackEffectTime;
+      }
+    }
+
     if (trap.triggerEffect?.timer > 0) {
       trap.triggerEffect.timer = Math.max(0, trap.triggerEffect.timer - dt);
       if (trap.triggerEffect.timer <= 0) delete trap.triggerEffect;

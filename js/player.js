@@ -30,6 +30,7 @@ const ATTACK_INPUT_CODES = new Set([
   "ShiftRight",
   "Space",
 ]);
+const NO_INPUT_KEYS = new Set();
 const WORLD_TOP = 0;
 const WALL_GRAB_SLIDE_SPEED = 70;
 const WALL_JUMP_X_SPEED = 280;
@@ -44,6 +45,10 @@ const WALL_DASH_DURATION = 0.155;
 const HIT_INVINCIBLE_TIME = 0.55;
 const HIT_FLASH_TIME = 0.32;
 const BLOCK_INVINCIBLE_TIME = 0.45;
+const HACK_DELAY = 1;
+const HACK_DURATION = 1;
+const HACK_RANGE = 220;
+const HACK_SCAN_VERTICAL_PADDING = 120;
 
 export function createHacker(game) {
   return {
@@ -97,8 +102,12 @@ export function createHacker(game) {
     shield: false,
     shieldTime: 0,
     shieldBlockFlashTime: 0,
-    shieldDuration: 2,
+    shieldDuration: HACK_DURATION,
     shieldInputLock: false,
+    hackChargeTime: 0,
+    hackChargeDuration: HACK_DELAY,
+    hackEffectTime: 0,
+    hackTarget: null,
     slowTime: 0,
     slowMultiplier: 1,
   };
@@ -133,8 +142,9 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   updateSlidePose(h);
 
   h.shieldTime = Math.max(0, h.shieldTime - dt);
-  h.shield = h.shieldTime > 0;
-  h.shieldBlockFlashTime = Math.max(0, (h.shieldBlockFlashTime || 0) - dt);
+  h.shield = false;
+  h.shieldBlockFlashTime = 0;
+  updateHackState(h, dt, flashLog);
   h.slowTime = Math.max(0, (h.slowTime || 0) - dt);
   tickBaseHazardTimers(game, dt);
 
@@ -142,56 +152,63 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   const right = keys.has("ArrowRight");
   const jump = keys.has("ArrowUp");
   const dash = keys.has("ShiftLeft") || keys.has("ShiftRight");
-  const shield = keys.has("Space");
+  const hack = keys.has("Space");
   const moveSpeed = h.slowTime > 0 ? h.speed * h.slowMultiplier : h.speed;
 
-  if (dash && !h.dashInputLock) {
-    tryDash(game, keys, flashLog);
-    h.dashInputLock = true;
-  }
-
-  if (!dash) {
-    h.dashInputLock = false;
-  }
-
-  if (h.isDashing) {
-    h.vx = h.dashDirection * h.dashSpeed;
-  } else if (left && !right) {
-    h.vx = h.vx < -moveSpeed ? approach(h.vx, -moveSpeed, 1800 * dt) : -moveSpeed;
-    h.facing = -1;
-  } else if (right && !left) {
-    h.vx = h.vx > moveSpeed ? approach(h.vx, moveSpeed, 1800 * dt) : moveSpeed;
-    h.facing = 1;
-  } else {
-    h.vx = approach(h.vx, 0, 1800 * dt);
-  }
-
-  const wallJumpSide = getWallJumpSide(h);
-  const pressingAwayFromWall = isPressingAwayFromWall(wallJumpSide, left, right);
-
-  if (jump && wallJumpSide && (!h.wallJumpInputLock || pressingAwayFromWall)) {
-    performWallJump(h, wallJumpSide, dash && pressingAwayFromWall);
-  } else if (jump && h.onGround) {
-    h.vy = -h.jumpPower;
-    h.onGround = false;
-  }
-
-  if (!jump) {
-    h.wallJumpInputLock = false;
-  }
-
-  if (shield && !h.shieldInputLock) {
-    activateShield(game, flashLog);
+  if (hack && !h.shieldInputLock) {
+    activateHack(game, flashLog);
     h.shieldInputLock = true;
   }
 
-  if (!shield) {
+  if (!hack) {
     h.shieldInputLock = false;
   }
 
-  h.vy += 1600 * dt;
+  const hackMovementLocked = h.hackChargeTime > 0;
+  if (hackMovementLocked) {
+    lockHackerMovementForHack(h);
+  } else {
+    if (dash && !h.dashInputLock) {
+      tryDash(game, keys, flashLog);
+      h.dashInputLock = true;
+    }
 
-  moveAndCollide(h, dt, game, keys);
+    if (!dash) {
+      h.dashInputLock = false;
+    }
+
+    if (h.isDashing) {
+      h.vx = h.dashDirection * h.dashSpeed;
+    } else if (left && !right) {
+      h.vx = h.vx < -moveSpeed ? approach(h.vx, -moveSpeed, 1800 * dt) : -moveSpeed;
+      h.facing = -1;
+    } else if (right && !left) {
+      h.vx = h.vx > moveSpeed ? approach(h.vx, moveSpeed, 1800 * dt) : moveSpeed;
+      h.facing = 1;
+    } else {
+      h.vx = approach(h.vx, 0, 1800 * dt);
+    }
+
+    const wallJumpSide = getWallJumpSide(h);
+    const pressingAwayFromWall = isPressingAwayFromWall(wallJumpSide, left, right);
+
+    if (jump && wallJumpSide && (!h.wallJumpInputLock || pressingAwayFromWall)) {
+      performWallJump(h, wallJumpSide, dash && pressingAwayFromWall);
+    } else if (jump && h.onGround) {
+      h.vy = -h.jumpPower;
+      h.onGround = false;
+    }
+
+    if (!jump) {
+      h.wallJumpInputLock = false;
+    }
+  }
+
+  if (!hackMovementLocked) {
+    h.vy += 1600 * dt;
+  }
+
+  moveAndCollide(h, dt, game, hackMovementLocked ? NO_INPUT_KEYS : keys);
   applyAttackHazards(h, game, flashLog);
   if (game.attackTimerStarted) {
     recordHacker(game, dt);
@@ -241,6 +258,21 @@ function performWallJump(h, wallSide, useSlideBoost = false) {
     h.slidePoseTime = SLIDE_POSE_DURATION;
     startSlide(h);
   }
+}
+
+function lockHackerMovementForHack(h) {
+  h.vx = 0;
+  h.vy = 0;
+  h.isDashing = false;
+  h.dashTime = 0;
+  h.slidePoseTime = 0;
+  h.dashHazardGrace = 0;
+  h.wallGrab = false;
+  h.wallSide = 0;
+  h.wallContactSide = 0;
+  h.wallContactTimer = 0;
+  h.wallJumpDashTimer = 0;
+  endSlide(h);
 }
 
 function hasAttackInput(keys) {
@@ -316,29 +348,109 @@ function setHackerHeight(h, nextHeight) {
   h.y = feetY - h.h;
 }
 
-export function activateShield(game, flashLog) {
+export function activateHack(game, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
 
   const h = game.hacker;
   const freeShield = canUseFreeShield(game);
   const cost = freeShield ? 0 : getSkillEnergyCost(game, game.mods.shieldDrain);
 
-  if (h.shieldTime > 0) return;
+  if (h.hackChargeTime > 0) return;
 
   if (h.energy < cost) {
-    flashLog("실드를 켜기 위한 에너지가 부족합니다.");
+    flashLog("해킹을 실행하기 위한 에너지가 부족합니다.");
+    return;
+  }
+
+  const target = findHackTarget(game, h);
+  if (!target) {
+    flashLog("해킹 가능한 레이저나 카메라가 전방에 없습니다.");
     return;
   }
 
   h.energy -= cost;
   game.metrics.energyUsed += cost;
   if (freeShield) game.stageState.freeShieldUsesUsed += 1;
-  h.shieldTime = h.shieldDuration;
-  h.shield = true;
+  h.hackChargeTime = HACK_DELAY;
+  h.hackChargeDuration = HACK_DELAY;
+  h.hackEffectTime = HACK_DELAY;
+  h.hackTarget = target;
+  target.hackPendingTime = HACK_DELAY;
+  target.hackPendingDuration = HACK_DELAY;
 
   flashLog(freeShield
-    ? `실드 활성화. 첫 사용 보상으로 에너지를 소모하지 않았습니다.`
-    : `실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
+    ? "해킹 시작. 첫 사용 보상으로 에너지를 소모하지 않았습니다."
+    : `해킹 시작. ${HACK_DELAY.toFixed(1)}초 뒤 전방 보안장치를 무력화합니다.`);
+}
+
+function updateHackState(h, dt, flashLog) {
+  const previousChargeTime = h.hackChargeTime || 0;
+  h.hackChargeTime = Math.max(0, previousChargeTime - dt);
+  h.hackEffectTime = Math.max(0, (h.hackEffectTime || 0) - dt);
+
+  if (previousChargeTime <= 0 || h.hackChargeTime > 0) return;
+
+  const target = h.hackTarget;
+  h.hackTarget = null;
+  if (!target || !isHackableHazard(target)) {
+    flashLog("해킹 대상 연결이 끊겼습니다.");
+    return;
+  }
+
+  target.hackedTime = HACK_DURATION;
+  target.hackedDuration = HACK_DURATION;
+  target.hackEffectTime = HACK_DURATION;
+  target.hackPendingTime = 0;
+  h.hackEffectTime = 0.28;
+  flashLog(`${TRAPS[target.type].name} 해킹 완료. ${HACK_DURATION.toFixed(0)}초 동안 무력화됩니다.`);
+}
+
+function findHackTarget(game, h) {
+  const scanBox = getHackScanBox(h);
+  const candidates = [];
+
+  for (const hazard of game.baseHazards || []) {
+    if (!isHackableHazard(hazard)) continue;
+    if ((hazard.hackedTime || 0) > 0 || (hazard.hackPendingTime || 0) > 0) continue;
+
+    const box = getHazardHitbox(hazard, game);
+    if (!rectsOverlap(scanBox, box)) continue;
+    candidates.push({ hazard, distance: getForwardDistance(h, box) });
+  }
+
+  candidates.sort((a, b) => a.distance - b.distance);
+  return candidates[0]?.hazard || null;
+}
+
+function getHackScanBox(h) {
+  const centerY = h.y + h.h / 2;
+  const top = centerY - h.h / 2 - HACK_SCAN_VERTICAL_PADDING;
+  const height = h.h + HACK_SCAN_VERTICAL_PADDING * 2;
+
+  if ((h.facing || 1) < 0) {
+    return {
+      x: h.x - HACK_RANGE,
+      y: top,
+      w: HACK_RANGE,
+      h: height,
+    };
+  }
+
+  return {
+    x: h.x + h.w,
+    y: top,
+    w: HACK_RANGE,
+    h: height,
+  };
+}
+
+function getForwardDistance(h, box) {
+  if ((h.facing || 1) < 0) return Math.max(0, h.x - (box.x + box.w));
+  return Math.max(0, box.x - (h.x + h.w));
+}
+
+function isHackableHazard(hazard) {
+  return hazard?.type === "laser" || hazard?.type === "camera";
 }
 
 function getSkillEnergyCost(game, baseCost) {
@@ -501,6 +613,7 @@ function grabWall(entity, side) {
 
 function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
+    if ((hazard.hackedTime || 0) > 0) continue;
     if (hazard.type === "camera" && !isEntityInCameraView(h, hazard, game)) continue;
     if (!rectsOverlap(h, getHazardHitbox(hazard, game))) continue;
 
@@ -517,14 +630,6 @@ function applyAttackHazards(h, game, flashLog) {
 
     if (hazard.type === "firewall" && !hazard.closed) {
       continue;
-    }
-
-    if (h.shield) {
-      h.invincible = BLOCK_INVINCIBLE_TIME;
-      h.damageFlashTime = 0;
-      h.shieldBlockFlashTime = BLOCK_INVINCIBLE_TIME;
-      flashLog(hazard.type === "emp" ? "실드가 EMP 충격을 막았습니다." : "실드가 함정을 막았습니다.");
-      return;
     }
 
     if (hazard.type === "firewall") {
