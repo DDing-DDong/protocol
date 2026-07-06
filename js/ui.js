@@ -21,6 +21,7 @@ import {
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
 } from "./trap.js";
+import { playSfx, unlockAudio } from "./audio.js";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -28,6 +29,28 @@ const VISUAL_TILE_SIZE = 48;
 const VISUAL_TILE_DRAW_W = 56;
 const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
+const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
+const TRAP_IMAGE_FILES = {
+  laser: "laser.png",
+  laserEmpowered: "laser-empowered.png",
+  shock: "shock.png",
+  shockEmpowered: "shock-empowered.png",
+  camera: "camera.png",
+  firewall: "firewall.png",
+  firewallEmpowered: "firewall-empowered.png",
+  emp: "emp.png",
+  empEmpowered: "emp-empowered.png",
+};
+const trapImages = createTrapImages();
+const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
+const HACKER_IMAGE_FILES = {
+  idle: ["idle-1.png", "idle-2.png", "idle-3.png", "idle-4.png"],
+  run: ["run-1.png", "run-2.png", "run-3.png", "run-4.png", "run-5.png"],
+  jump: ["jump-1.png", "jump-2.png", "jump-3.png", "jump-4.png"],
+  slide: ["slide-1.png", "slide-2.png", "slide-3.png"],
+};
+const hackerImages = createHackerImages();
+const transparentHackerFrames = new WeakMap();
 const DEFAULT_BACKGROUND_LAYERS = {
   far: ["future-city"],
   mid: ["server-rack", "cable", "security-panel"],
@@ -68,6 +91,44 @@ const VISUAL_THEMES = {
     skyline: "42, 18, 40",
   },
 };
+
+function createTrapImages() {
+  const images = {};
+  for (const [key, file] of Object.entries(TRAP_IMAGE_FILES)) {
+    const image = new Image();
+    image.src = new URL(file, TRAP_IMAGE_BASE_URL).href;
+    images[key] = image;
+  }
+  return images;
+}
+
+function createHackerImages() {
+  const groups = {};
+  for (const [state, files] of Object.entries(HACKER_IMAGE_FILES)) {
+    groups[state] = files.map((file) => {
+      const image = new Image();
+      image.src = new URL(file, HACKER_IMAGE_BASE_URL).href;
+      return image;
+    });
+  }
+  return groups;
+}
+
+function isImageReady(image) {
+  return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+function isDrawableReady(source) {
+  if (!source) return false;
+  if (source instanceof HTMLCanvasElement) return source.width > 0 && source.height > 0;
+  return isImageReady(source);
+}
+
+function getTrapImageAspect(type) {
+  const image = trapImages[type];
+  if (!isImageReady(image)) return 1;
+  return image.naturalWidth / image.naturalHeight;
+}
 
 export function initUI(callbacks) {
   const canvas = document.getElementById("gameCanvas");
@@ -185,9 +246,11 @@ export function initUI(callbacks) {
     ui.attackSkillsPanel = panel;
   }
 
-  function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton }) {
+  function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton, speaker = "" }) {
     overlayAction = typeof onButton === "function" ? onButton : hideOverlay;
     ui.overlay.classList.remove("hidden");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker");
+    if (speaker) ui.overlay.classList.add(`speaker-${speaker}`);
     ui.overlayTitle.textContent = title;
     ui.overlayText.textContent = text;
     ui.overlayButton.textContent = buttonText;
@@ -211,6 +274,7 @@ export function initUI(callbacks) {
 
   function hideOverlay() {
     ui.overlay.classList.add("hidden");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker");
     ui.rewardList.innerHTML = "";
     overlayAction = null;
   }
@@ -903,14 +967,14 @@ export function initUI(callbacks) {
     for (const hazard of game.baseHazards) {
       let box = hazard;
       if (hazard.type === "laser") drawLaser(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard);
-      if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
+      if (hazard.type === "shock") drawShock(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard);
       if (hazard.type === "camera") {
         const cameraBox = getCameraHazardBox(hazard, game);
         box = cameraBox;
         drawCamera(ctx, cameraBox.x, cameraBox.y, cameraBox.w, cameraBox.h, hazard);
       }
       if (hazard.type === "firewall") drawFirewall(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard.closed || hazard.empowered);
-      if (hazard.type === "emp") drawEmp(ctx, hazard.x, hazard.y, hazard.w, hazard.h);
+      if (hazard.type === "emp") drawEmp(ctx, hazard.x, hazard.y, hazard.w, hazard.h, hazard);
       if (hazard.empowered) drawEmpoweredMark(ctx, box);
       drawHackStatus(ctx, hazard, box);
     }
@@ -1004,11 +1068,11 @@ export function initUI(callbacks) {
     if (!Array.isArray(placedTraps)) return;
     for (const trap of placedTraps) {
       const box = getOrientedTrapBox(trap, game);
-      if (trap.type === "laser") drawLaser(ctx, box.x, box.y, box.w, box.h);
-      if (trap.type === "shock") drawShock(ctx, box.x, box.y, box.w, box.h);
-      if (trap.type === "camera") drawCamera(ctx, box.x, box.y, box.w, box.h);
+      if (trap.type === "laser") drawLaser(ctx, box.x, box.y, box.w, box.h, trap);
+      if (trap.type === "shock") drawShock(ctx, box.x, box.y, box.w, box.h, trap);
+      if (trap.type === "camera") drawCamera(ctx, box.x, box.y, box.w, box.h, trap);
       if (trap.type === "firewall") drawFirewall(ctx, box.x, box.y, box.w, box.h, trap.closed || trap.empowered);
-      if (trap.type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h);
+      if (trap.type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h, trap);
       if (trap.empowered) drawEmpoweredMark(ctx, box);
     }
   }
@@ -1026,6 +1090,16 @@ export function initUI(callbacks) {
     const hacked = (state?.hackedTime || 0) > 0;
     const pending = (state?.hackPendingTime || 0) > 0;
     const flicker = getHackFlicker(state);
+    const image = trapImages[state?.empowered ? "laserEmpowered" : "laser"];
+    if (drawTrapImage(ctx, image, x, y, w, h, {
+      type: "laser",
+      rotation: state?.rotation || (h >= w ? 90 : 0),
+      alpha: hacked || pending ? flicker.alpha : 1,
+    })) {
+      if (pending || hacked) drawHackGlitchLines(ctx, x, y, w, h, flicker.jitter);
+      return;
+    }
+
     ctx.save();
     ctx.globalAlpha = hacked || pending ? flicker.alpha : 1;
     ctx.fillStyle = hacked ? "rgba(39, 255, 200, 0.12)" : "rgba(255, 59, 103, 0.22)";
@@ -1038,7 +1112,10 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawShock(ctx, x, y, w, h) {
+  function drawShock(ctx, x, y, w, h, state = null) {
+    const image = trapImages[state?.empowered ? "shockEmpowered" : "shock"];
+    if (drawTrapImage(ctx, image, x, y, w, h, { type: "shock" })) return;
+
     ctx.save();
     ctx.fillStyle = "rgba(255, 204, 51, 0.26)";
     ctx.fillRect(x, y, w, h);
@@ -1052,7 +1129,10 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawEmp(ctx, x, y, w, h) {
+  function drawEmp(ctx, x, y, w, h, state = null) {
+    const image = trapImages[state?.empowered ? "empEmpowered" : "emp"];
+    if (drawTrapImage(ctx, image, x, y, w, h, { type: "emp" })) return;
+
     ctx.save();
     ctx.fillStyle = "rgba(51, 230, 255, 0.26)";
     ctx.fillRect(x, y, w, h);
@@ -1071,6 +1151,8 @@ export function initUI(callbacks) {
   }
 
   function drawCamera(ctx, x, y, w, h, state = null) {
+    if (drawTrapImage(ctx, trapImages.camera, x, y, w, h, { type: "camera" })) return;
+
     const bodyW = Math.min(56, w * 0.5);
     const bodyH = Math.min(36, h * 0.32);
     const bodyX = x + w - bodyW - 2;
@@ -1162,6 +1244,9 @@ export function initUI(callbacks) {
   }
 
   function drawFirewall(ctx, x, y, w, h, closed = false) {
+    const image = trapImages[closed ? "firewallEmpowered" : "firewall"];
+    if (drawTrapImage(ctx, image, x, y, w, h, { type: "firewall" })) return;
+
     ctx.save();
     ctx.fillStyle = closed ? "rgba(255, 112, 64, 0.36)" : "rgba(255, 112, 64, 0.10)";
     ctx.fillRect(x, y, w, h);
@@ -1175,6 +1260,89 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
+  function drawTrapImage(ctx, image, x, y, w, h, options = {}) {
+    if (!isImageReady(image)) return false;
+
+    const box = getTrapVisualBox(options.type, x, y, w, h);
+    const rotation = normalizeVisualRotation(options.rotation || 0);
+    const rotate = options.type === "laser" && rotation !== 90;
+
+    ctx.save();
+    ctx.globalAlpha = Number.isFinite(options.alpha) ? options.alpha : 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    if (rotate) {
+      const centerX = box.x + box.w / 2;
+      const centerY = box.y + box.h / 2;
+      const drawW = box.h;
+      const drawH = box.w;
+      ctx.translate(centerX, centerY);
+      ctx.rotate((rotation - 90) * Math.PI / 180);
+      ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(image, box.x, box.y, box.w, box.h);
+    }
+
+    ctx.restore();
+    return true;
+  }
+
+  function getTrapVisualBox(type, x, y, w, h) {
+    if (type === "laser") {
+      const isHorizontal = w > h;
+      if (isHorizontal) {
+        return centerBox(x + w / 2, y + h / 2, Math.max(w + 4, 88), Math.max(h + 8, 26));
+      }
+      const visualW = Math.max(w + 34, 44);
+      const visualH = Math.max(h + 44, 108);
+      return bottomAlignedBox(x + w / 2, y + h + 12, visualW, visualH);
+    }
+
+    if (type === "shock" || type === "emp") {
+      const visualW = Math.max(w + 44, 104);
+      const visualH = Math.max(h + 30, 38);
+      const groundOffset = type === "shock" ? 13 : 11;
+      return bottomAlignedBox(x + w / 2, y + h + groundOffset, visualW, visualH);
+    }
+
+    if (type === "firewall") {
+      const visualH = Math.max(h + 42, 136);
+      const visualW = Math.max(w + 34, visualH * getTrapImageAspect("firewall") * 0.82);
+      return bottomAlignedBox(x + w / 2, y + h + 18, visualW, visualH);
+    }
+
+    if (type === "camera") {
+      const visualW = Math.max(w + 58, 176);
+      const visualH = visualW / getTrapImageAspect("camera");
+      return bottomAlignedBox(x + w / 2, y + h + 19, visualW, visualH);
+    }
+
+    return { x, y, w, h };
+  }
+
+  function centerBox(centerX, centerY, w, h) {
+    return {
+      x: centerX - w / 2,
+      y: centerY - h / 2,
+      w,
+      h,
+    };
+  }
+
+  function bottomAlignedBox(centerX, bottomY, w, h) {
+    return {
+      x: centerX - w / 2,
+      y: bottomY - h,
+      w,
+      h,
+    };
+  }
+
+  function normalizeVisualRotation(rotation) {
+    return ((Math.round((Number(rotation) || 0) / 90) * 90) % 360 + 360) % 360;
+  }
+
   function drawEmpoweredMark(ctx, box) {
     ctx.save();
     ctx.strokeStyle = "#27ffc8";
@@ -1183,7 +1351,7 @@ export function initUI(callbacks) {
     ctx.lineWidth = 2;
     ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
     ctx.fillStyle = "#27ffc8";
-    ctx.font = "bold 11px system-ui";
+    ctx.font = "bold 11px PfStardust30, system-ui";
     ctx.fillText("BOOST", box.x, box.y - 8);
     ctx.restore();
   }
@@ -1202,7 +1370,7 @@ export function initUI(callbacks) {
     const label = effect.label || "발동";
     const timerText = formatEffectTimer(remaining);
     ctx.save();
-    ctx.font = "bold 12px system-ui";
+    ctx.font = "bold 12px PfStardust30, system-ui";
     const labelW = Math.max(82, ctx.measureText(label).width + 70);
     const h = 28;
     const left = Math.max(8, Math.min(CANVAS_WIDTH - labelW - 8, x - labelW / 2));
@@ -1236,7 +1404,7 @@ export function initUI(callbacks) {
     ctx.arc(cx, cy, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
     ctx.stroke();
     ctx.fillStyle = "#e9f8ff";
-    ctx.font = "bold 9px system-ui";
+    ctx.font = "bold 9px PfStardust30, system-ui";
     ctx.textAlign = "center";
     ctx.fillText(timerText, cx, cy + 0.5);
     ctx.restore();
@@ -1287,7 +1455,7 @@ export function initUI(callbacks) {
     ctx.beginPath();
     ctx.arc(x, y, 10 + pulse * 8, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.font = "bold 13px system-ui";
+    ctx.font = "bold 13px PfStardust30, system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, x, y - 26 - pulse * 4);
@@ -1341,6 +1509,18 @@ export function initUI(callbacks) {
     ctx.globalAlpha = isGhost ? 0.72 : getHackerAlpha(h, isInvincibleBlink);
     if (isGhost && h.glitchTime > 0) drawGlitchAura(ctx, h);
     if (isHitFlashing) drawDamageFlash(ctx, h);
+    if (drawHackerSprite(ctx, h, isGhost, isHitFlashing)) {
+      if (!isGhost && ((h.hackChargeTime || 0) > 0 || (h.hackEffectTime || 0) > 0)) {
+        ctx.save();
+        ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
+        ctx.scale(h.facing || 1, 1);
+        drawHackCastEffect(ctx, h);
+        ctx.restore();
+      }
+      ctx.restore();
+      return;
+    }
+
     ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
     ctx.scale(h.facing || 1, 1);
     const damageColor = h.damageFlashColor || "#ff3b67";
@@ -1364,6 +1544,112 @@ export function initUI(callbacks) {
     }
 
     ctx.restore();
+  }
+
+  function drawHackerSprite(ctx, h, isGhost, isHitFlashing) {
+    const state = getHackerSpriteState(h);
+    const frames = hackerImages[state] || hackerImages.idle;
+    const frame = getAnimationFrame(frames, getHackerFrameRate(state));
+    if (!isImageReady(frame)) return false;
+    const drawableFrame = getTransparentHackerFrame(frame);
+    if (!isDrawableReady(drawableFrame)) return false;
+
+    const box = getHackerSpriteBox(h, state, drawableFrame);
+    const facing = state === "idle" ? -1 : (h.facing || 1);
+
+    ctx.save();
+    ctx.translate(h.x + h.w / 2, box.y + box.h / 2);
+    ctx.scale(facing, 1);
+    if (isHitFlashing) {
+      ctx.shadowColor = h.damageFlashColor || "#ff3b67";
+      ctx.shadowBlur = 18;
+    } else if (isGhost) {
+      ctx.shadowColor = "#8af2ff";
+      ctx.shadowBlur = 10;
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(drawableFrame, -box.w / 2, -box.h / 2, box.w, box.h);
+    ctx.restore();
+
+    if (!isGhost && h.isSliding) {
+      ctx.save();
+      ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
+      ctx.scale(facing, 1);
+      drawSlideTrail(ctx, h.w + 18, h.h);
+      ctx.restore();
+    }
+
+    if (!isGhost && (h.wallGrab || (h.wallAttachEffectTime || 0) > 0 || (h.wallSlideEffectTime || 0) > 0)) {
+      ctx.save();
+      ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
+      ctx.scale(facing, 1);
+      drawWallMoveEffect(ctx, h, h.w, h.h);
+      ctx.restore();
+    }
+
+    return true;
+  }
+
+  function getHackerSpriteState(h) {
+    if (h.isSliding) return "slide";
+    if (Math.abs(h.vy || 0) > 20 || !h.onGround) return "jump";
+    if (Math.abs(h.vx || 0) > 12) return "run";
+    return "idle";
+  }
+
+  function getHackerFrameRate(state) {
+    if (state === "run") return 12;
+    if (state === "slide") return 10;
+    if (state === "jump") return 9;
+    return 6;
+  }
+
+  function getAnimationFrame(frames, fps) {
+    const safeFrames = frames || [];
+    if (safeFrames.length === 0) return null;
+    const index = Math.floor(performance.now() / 1000 * fps) % safeFrames.length;
+    return safeFrames[index];
+  }
+
+  function getTransparentHackerFrame(image) {
+    if (transparentHackerFrames.has(image)) return transparentHackerFrames.get(image);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const frameCtx = canvas.getContext("2d", { willReadFrequently: true });
+    frameCtx.drawImage(image, 0, 0);
+
+    const imageData = frameCtx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const isBrightNeutral = max > 204 && max - min < 34;
+      if (isBrightNeutral) data[i + 3] = 0;
+    }
+
+    frameCtx.putImageData(imageData, 0, 0);
+    transparentHackerFrames.set(image, canvas);
+    return canvas;
+  }
+
+  function getHackerSpriteBox(h, state, frame) {
+    const aspect = frame.width / frame.height || 1;
+    const height = state === "slide" ? h.h * 1.52 : h.h * 1.74;
+    const width = height * aspect;
+    const groundY = h.y + h.h;
+    return {
+      x: h.x + h.w / 2 - width / 2,
+      y: groundY - height,
+      w: width,
+      h: height,
+    };
   }
 
   function getHackerAlpha(h, isInvincibleBlink) {
@@ -1517,10 +1803,8 @@ export function initUI(callbacks) {
   function drawStageBanner(ctx, game) {
     const bannerTurn = getStageBannerTurn(game);
     ctx.save();
-    ctx.fillStyle = "rgba(3, 8, 13, 0.66)";
-    ctx.fillRect(16, 16, 390, 54);
     ctx.fillStyle = bannerTurn === TURN.ATTACK ? "#ff446a" : "#18e0ff";
-    ctx.font = "bold 16px system-ui";
+    ctx.font = "bold 16px PfStardust30, system-ui";
     ctx.fillText(
       `STAGE ${game.stage} / ${
         bannerTurn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
@@ -1529,7 +1813,7 @@ export function initUI(callbacks) {
       40
     );
     ctx.fillStyle = "#c4e9f4";
-    ctx.font = "13px system-ui";
+    ctx.font = "13px PfStardust30, system-ui";
     ctx.fillText(getObjectiveDisplayText(game), 30, 60);
 
     if (game.stage >= 12) {
@@ -1579,6 +1863,14 @@ export function initUI(callbacks) {
   function bindEvents() {
     initializeTrapButtonIcons();
 
+    document.addEventListener("pointerdown", unlockAudio);
+    document.addEventListener("keydown", unlockAudio);
+    document.addEventListener("click", (event) => {
+      if (!event.target?.closest?.("button")) return;
+      unlockAudio();
+      playSfx("click");
+    }, true);
+
     window.addEventListener("keydown", (event) => {
       if (event.repeat && !keys.has(event.code)) {
         if (attackResumeKeys.has(event.code) || event.code === "KeyS") {
@@ -1591,6 +1883,11 @@ export function initUI(callbacks) {
         event.preventDefault();
         callbacks.onToggleAttackPause();
         return;
+      }
+
+      if (!event.repeat && callbacks.canPlayAttackSfx?.()) {
+        if (event.code === "ArrowUp") playSfx("jump");
+        if (event.code === "ShiftLeft" || event.code === "ShiftRight") playSfx("dash");
       }
 
       keys.add(event.code);
