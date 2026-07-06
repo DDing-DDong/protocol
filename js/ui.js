@@ -1279,6 +1279,9 @@ export function initUI(callbacks) {
     const bodyW = h.isSliding ? h.w + 18 : h.w;
     const bodyH = h.h;
     if (!isGhost && h.isSliding) drawSlideTrail(ctx, bodyW, bodyH);
+    if (!isGhost && (h.wallGrab || (h.wallAttachEffectTime || 0) > 0 || (h.wallSlideEffectTime || 0) > 0)) {
+      drawWallMoveEffect(ctx, h, bodyW, bodyH);
+    }
     ctx.fillRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH);
     ctx.fillStyle = "#071019";
     ctx.fillRect(2, h.isSliding ? -5 : -14, 9, 6);
@@ -1356,6 +1359,72 @@ export function initUI(callbacks) {
     ctx.font = "bold 10px monospace";
     ctx.textAlign = "left";
     ctx.fillText("EXEC", originX + 16, originY - 18);
+    ctx.restore();
+  }
+
+  function drawWallMoveEffect(ctx, h, bodyW, bodyH) {
+    const t = performance.now() / 1000;
+    const facing = h.facing || 1;
+    const wallSide = h.wallSide || h.wallStickSide || facing;
+    const localSide = wallSide * facing;
+    const handX = localSide > 0 ? bodyW / 2 + 4 : -bodyW / 2 - 4;
+    const handY = h.isSliding ? 0 : -bodyH * 0.22;
+    const wallOutward = localSide > 0 ? 1 : -1;
+    const slideOutward = -1;
+    const sticking = h.wallGrab && (h.wallStickTimer || 0) > 0;
+    const sliding = h.wallGrab && !sticking;
+    const attachPower = clamp01((h.wallAttachEffectTime || 0) / 0.24);
+    const slidePower = sliding ? 1 : clamp01((h.wallSlideEffectTime || 0) / 0.28);
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = "round";
+
+    for (let i = 0; i < 5; i += 1) {
+      const phase = (t * (sliding ? 20 : 13) + i * 0.31) % 1;
+      const y = sticking
+        ? handY + (i - 2) * 4 + Math.sin(t * 18 + i) * 1.5
+        : -bodyH / 2 + 8 + i * (bodyH - 16) / 4 + Math.sin(t * 12 + i) * 2;
+      const length = sticking ? 6 + attachPower * 10 : 18 + i * 4;
+      const drop = sliding ? 12 + phase * 24 : 2 + attachPower * 5;
+      const outward = sticking ? wallOutward : slideOutward;
+      const alpha = (sticking ? 0.24 : 0.34) * (1 - phase * 0.5) + attachPower * 0.12;
+
+      ctx.globalAlpha = Math.min(0.82, alpha * Math.max(0.45, slidePower));
+      ctx.strokeStyle = i % 2 === 0 ? "#e9f8ff" : "#27ffc8";
+      ctx.lineWidth = Math.max(1.2, 3 - i * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(handX, y);
+      ctx.lineTo(handX + outward * length, y + drop);
+      ctx.stroke();
+    }
+
+    if (attachPower > 0) {
+      ctx.globalAlpha = 0.78 * attachPower;
+      ctx.strokeStyle = "#27ffc8";
+      ctx.fillStyle = "#e9fff8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(handX + wallOutward * 3, handY, 4 + attachPower * 7, -0.9, 0.9);
+      ctx.stroke();
+
+      for (let i = 0; i < 4; i += 1) {
+        const spread = (i - 1.5) * 0.42;
+        const startX = handX + wallOutward * 2;
+        const startY = handY + spread * 10;
+        ctx.globalAlpha = 0.68 * attachPower;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(startX + wallOutward * (7 + attachPower * 8), startY + spread * 6);
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 0.95 * attachPower;
+      ctx.beginPath();
+      ctx.arc(handX + wallOutward * 2, handY, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 
