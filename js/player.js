@@ -20,6 +20,7 @@ import {
   tickBaseHazardTimers,
 } from "./trap.js";
 import { recordHacker } from "./replay.js";
+import { playSfx, stopSfx } from "./audio.js";
 
 const ATTACK_INPUT_CODES = new Set([
   "ArrowLeft",
@@ -158,6 +159,11 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   h.shieldBlockFlashTime = 0;
   updateHackState(h, dt, flashLog);
   h.slowTime = Math.max(0, (h.slowTime || 0) - dt);
+  if (h.slowTime > 0) {
+    playSfx("electric", { loop: true, volume: 0.28 });
+  } else {
+    stopSfx("electric");
+  }
   tickBaseHazardTimers(game, dt);
 
   const left = keys.has("ArrowLeft");
@@ -704,6 +710,7 @@ function applyAttackHazards(h, game, flashLog) {
     if (!rectsOverlap(h, getHazardHitbox(hazard, game))) continue;
 
     if (canSlidePastFloorHazard(h, hazard)) {
+      if (hazard.type === "shock") playSfx("electric", { maxDuration: 0.45, volume: 0.24 });
       continue;
     }
 
@@ -726,6 +733,7 @@ function applyAttackHazards(h, game, flashLog) {
       h.slidePoseTime = 0;
       h.invincible = 0.25;
       showDamageFlash(h, hazard.type);
+      playSfx("hit");
       flashLog("닫힌 방화벽이 해커의 이동을 막았습니다.");
       return;
     }
@@ -742,6 +750,7 @@ function applyAttackHazards(h, game, flashLog) {
       const empoweredHazards = empowerNextHazardsByPlacementOrder(game);
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
+      playSfx("scanner");
       flashLog(formatCameraAlertLog(empoweredHazards));
       return;
     }
@@ -754,6 +763,7 @@ function applyAttackHazards(h, game, flashLog) {
       hazard.empowered = false;
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
+      playSfx("electric", { loop: true, volume: 0.28 });
       flashLog(wasEmpowered
         ? `강화 감전패널이 이동속도를 ${formatSeconds(slowTime)} 동안 낮춰 이동을 지연시켰습니다.`
         : `감전패널이 이동속도를 ${formatSeconds(slowTime)} 동안 낮춰 이동을 지연시켰습니다.`);
@@ -767,6 +777,7 @@ function applyAttackHazards(h, game, flashLog) {
       hazard.empowered = false;
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
+      playSfx("hit");
       flashLog(`EMP패널이 에너지를 ${drain} 흡수했습니다.`);
       return;
     }
@@ -780,6 +791,7 @@ function applyAttackHazards(h, game, flashLog) {
       game.mods.freeHit -= 1;
       h.invincible = BLOCK_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
+      playSfx(getHitSfxName(hazard.type));
       flashLog("보호막으로 피해를 1회 무시했습니다.");
       return;
     }
@@ -788,9 +800,16 @@ function applyAttackHazards(h, game, flashLog) {
     game.metrics.hpLost += 1;
     h.invincible = HIT_INVINCIBLE_TIME;
     showDamageFlash(h, hazard.type);
+    playSfx(getHitSfxName(hazard.type));
     flashLog(`${TRAPS[hazard.type].name}에 걸렸습니다. 체력 -1`);
     return;
   }
+}
+
+function getHitSfxName(hazardType) {
+  if (hazardType === "camera") return "scanner";
+  if (hazardType === "shock") return "electric";
+  return "hit";
 }
 
 function canSlidePastFloorHazard(h, hazard) {

@@ -19,6 +19,7 @@ import {
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
 } from "./trap.js";
+import { playSfx, stopSfx } from "./audio.js";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;
@@ -31,7 +32,10 @@ export function createReplayHacker(game) {
     y: first.y,
     w: 30,
     h: first.h || 54,
+    vx: first.vx || 0,
+    vy: first.vy || 0,
     facing: first.facing || 1,
+    onGround: Boolean(first.onGround),
     isSliding: Boolean(first.isSliding),
     hp: 3,
     glitchTime: 0,
@@ -51,7 +55,10 @@ export function recordHacker(game, dt) {
     x: h.x,
     y: h.y,
     h: h.h,
+    vx: h.vx,
+    vy: h.vy,
     facing: h.facing,
+    onGround: h.onGround,
     isSliding: Boolean(h.isSliding),
     shield: h.shield,
     energyUsed: game.metrics.energyUsed,
@@ -89,6 +96,7 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
   if (game.replayPause > 0) {
     const pauseDt = Math.min(game.replayPause, dt);
     game.replayPause = normalizeTime(game.replayPause - pauseDt);
+    if (game.replayPause <= 0) stopSfx("electric");
     game.metrics.delay = normalizeTime(game.metrics.delay + pauseDt);
     updateObjectiveCompletionEffects(game, findTrapById(game, game.replayDelaySourceTrapId));
     if (evaluateDefenseSuccess(game)) {
@@ -115,7 +123,10 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
   r.x = sample.x;
   r.y = sample.y;
   r.h = sample.h || 54;
+  r.vx = sample.vx || 0;
+  r.vy = sample.vy || 0;
   r.facing = sample.facing || r.facing;
+  r.onGround = Boolean(sample.onGround);
   r.isSliding = Boolean(sample.isSliding);
   game.metrics.energyUsed = Math.max(game.metrics.energyUsed, sample.energyUsed || 0);
 
@@ -139,7 +150,10 @@ function checkDefenseTraps(r, game, flashLog) {
     if (trap.type === "camera" && !isEntityInCameraView(r, trap, game)) continue;
     if (!rectsOverlap(r, getTrapHitbox(trap, game))) continue;
     if (trap.type === "camera" && !cameraCanSeeHacker(trap, r, game)) continue;
-    if (canSlidePastFloorTrap(r, trap)) continue;
+    if (canSlidePastFloorTrap(r, trap)) {
+      if (trap.type === "shock") playSfx("electric", { maxDuration: 0.45, volume: 0.24 });
+      continue;
+    }
 
     const key = `${trap.id}-${trap.type}`;
     if (r.triggeredTraps.has(key)) continue;
@@ -155,6 +169,7 @@ function checkDefenseTraps(r, game, flashLog) {
       updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 0.7);
       trap.empowered = false;
+      playSfx("hit");
       flashLog(wasEmpowered ? "강화 레이저가 해커를 강하게 탐지했습니다." : "레이저가 해커를 탐지했습니다.");
     }
 
@@ -179,6 +194,7 @@ function checkDefenseTraps(r, game, flashLog) {
       );
       const empoweredTraps = empowerNextTrapsByPlacementOrder(game);
       updateObjectiveCompletionEffects(game, trap);
+      playSfx("scanner");
       flashLog(formatCameraAlertLog(empoweredTraps));
     }
 
@@ -192,6 +208,7 @@ function checkDefenseTraps(r, game, flashLog) {
       updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.4);
       trap.empowered = false;
+      playSfx("electric", { loop: true, volume: 0.28 });
       flashLog(`감전패널이 해커를 ${delay.toFixed(1)}초 지연시켰습니다.`);
     }
 
@@ -210,6 +227,7 @@ function checkDefenseTraps(r, game, flashLog) {
       startTrapTriggerEffect(trap, "delay", `지연 ${formatShortSeconds(delay)}`, Math.max(0.9, delay));
       updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.8);
+      playSfx("hit");
       flashLog(`강화 방화벽이 닫히며 해커를 ${delay}초 지연시켰습니다.`);
     }
 
@@ -221,6 +239,7 @@ function checkDefenseTraps(r, game, flashLog) {
       updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.0);
       trap.empowered = false;
+      playSfx("hit");
       flashLog(`EMP패널이 에너지를 ${drain} 흡수했습니다.`);
     }
   }

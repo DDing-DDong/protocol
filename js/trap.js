@@ -7,10 +7,10 @@ export const CAMERA_W = 90;
 export const CAMERA_H = 94;
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
-  if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return;
+  if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return false;
   if (slot.blocked) {
     flashLog("이 슬롯은 현재 설치할 수 없습니다.");
-    return;
+    return false;
   }
 
   const objective = getDefenseObjective(game.stage);
@@ -18,7 +18,7 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
   if (objective?.maxTraps && countObjectiveTraps(game) >= objective.maxTraps) {
     if (!extraUse) {
       flashLog(`이번 방어 목표는 함정 ${objective.maxTraps}개 이하입니다.`);
-      return;
+      return false;
     }
   }
 
@@ -26,7 +26,7 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
   const cost = getTrapCost(selectedTrap, game, slot);
   if (game.defenseBudget < cost) {
     flashLog("함정 토큰이 부족합니다.");
-    return;
+    return false;
   }
 
   const trap = {

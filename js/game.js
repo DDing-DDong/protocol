@@ -26,6 +26,26 @@ import {
   getTrapCost,
 } from "./trap.js";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js";
+import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js";
+
+const BGM_TRACKS = {
+  lobby: "neon-protocol.mp3",
+  play: "neon-circuit-drift.mp3",
+  ending: "clear-bgm.mp3",
+};
+
+function playLobbyBgm() {
+  playBgm(BGM_TRACKS.lobby, { force: true });
+}
+
+function playGameplayBgmForTurn(turn) {
+  if (turn === TURN.ATTACK || turn === TURN.DEFENSE_BUILD || turn === TURN.DEFENSE_REPLAY) {
+    playBgm(BGM_TRACKS.play, { force: true });
+    return;
+  }
+
+  stopBgm();
+}
 
 const canvas = document.getElementById("gameCanvas");
 const uiModule = initUI({
@@ -34,6 +54,7 @@ const uiModule = initUI({
     game.deleteMode = false;
     uiModule.setDeleteMode(false);
     startReplayMode(game);
+    playGameplayBgmForTurn(game.turn);
     uiModule.setLog("리플레이 중입니다. 해커가 이전 공격 경로를 따라갑니다.");
     uiModule.updateUI(game);
   },
@@ -66,6 +87,7 @@ const uiModule = initUI({
   onApplyReward: applyReward,
   onToggleAttackPause: toggleAttackPause,
   onResumeAttackPause: resumeAttackPause,
+  canPlayAttackSfx: () => game.turn === TURN.ATTACK && !game.tutorialInputLocked && !game.attackPaused,
 });
 
 const game = {
@@ -225,6 +247,8 @@ function getTrapRefund(trap) {
 
 function setupStage(options = {}) {
   uiModule.hideOverlay();
+  stopSfx("electric");
+  if (!options.keepCurrentBgm) playLobbyBgm();
   uiModule.keys.clear();
   const isAttack = isAttackStage(game.stage);
   syncStageLayoutSelection();
@@ -287,7 +311,8 @@ function setupStage(options = {}) {
 
   uiModule.setDeleteMode(false);
   uiModule.updateUI(game);
-  maybeShowStageTutorial({ keepDefenseTraps });
+  const showedTutorial = maybeShowStageTutorial({ keepDefenseTraps });
+  if (!showedTutorial && !isAttack) playGameplayBgmForTurn(game.turn);
 }
 
 function snapshotDefenseTraps(traps) {
@@ -376,7 +401,9 @@ function update(dt) {
 
   if (game.turn === TURN.ATTACK) {
     if (!game.attackPaused) {
+      const wasAttackStarted = game.attackTimerStarted;
       updateAttack(game, dt, uiModule.keys, flashLog, endStage);
+      if (!wasAttackStarted && game.attackTimerStarted) playGameplayBgmForTurn(game.turn);
     }
   }
   if (game.turn === TURN.DEFENSE_REPLAY) {
@@ -392,6 +419,7 @@ function toggleAttackPause() {
   game.attackPaused = !game.attackPaused;
   if (game.attackPaused) {
     uiModule.keys.clear();
+    playSfx("stop");
     uiModule.setLog("공격 턴을 일시정지했습니다.");
   } else {
     uiModule.setLog("공격 턴을 재개했습니다.");
@@ -412,6 +440,7 @@ function resumeAttackPause() {
 
 function endStage(success, text) {
   if (game.turn === TURN.ENDING) return;
+  stopSfx("electric");
   const completedStage = game.stage;
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;
@@ -419,6 +448,12 @@ function endStage(success, text) {
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
   game.showSuccessDefenseLayout = success && completedTurn === TURN.DEFENSE_REPLAY;
   updateBest(completedStage, success);
+  playSfx(success ? "success" : "fail");
+  if (success && completedStage === 11) {
+    playBgm(BGM_TRACKS.ending);
+  } else {
+    playLobbyBgm();
+  }
 
   if (success && completedStage % 2 === 0) {
     carryDefenseTrapsToNextStage(game, completedStage + 1);
@@ -467,6 +502,7 @@ function endStage(success, text) {
 }
 
 function showStageClearRewardOverlay(completedStage, completedTurn, text) {
+  playLobbyBgm();
   const rewards = getStageRewardChoices(completedStage, completedTurn);
   const selectedReward = rewards.find((reward) => reward.recommended);
 
@@ -477,12 +513,13 @@ function showStageClearRewardOverlay(completedStage, completedTurn, text) {
     buttonText: selectedReward ? "선택된 보상 받기" : "보상 없이 진행",
     onButton: () => {
       if (selectedReward) {
-        applyReward(selectedReward);
+        applyReward(selectedReward, { keepCurrentBgm: true });
         return;
       }
 
       game.stage += 1;
-      setupStage();
+      playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
+      setupStage({ keepCurrentBgm: true });
     },
   });
 }
@@ -496,10 +533,11 @@ function getStageRewardChoices(completedStage, completedTurn) {
     : {});
 }
 
-function applyReward(reward) {
+function applyReward(reward, options = {}) {
   reward.apply(game, reward);
   game.stage += 1;
-  setupStage();
+  playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
+  setupStage({ keepCurrentBgm: Boolean(options.keepCurrentBgm) });
 }
 
 function updateBest(stage, success) {
@@ -518,7 +556,19 @@ function showHelp() {
 
   uiModule.showOverlay({
     title: "조작법",
-    text: "공격 턴에는 방향키 이동/점프, Shift 대시, Space 해킹, S 일시정지를 사용합니다. 일시정지 중에는 이동/대시/해킹 입력으로 바로 재개합니다. 방어 턴에는 표시된 슬롯에 함정을 배치하고 리플레이를 시작하세요.",
+    text: [
+      "공격 턴",
+      "",
+      "방향키 ← → 이동 ↑ 점프",
+      "Space 보호막",
+      "Shift 대시",
+      "",
+      "AI 방어 준비 턴",
+      "",
+      "함정을 선택합니다.",
+      "맵을 클릭해 설치합니다.",
+      "리플레이 시작을 누릅니다.",
+    ].join("\n"),
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });
@@ -529,8 +579,12 @@ function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
     game.tutorialFlags.stage1Intro = true;
     showDialogueSequence("해커", STAGE_ONE_HACKER_DIALOGUE, {
       finalButtonText: "침투 시작",
+      onComplete: () => {
+        uiModule.hideOverlay();
+        playGameplayBgmForTurn(game.turn);
+      },
     });
-    return;
+    return true;
   }
 
   if (
@@ -542,11 +596,20 @@ function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
     game.tutorialFlags.stage2Defense = true;
     showDialogueSequence("AI 시스템", STAGE_TWO_DEFENSE_DIALOGUE, {
       finalButtonText: "방어 준비",
+      keepCurrentBgm: true,
+      onComplete: () => {
+        uiModule.hideOverlay();
+        playGameplayBgmForTurn(game.turn);
+      },
     });
+    return true;
   }
+
+  return false;
 }
 
 function showDialogueSequence(title, lines, options = {}) {
+  if (!options.keepCurrentBgm) playLobbyBgm();
   let index = 0;
   game.tutorialInputLocked = true;
   uiModule.keys.clear();
@@ -556,6 +619,7 @@ function showDialogueSequence(title, lines, options = {}) {
     uiModule.showOverlay({
       title,
       text: lines[index],
+      speaker: getDialogueSpeaker(title),
       buttonText: isLast ? (options.finalButtonText || "확인") : "다음",
       onButton: () => {
         if (!isLast) {
@@ -578,6 +642,12 @@ function showDialogueSequence(title, lines, options = {}) {
   showLine();
 }
 
+function getDialogueSpeaker(title) {
+  if (title === "AI 시스템") return "ai";
+  if (title === "해커") return "hacker";
+  return "";
+}
+
 function handleCanvasClick(pos) {
   if (game.turn !== TURN.DEFENSE_BUILD) return;
 
@@ -595,7 +665,9 @@ function handleCanvasClick(pos) {
     pos.y <= s.y
   ));
   if (slot) {
+    const trapCount = game.placedTraps.length;
     placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog);
+    if (game.placedTraps.length > trapCount) playSfx("deploy", { maxDuration: 2 });
     uiModule.updateUI(game);
   }
 }
