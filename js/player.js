@@ -81,7 +81,7 @@ export function createHacker(game) {
 
     // 대시 거리 조정: 약 4칸 정도 이동하도록 속도/시간을 낮춤
     dashSpeed: 580,
-    dashDuration: 0.18,
+    dashDuration: 0.18 + (game.mods.dashDurationBonus || 0),
 
     dashCost: 18,
     dashInputLock: false,
@@ -91,7 +91,7 @@ export function createHacker(game) {
     slidePoseTime: 0,
     dashDirection: 1,
 
-    // 대시 직후 장애물 끝부분에 걸리는 문제 방지
+    // 대시/슬라이딩 중 바닥 함정 끝부분에 걸리는 문제 방지
     dashHazardGrace: 0,
 
     shield: false,
@@ -254,10 +254,11 @@ function tryDash(game, keys, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
 
   const h = game.hacker;
+  const cost = getSkillEnergyCost(game, h.dashCost);
 
   if (h.dashCooldown > 0) return;
 
-  if (h.energy < h.dashCost) {
+  if (h.energy < cost) {
     flashLog("대시를 사용하기 위한 에너지가 부족합니다.");
     return;
   }
@@ -276,8 +277,8 @@ function tryDash(game, keys, flashLog) {
   h.facing = h.dashDirection;
   h.vx = h.dashDirection * h.dashSpeed;
 
-  h.energy -= h.dashCost;
-  game.metrics.energyUsed += h.dashCost;
+  h.energy -= cost;
+  game.metrics.energyUsed += cost;
   h.dashCooldown = game.mods.dashCooldown;
 
   h.isDashing = true;
@@ -285,7 +286,7 @@ function tryDash(game, keys, flashLog) {
   h.slidePoseTime = SLIDE_POSE_DURATION;
   startSlide(h);
 
-  // 대시 중 + 대시 직후까지 짧게 장애물 판정을 무시
+  // 대시 중 + 대시 직후까지 바닥류 함정 판정을 짧게 무시
   h.dashHazardGrace = h.dashDuration + 0.22;
 }
 
@@ -319,7 +320,8 @@ export function activateShield(game, flashLog) {
   if (game.turn !== TURN.ATTACK || !game.hacker) return;
 
   const h = game.hacker;
-  const cost = game.mods.shieldDrain;
+  const freeShield = canUseFreeShield(game);
+  const cost = freeShield ? 0 : getSkillEnergyCost(game, game.mods.shieldDrain);
 
   if (h.shieldTime > 0) return;
 
@@ -330,10 +332,25 @@ export function activateShield(game, flashLog) {
 
   h.energy -= cost;
   game.metrics.energyUsed += cost;
+  if (freeShield) game.stageState.freeShieldUsesUsed += 1;
   h.shieldTime = h.shieldDuration;
   h.shield = true;
 
-  flashLog(`실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
+  flashLog(freeShield
+    ? `실드 활성화. 첫 사용 보상으로 에너지를 소모하지 않았습니다.`
+    : `실드 활성화. ${h.shieldDuration.toFixed(1)}초 동안 1회 방어합니다.`);
+}
+
+function getSkillEnergyCost(game, baseCost) {
+  return Math.ceil(baseCost * (game.mods.skillEnergyCostMultiplier || 1));
+}
+
+function canUseFreeShield(game) {
+  return (game?.stageState?.freeShieldUsesUsed || 0) < (game?.mods?.freeShieldUses || 0);
+}
+
+function canIgnoreCamera(game) {
+  return (game?.stageState?.cameraIgnoreUsesUsed || 0) < (game?.mods?.cameraIgnoreUses || 0);
 }
 
 function moveAndCollide(entity, dt, game, keys) {
@@ -484,10 +501,10 @@ function grabWall(entity, side) {
 
 function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
-    if (hazard.type === "camera" && !isEntityInCameraView(h, hazard)) continue;
-    if (!rectsOverlap(h, getHazardHitbox(hazard))) continue;
+    if (hazard.type === "camera" && !isEntityInCameraView(h, hazard, game)) continue;
+    if (!rectsOverlap(h, getHazardHitbox(hazard, game))) continue;
 
-    if (game.turn === TURN.ATTACK && game.stage % 2 === 1 && h.dashHazardGrace > 0) {
+    if (canSlidePastFloorHazard(h, hazard)) {
       continue;
     }
 
@@ -523,6 +540,12 @@ function applyAttackHazards(h, game, flashLog) {
     }
 
     if (hazard.type === "camera") {
+      if (canIgnoreCamera(game)) {
+        game.stageState.cameraIgnoreUsesUsed += 1;
+        h.invincible = 0.35;
+        flashLog("카메라 탐지를 1회 무시했습니다.");
+        return;
+      }
       game.metrics.detections += 1;
       game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
       const empoweredHazards = empowerNextHazardsByPlacementOrder(game);
@@ -533,7 +556,7 @@ function applyAttackHazards(h, game, flashLog) {
     }
 
     if (hazard.type === "shock") {
-      const slowTime = getShockSlowTime(hazard);
+      const slowTime = getShockSlowTime(hazard, game);
       const wasEmpowered = hazard.empowered;
       h.slowTime = Math.max(h.slowTime || 0, slowTime);
       h.slowMultiplier = SHOCK_SLOW_MULTIPLIER;
@@ -579,6 +602,14 @@ function applyAttackHazards(h, game, flashLog) {
   }
 }
 
+function canSlidePastFloorHazard(h, hazard) {
+  return isFloorHazard(hazard) && (h.isSliding || h.dashHazardGrace > 0);
+}
+
+function isFloorHazard(hazard) {
+  return hazard?.type === "shock" || hazard?.type === "emp";
+}
+
 function showDamageFlash(h, hazardType) {
   h.damageFlashTime = HIT_FLASH_TIME;
   h.damageFlashColor = TRAPS[hazardType]?.color || "#ff3b67";
@@ -610,9 +641,9 @@ function collideClosedFirewallsX(entity, previousX, game) {
       hazard.closedTime = getFirewallBlockTime(game);
     }
     if (!hazard.closed) continue;
-    if (!rectsOverlap(entity, getHazardHitbox(hazard))) continue;
+    if (!rectsOverlap(entity, getHazardHitbox(hazard, game))) continue;
 
-    const wall = getHazardHitbox(hazard);
+    const wall = getHazardHitbox(hazard, game);
     if (previousBox.x + previousBox.w <= wall.x) {
       entity.x = wall.x - entity.w;
     } else if (previousBox.x >= wall.x + wall.w) {

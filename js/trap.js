@@ -1,23 +1,31 @@
 // trap.js
 // 책임: 함정 생성, 배치, 트랩 판정과 관련된 로직을 담당합니다.
 
-import { TURN, TRAPS, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js";
+import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js";
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return;
-
-  const objective = getDefenseObjective(game.stage);
-  if (objective?.maxTraps && game.placedTraps.length >= objective.maxTraps) {
-    flashLog(`이번 방어 목표는 함정 ${objective.maxTraps}개 이하입니다.`);
+  if (slot.blocked) {
+    flashLog("이 슬롯은 현재 설치할 수 없습니다.");
     return;
   }
 
-  const cost = getTrapCost(selectedTrap, game);
+  const objective = getDefenseObjective(game.stage);
+  const extraUse = canUseExtraTrap(game, selectedTrap);
+  if (objective?.maxTraps && countObjectiveTraps(game) >= objective.maxTraps) {
+    if (!extraUse) {
+      flashLog(`이번 방어 목표는 함정 ${objective.maxTraps}개 이하입니다.`);
+      return;
+    }
+  }
+
+  const usedFreePlacement = canUseFreeTrapPlacement(game);
+  const cost = getTrapCost(selectedTrap, game, slot);
   if (game.defenseBudget < cost) {
-    flashLog("예산이 부족합니다.");
+    flashLog("함정 토큰이 부족합니다.");
     return;
   }
 
@@ -31,12 +39,17 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
     empowered: false,
     closed: false,
     closedTime: 0,
+    costPaid: cost,
+    usedFreePlacement,
+    extraUse,
   };
 
   slot.occupied = true;
   game.placedTraps.push(trap);
+  if (usedFreePlacement) game.stageState.freeTrapPlacementsUsed += 1;
+  if (extraUse) game.stageState.extraTrapUsesByType[selectedTrap] -= 1;
   game.defenseBudget -= cost;
-  flashLog(`${TRAPS[selectedTrap].name} 배치 완료. 남은 예산 ${game.defenseBudget}`);
+  flashLog(`${TRAPS[selectedTrap].name}${extraUse ? " 제한 외" : ""} 배치 완료. 남은 함정 토큰 ${game.defenseBudget}`);
 }
 
 export function undoTrap(game) {
@@ -48,7 +61,8 @@ export function undoTrap(game) {
   const slot = game.trapSlots.find((s) => s.id === trap.slotId);
   if (slot) slot.occupied = false;
 
-  game.defenseBudget += getTrapCost(trap.type, game);
+  restorePlacementUses(game, trap);
+  game.defenseBudget += getTrapRefund(trap);
 }
 
 export function removeTrapAtPosition(game, pos, flashLog) {
@@ -61,13 +75,43 @@ export function removeTrapAtPosition(game, pos, flashLog) {
   const slot = game.trapSlots.find((s) => s.id === trap.slotId);
   if (slot) slot.occupied = false;
 
-  game.defenseBudget += getTrapCost(trap.type, game);
-  flashLog(`${TRAPS[trap.type].name} 삭제 완료. 남은 예산 ${game.defenseBudget}`);
+  restorePlacementUses(game, trap);
+  game.defenseBudget += getTrapRefund(trap);
+  flashLog(`${TRAPS[trap.type].name} 삭제 완료. 남은 함정 토큰 ${game.defenseBudget}`);
   return true;
 }
 
-export function getTrapCost(type) {
-  return TRAPS[type].cost;
+export function getTrapCost(type, game, slot) {
+  if (canUseFreeTrapPlacement(game)) return 0;
+  return Math.max(0, TRAPS[type].cost - (slot?.costDiscount || 0));
+}
+
+function getTrapRefund(trap) {
+  return Number.isFinite(trap.costPaid) ? trap.costPaid : TRAPS[trap.type].cost;
+}
+
+function canUseFreeTrapPlacement(game) {
+  const available = game?.mods?.freeTrapPlacements || 0;
+  const used = game?.stageState?.freeTrapPlacementsUsed || 0;
+  return used < available;
+}
+
+function canUseExtraTrap(game, type) {
+  return (game?.stageState?.extraTrapUsesByType?.[type] || 0) > 0;
+}
+
+function countObjectiveTraps(game) {
+  return (game.placedTraps || []).filter((trap) => !trap.extraUse).length;
+}
+
+function restorePlacementUses(game, trap) {
+  if (trap.usedFreePlacement) {
+    game.stageState.freeTrapPlacementsUsed = Math.max(0, game.stageState.freeTrapPlacementsUsed - 1);
+  }
+
+  if (trap.extraUse) {
+    game.stageState.extraTrapUsesByType[trap.type] = (game.stageState.extraTrapUsesByType[trap.type] || 0) + 1;
+  }
 }
 
 export function normalizeRotation(value) {
@@ -89,7 +133,7 @@ export function getOrientedTrapBox(trap, game) {
   const positive = rotation === 0 || rotation === 90;
 
   if (trap.type === "laser") {
-    const length = 118 + game.mods.laserBoost;
+    const length = LASER_BASE_LENGTH + game.mods.laserBoost;
 
     if (horizontal) {
       return {
@@ -117,12 +161,7 @@ export function getOrientedTrapBox(trap, game) {
   }
 
   if (trap.type === "camera") {
-    return {
-      x: trap.x - 64,
-      y: trap.y - CAMERA_H,
-      w: CAMERA_W,
-      h: CAMERA_H,
-    };
+    return getCameraBoxFromAnchor(trap.x, trap.y, getCameraRangeScale(game, trap));
   }
 
   if (trap.type === "firewall") {
@@ -132,34 +171,39 @@ export function getOrientedTrapBox(trap, game) {
   return { x: trap.x, y: trap.y, w: 1, h: 1 };
 }
 
-export function getHazardHitbox(hazard) {
-  if (hazard.type === "camera") return getCameraHazardBox(hazard);
+export function getHazardHitbox(hazard, game) {
+  if (hazard.type === "camera") return getCameraHazardBox(hazard, game);
   return hazard;
 }
 
-export function getCameraHazardBox(hazard) {
+export function getCameraHazardBox(hazard, game) {
   if (hazard.carried && Number.isFinite(hazard.w) && Number.isFinite(hazard.h)) {
     return { x: hazard.x, y: hazard.y, w: hazard.w, h: hazard.h };
   }
 
   if (Number.isFinite(hazard.w) && Number.isFinite(hazard.h)) {
-    return getCameraBoxFromAnchor(hazard.x, hazard.y);
+    return getCameraBoxFromAnchor(hazard.x, hazard.y, getCameraRangeScale(game, hazard));
   }
 
-  return getCameraBoxFromAnchor(hazard.x, hazard.y);
+  return getCameraBoxFromAnchor(hazard.x, hazard.y, getCameraRangeScale(game, hazard));
 }
 
-function getCameraBoxFromAnchor(anchorX, anchorY) {
+function getCameraBoxFromAnchor(anchorX, anchorY, scale = 1) {
+  const width = CAMERA_W * scale;
   return {
-    x: anchorX - 64,
+    x: anchorX - 64 - (width - CAMERA_W) / 2,
     y: anchorY - CAMERA_H,
-    w: CAMERA_W,
+    w: width,
     h: CAMERA_H,
   };
 }
 
-export function getCameraDetectionPolygon(camera) {
-  const box = getCameraHazardBox(camera);
+function getCameraRangeScale(game, camera) {
+  return Math.max(0.5, camera?.cameraRangeScale || game?.mods?.cameraRangeScale || 1);
+}
+
+export function getCameraDetectionPolygon(camera, game) {
+  const box = getCameraHazardBox(camera, game);
   const bodyW = Math.min(56, box.w * 0.5);
   const bodyH = Math.min(36, box.h * 0.32);
   const bodyX = box.x + box.w - bodyW - 2;
@@ -185,12 +229,12 @@ export function isPointInPolygon(point, polygon) {
   return inside;
 }
 
-export function isEntityInCameraView(entity, camera) {
+export function isEntityInCameraView(entity, camera, game) {
   const center = {
     x: entity.x + entity.w / 2,
     y: entity.y + entity.h / 2,
   };
-  return isPointInPolygon(center, getCameraDetectionPolygon(camera));
+  return isPointInPolygon(center, getCameraDetectionPolygon(camera, game));
 }
 
 export function getTrapHitbox(trap, game) {
@@ -205,9 +249,9 @@ export function carryDefenseTrapsToNextStage(game, stage) {
     x: trap.x,
     y: trap.y,
     slotId: trap.slotId,
-    empowered: trap.empowered,
-    closed: trap.closed,
-    closedTime: trap.closedTime,
+    empowered: false,
+    closed: false,
+    closedTime: 0,
   }));
 
   game.carriedTrapsByStage.set(stage, traps);
@@ -292,6 +336,20 @@ export function tickBaseHazardTimers(game, dt) {
 
 function tickTrapTimers(traps, dt) {
   for (const trap of traps || []) {
+    if (trap.triggerEffect?.timer > 0) {
+      trap.triggerEffect.timer = Math.max(0, trap.triggerEffect.timer - dt);
+      if (trap.triggerEffect.timer <= 0) delete trap.triggerEffect;
+    }
+
+    if (trap.objectiveSparkTimer > 0) {
+      trap.objectiveSparkTimer = Math.max(0, trap.objectiveSparkTimer - dt);
+      if (trap.objectiveSparkTimer <= 0) {
+        delete trap.objectiveSparkTimer;
+        delete trap.objectiveSparkDuration;
+        delete trap.objectiveSparkLabel;
+      }
+    }
+
     if (!trap.closedTime || trap.closedTime <= 0) continue;
     trap.closedTime = Math.max(0, trap.closedTime - dt);
     if (trap.closedTime <= 0) {

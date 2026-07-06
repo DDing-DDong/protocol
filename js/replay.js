@@ -21,6 +21,8 @@ import {
 } from "./trap.js";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
+const DETECTION_EFFECT_DURATION = 0.95;
+const OBJECTIVE_SPARK_DURATION = 1.1;
 
 export function createReplayHacker(game) {
   const first = game.lastAttackRecording[0] || { x: 64, y: 388, h: 54, facing: 1 };
@@ -63,6 +65,15 @@ export function startReplay(game) {
   game.replayPause = 0;
   game.replayStepTimer = 0;
   game.replayFinished = false;
+  game.replayDelaySourceTrapId = null;
+  game.completedObjectiveEffectIds = new Set(
+    getDefenseObjectiveItems(game)
+      .filter((item) => item.complete)
+      .map((item) => item.id)
+  );
+  game.objectiveSparkTimer = 0;
+  game.objectiveSparkDuration = 0;
+  for (const trap of game.placedTraps || []) clearTrapEffects(trap);
   game.replayHacker = createReplayHacker(game);
 }
 
@@ -72,12 +83,14 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
 
   tickTrapCooldowns(r, dt);
   tickPlacedTrapTimers(game, dt);
+  tickObjectiveSpark(game, dt);
   r.glitchTime = Math.max(0, (r.glitchTime || 0) - dt);
 
   if (game.replayPause > 0) {
     const pauseDt = Math.min(game.replayPause, dt);
     game.replayPause = normalizeTime(game.replayPause - pauseDt);
     game.metrics.delay = normalizeTime(game.metrics.delay + pauseDt);
+    updateObjectiveCompletionEffects(game, findTrapById(game, game.replayDelaySourceTrapId));
     if (evaluateDefenseSuccess(game)) {
       endStage(true, "방어 목표를 달성했습니다.");
     }
@@ -123,9 +136,10 @@ function tickTrapCooldowns(r, dt) {
 
 function checkDefenseTraps(r, game, flashLog) {
   for (const trap of game.placedTraps) {
-    if (trap.type === "camera" && !isEntityInCameraView(r, trap)) continue;
+    if (trap.type === "camera" && !isEntityInCameraView(r, trap, game)) continue;
     if (!rectsOverlap(r, getTrapHitbox(trap, game))) continue;
     if (trap.type === "camera" && !cameraCanSeeHacker(trap, r, game)) continue;
+    if (canSlidePastFloorTrap(r, trap)) continue;
 
     const key = `${trap.id}-${trap.type}`;
     if (r.triggeredTraps.has(key)) continue;
@@ -137,6 +151,8 @@ function checkDefenseTraps(r, game, flashLog) {
       const detections = trap.empowered ? 2 : 1;
       game.metrics.detections += detections;
       recordTrapTrigger(game.metrics, trap.type);
+      startTrapTriggerEffect(trap, "detect", `탐지 +${detections}`, DETECTION_EFFECT_DURATION);
+      updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 0.7);
       trap.empowered = false;
       flashLog(wasEmpowered ? "강화 레이저가 해커를 강하게 탐지했습니다." : "레이저가 해커를 탐지했습니다.");
@@ -148,15 +164,32 @@ function checkDefenseTraps(r, game, flashLog) {
       recordTrapTrigger(game.metrics, trap.type);
       trap.detectFlash = 0.35;
       r.trapCooldowns.set(key, 1.2);
+      if (game.mods.cameraDelay > 0) {
+        game.replayPause = Math.max(game.replayPause, game.mods.cameraDelay);
+        r.glitchTime = Math.max(r.glitchTime || 0, game.mods.cameraDelay);
+        game.replayDelaySourceTrapId = trap.id;
+      }
+      startTrapTriggerEffect(
+        trap,
+        game.mods.cameraDelay > 0 ? "mixed" : "detect",
+        game.mods.cameraDelay > 0
+          ? `탐지 +1 · 지연 ${formatShortSeconds(game.mods.cameraDelay)}`
+          : "탐지 +1",
+        Math.max(DETECTION_EFFECT_DURATION, game.mods.cameraDelay || 0)
+      );
       const empoweredTraps = empowerNextTrapsByPlacementOrder(game);
+      updateObjectiveCompletionEffects(game, trap);
       flashLog(formatCameraAlertLog(empoweredTraps));
     }
 
     if (trap.type === "shock") {
-      const delay = getShockDelay(trap);
+      const delay = getShockDelay(trap, game);
       game.replayPause = Math.max(game.replayPause, delay);
       r.glitchTime = Math.max(r.glitchTime || 0, delay);
       recordTrapTrigger(game.metrics, trap.type);
+      game.replayDelaySourceTrapId = trap.id;
+      startTrapTriggerEffect(trap, "delay", `지연 ${formatShortSeconds(delay)}`, Math.max(0.9, delay));
+      updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.4);
       trap.empowered = false;
       flashLog(`감전패널이 해커를 ${delay.toFixed(1)}초 지연시켰습니다.`);
@@ -173,6 +206,9 @@ function checkDefenseTraps(r, game, flashLog) {
       game.replayPause = Math.max(game.replayPause, delay);
       r.glitchTime = Math.max(r.glitchTime || 0, delay);
       recordTrapTrigger(game.metrics, trap.type);
+      game.replayDelaySourceTrapId = trap.id;
+      startTrapTriggerEffect(trap, "delay", `지연 ${formatShortSeconds(delay)}`, Math.max(0.9, delay));
+      updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.8);
       flashLog(`강화 방화벽이 닫히며 해커를 ${delay}초 지연시켰습니다.`);
     }
@@ -182,11 +218,16 @@ function checkDefenseTraps(r, game, flashLog) {
       game.metrics.energyUsed += drain;
       game.metrics.energyDrained = (game.metrics.energyDrained || 0) + drain;
       recordTrapTrigger(game.metrics, trap.type);
+      updateObjectiveCompletionEffects(game, trap);
       r.trapCooldowns.set(key, 1.0);
       trap.empowered = false;
       flashLog(`EMP패널이 에너지를 ${drain} 흡수했습니다.`);
     }
   }
+}
+
+function canSlidePastFloorTrap(hacker, trap) {
+  return Boolean(hacker?.isSliding) && (trap?.type === "shock" || trap?.type === "emp");
 }
 
 function formatCameraAlertLog(empoweredTraps) {
@@ -212,6 +253,71 @@ function getCameraOrigin(box) {
 function evaluateDefenseSuccess(game) {
   const items = getDefenseObjectiveItems(game);
   return items.length > 0 && items.every((item) => item.complete);
+}
+
+function updateObjectiveCompletionEffects(game, sourceTrap) {
+  const items = getDefenseObjectiveItems(game);
+  if (items.length === 0) return;
+  if (!(game.completedObjectiveEffectIds instanceof Set)) {
+    game.completedObjectiveEffectIds = new Set(game.completedObjectiveEffectIds || []);
+  }
+
+  const newlyCompleted = [];
+  for (const item of items) {
+    if (!item.complete || game.completedObjectiveEffectIds.has(item.id)) continue;
+    game.completedObjectiveEffectIds.add(item.id);
+    newlyCompleted.push(item);
+  }
+
+  if (newlyCompleted.length === 0) return;
+
+  const allComplete = items.every((item) => item.complete);
+  const label = allComplete ? "목표 완료" : "조건 완료";
+  game.objectiveSparkTimer = OBJECTIVE_SPARK_DURATION;
+  game.objectiveSparkDuration = OBJECTIVE_SPARK_DURATION;
+  game.objectiveSparkLabel = label;
+
+  if (sourceTrap) {
+    sourceTrap.objectiveSparkTimer = OBJECTIVE_SPARK_DURATION;
+    sourceTrap.objectiveSparkDuration = OBJECTIVE_SPARK_DURATION;
+    sourceTrap.objectiveSparkLabel = label;
+  }
+}
+
+function startTrapTriggerEffect(trap, kind, label, duration) {
+  trap.triggerEffect = {
+    kind,
+    label,
+    timer: duration,
+    duration,
+  };
+}
+
+function clearTrapEffects(trap) {
+  delete trap.triggerEffect;
+  delete trap.objectiveSparkTimer;
+  delete trap.objectiveSparkDuration;
+  delete trap.objectiveSparkLabel;
+}
+
+function tickObjectiveSpark(game, dt) {
+  if (!game.objectiveSparkTimer || game.objectiveSparkTimer <= 0) return;
+  game.objectiveSparkTimer = Math.max(0, game.objectiveSparkTimer - dt);
+  if (game.objectiveSparkTimer <= 0) {
+    delete game.objectiveSparkTimer;
+    delete game.objectiveSparkDuration;
+    delete game.objectiveSparkLabel;
+  }
+}
+
+function findTrapById(game, id) {
+  if (!id) return null;
+  return (game.placedTraps || []).find((trap) => trap.id === id) || null;
+}
+
+function formatShortSeconds(value) {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}초`;
 }
 
 function normalizeTime(value) {

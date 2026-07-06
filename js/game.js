@@ -91,12 +91,19 @@ const game = {
   sampleStep: SAMPLE_STEP,
   metrics: createMetrics(),
   mods: createDefaultMods(),
+  activeEffects: [],
+  stageState: createStageState(),
   defenseBudget: 4,
   infiniteBest: Number(localStorage.getItem("traceProtocolBest") || 0),
   hacker: null,
   replayHacker: null,
   deleteMode: false,
   showFailedDefenseLayout: false,
+  showSuccessDefenseLayout: false,
+  completedObjectiveEffectIds: new Set(),
+  objectiveSparkTimer: 0,
+  tutorialFlags: createTutorialFlags(),
+  tutorialInputLocked: false,
 };
 
 let lastTime = performance.now();
@@ -104,10 +111,113 @@ let selectedTrap = "laser";
 let selectedRotation = 90;
 let laserRotation = 90;
 
+const STAGE_ONE_HACKER_DIALOGUE = [
+  "접속 성공. 외곽 서버실이 눈앞이야.",
+  "좋아, 여기까지는 깔끔하네.",
+  "이제부터 삐끗하면 내 기록이 통째로 날아가겠지만.",
+  "데이터 코어로 진입해서 정보를 빼내야 해.\n\n침투기록이 남을테니 최대한 빨리 움직여야지.",
+  "하던대로 움직이면 돼. 방향키로 이동하고\n\nShift로 슬라이딩. Space로 해킹툴을 사용해서 실드를 켜면 되겠지.",
+];
+
+const STAGE_ONE_REWARD_DIALOGUE = [
+  "침투가 감지되었습니다. 보안 개선을 시작하겠습니다.",
+  "감전패널을 임시 강화하여 보안 취약점을 개선하겠습니다.",
+];
+
+const STAGE_TWO_DEFENSE_DIALOGUE = [
+  "보안 취약점을 개선할때는 침입 궤적이 그대로 재생됩니다.",
+  "해당 경로 위에 보안 취약점을 개선할 함정을 배치해야 합니다.\n\n무작정 모든 길을 막는 것이 아니라, 반드시 통과할 지점을 선별해야 합니다.",
+  "표시된 슬롯을 클릭하면 함정을 설치할 수 있습니다.\n\n사용할 수 있는 함정 토큰은 제한되어 있으므로 경로 전체를 차단하는 방식은 비효율적입니다.",
+  "침투자가 지나간 위치, 점프 후 착지하는 지점.\n\n이런 구간이 가장 취약한 지점입니다.",
+  "설치가 완료되면 리플레이를 시작해, 개선점을 확인합니다.",
+  "목표는 침입마다 변경됩니다.\n\n지정된 조건을 달성해 방어를 성공시켜야 합니다.",
+  "정확한 방해 한 번으로도 전체 침투 시간을 무너뜨릴 수 있습니다.\n\n방어 준비를 개시합니다.",
+];
+
 function flashLog(text) {
   if (game.messageCooldown > 0) return;
   game.messageCooldown = 0.2;
   uiModule.setLog(text);
+}
+
+function createStageState(mods = createDefaultMods()) {
+  return {
+    freeTrapPlacementsUsed: 0,
+    freeShieldUsesUsed: 0,
+    cameraIgnoreUsesUsed: 0,
+    extraTrapUsesByType: { ...(mods.extraTrapUsesByType || {}) },
+  };
+}
+
+function createTutorialFlags() {
+  return {
+    stage1Intro: false,
+    stage1Reward: false,
+    stage2Defense: false,
+  };
+}
+
+function applyActiveEffectsForStage(stageType) {
+  game.mods = createDefaultMods();
+  for (const effect of game.activeEffects || []) {
+    if (!doesEffectTargetStage(effect, stageType)) continue;
+    if (typeof effect.applyEffect === "function") {
+      effect.applyEffect(game, effect);
+    }
+  }
+}
+
+function doesEffectTargetStage(effect, stageType) {
+  return effect?.target === stageType || effect?.target === "all";
+}
+
+function consumeActiveEffectsForStage(completedTurn) {
+  const stageType = completedTurn === TURN.ATTACK ? "attack" : "defense";
+  for (const effect of game.activeEffects || []) {
+    if (doesEffectTargetStage(effect, stageType)) {
+      effect.remainingTurns -= 1;
+    }
+  }
+  game.activeEffects = (game.activeEffects || []).filter((effect) => effect.remainingTurns > 0);
+}
+
+function prepareRewardTrapSlots(preservedDefenseTraps = []) {
+  if (game.turn !== TURN.DEFENSE_BUILD || !game.trapSlots.length) return;
+
+  const preservedSlotIds = new Set(preservedDefenseTraps.map((trap) => trap.slotId));
+  const blockableSlots = game.trapSlots.filter((slot) => !preservedSlotIds.has(slot.id));
+  for (const slot of pickRandomSlots(blockableSlots, game.mods.blockedSlotCount || 0)) {
+    slot.blocked = true;
+  }
+
+  const discountableSlots = game.trapSlots.filter((slot) => !slot.blocked);
+  for (const slot of pickRandomSlots(discountableSlots, game.mods.discountSlotCount || 0)) {
+    slot.costDiscount = Math.max(slot.costDiscount || 0, game.mods.discountSlotCostReduction || 0);
+  }
+}
+
+function pickRandomSlots(slots, count) {
+  const pool = slots.slice();
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.max(0, count));
+}
+
+function registerRestoredTrapUsage(trap) {
+  if (trap.usedFreePlacement) {
+    game.stageState.freeTrapPlacementsUsed += 1;
+  }
+
+  if (trap.extraUse) {
+    const remaining = game.stageState.extraTrapUsesByType[trap.type] || 0;
+    game.stageState.extraTrapUsesByType[trap.type] = Math.max(0, remaining - 1);
+  }
+}
+
+function getTrapRefund(trap) {
+  return Number.isFinite(trap.costPaid) ? trap.costPaid : getTrapCost(trap.type, game);
 }
 
 function setupStage(options = {}) {
@@ -116,7 +226,10 @@ function setupStage(options = {}) {
   const isAttack = isAttackStage(game.stage);
   const keepDefenseTraps = Boolean(options.keepDefenseTraps && !isAttack);
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
+  const preservedTrapSlotEffects = keepDefenseTraps ? snapshotTrapSlotEffects(game.trapSlots) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
+  applyActiveEffectsForStage(isAttack ? "attack" : "defense");
+  game.stageState = createStageState(game.mods);
   game.timer = getStageTime(game.stage);
   game.attackTimerStarted = false;
   game.attackPaused = false;
@@ -128,6 +241,9 @@ function setupStage(options = {}) {
   game.replayFinished = false;
   game.deleteMode = false;
   game.showFailedDefenseLayout = false;
+  game.showSuccessDefenseLayout = false;
+  game.completedObjectiveEffectIds = new Set();
+  game.objectiveSparkTimer = 0;
   game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
@@ -135,6 +251,11 @@ function setupStage(options = {}) {
   game.core = { x: CORE_X, y: 392, w: 42, h: 70 };
   game.baseHazards = createBaseHazards(game.stage, game);
   game.trapSlots = createTrapSlots(game.stage, game);
+  if (keepDefenseTraps) {
+    restoreTrapSlotEffects(preservedTrapSlotEffects);
+  } else {
+    prepareRewardTrapSlots(preservedDefenseTraps);
+  }
 
   if (isAttack) {
     game.hacker = createHacker(game);
@@ -161,6 +282,7 @@ function setupStage(options = {}) {
 
   uiModule.setDeleteMode(false);
   uiModule.updateUI(game);
+  maybeShowStageTutorial({ keepDefenseTraps });
 }
 
 function snapshotDefenseTraps(traps) {
@@ -171,11 +293,37 @@ function snapshotDefenseTraps(traps) {
     x: trap.x,
     y: trap.y,
     slotId: trap.slotId,
+    costPaid: trap.costPaid,
+    usedFreePlacement: trap.usedFreePlacement,
+    extraUse: trap.extraUse,
     empowered: false,
     closed: false,
     closedTime: 0,
     detectFlash: 0,
   }));
+}
+
+function snapshotTrapSlotEffects(slots) {
+  return (slots || [])
+    .filter((slot) => slot?.blocked || slot?.costDiscount)
+    .map((slot) => ({
+      id: slot.id,
+      blocked: Boolean(slot.blocked),
+      costDiscount: slot.costDiscount || 0,
+    }));
+}
+
+function restoreTrapSlotEffects(slotEffects) {
+  if (!slotEffects || slotEffects.length === 0) return;
+
+  const effectsById = new Map(slotEffects.map((effect) => [effect.id, effect]));
+  for (const slot of game.trapSlots) {
+    const effect = effectsById.get(slot.id);
+    if (!effect) continue;
+
+    slot.blocked = effect.blocked;
+    if (effect.costDiscount) slot.costDiscount = effect.costDiscount;
+  }
 }
 
 function restoreDefenseTraps(traps) {
@@ -187,7 +335,7 @@ function restoreDefenseTraps(traps) {
     if (!slot) continue;
 
     slot.occupied = true;
-    game.placedTraps.push({
+    const restoredTrap = {
       ...trap,
       x: slot.x,
       y: slot.y,
@@ -195,17 +343,25 @@ function restoreDefenseTraps(traps) {
       closed: false,
       closedTime: 0,
       detectFlash: 0,
-    });
+    };
+    registerRestoredTrapUsage(restoredTrap);
+    game.placedTraps.push(restoredTrap);
   }
 }
 
 function getRemainingDefenseBudget() {
-  const spent = game.placedTraps.reduce((total, trap) => total + getTrapCost(trap.type), 0);
+  const spent = game.placedTraps.reduce((total, trap) => total + getTrapRefund(trap), 0);
   return Math.max(0, getDefenseBudget(game.stage, game) - spent);
 }
 
 function update(dt) {
   game.messageCooldown = Math.max(0, game.messageCooldown - dt);
+  if (game.tutorialInputLocked) {
+    uiModule.keys.clear();
+    uiModule.updateUI(game);
+    return;
+  }
+
   if (game.turn === TURN.ATTACK) {
     if (!game.attackPaused) {
       updateAttack(game, dt, uiModule.keys, flashLog, endStage);
@@ -218,6 +374,7 @@ function update(dt) {
 }
 
 function toggleAttackPause() {
+  if (game.tutorialInputLocked) return false;
   if (game.turn !== TURN.ATTACK || game.turn === TURN.ENDING) return false;
 
   game.attackPaused = !game.attackPaused;
@@ -232,6 +389,7 @@ function toggleAttackPause() {
 }
 
 function resumeAttackPause() {
+  if (game.tutorialInputLocked) return false;
   if (game.turn !== TURN.ATTACK || !game.attackPaused) return false;
 
   game.attackPaused = false;
@@ -246,6 +404,7 @@ function endStage(success, text) {
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
+  game.showSuccessDefenseLayout = success && completedTurn === TURN.DEFENSE_REPLAY;
   updateBest(completedStage, success);
 
   if (success && completedStage % 2 === 0) {
@@ -267,6 +426,8 @@ function endStage(success, text) {
     return;
   }
 
+  consumeActiveEffectsForStage(completedTurn);
+
   if (completedStage === 11) {
     uiModule.showOverlay({
       title: "엔딩",
@@ -280,21 +441,50 @@ function endStage(success, text) {
     return;
   }
 
+  if (completedStage === 1 && completedTurn === TURN.ATTACK && !game.tutorialFlags.stage1Reward) {
+    game.tutorialFlags.stage1Reward = true;
+    showDialogueSequence("AI 시스템", STAGE_ONE_REWARD_DIALOGUE, {
+      finalButtonText: "보상 확인",
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+    });
+    return;
+  }
+
+  showStageClearRewardOverlay(completedStage, completedTurn, text);
+}
+
+function showStageClearRewardOverlay(completedStage, completedTurn, text) {
+  const rewards = getStageRewardChoices(completedStage, completedTurn);
+  const selectedReward = rewards.find((reward) => reward.recommended);
+
   uiModule.showOverlay({
     title: "스테이지 클리어",
     text: `${text}\n보상 1개를 선택하면 다음 스테이지로 진행합니다.`,
-    rewards: pickRewards(completedTurn === TURN.ATTACK ? "attack" : "defense", rewardPool),
-    buttonText: "보상 없이 진행",
+    rewards,
+    buttonText: selectedReward ? "선택된 보상 받기" : "보상 없이 진행",
     onButton: () => {
+      if (selectedReward) {
+        applyReward(selectedReward);
+        return;
+      }
+
       game.stage += 1;
       setupStage();
     },
-    onApplyReward: applyReward,
   });
 }
 
+function getStageRewardChoices(completedStage, completedTurn) {
+  const type = completedTurn === TURN.ATTACK ? "attack" : "defense";
+  const shouldGuideShockReward = completedStage === 1 && completedTurn === TURN.ATTACK;
+
+  return pickRewards(type, rewardPool, completedStage, shouldGuideShockReward
+    ? { preferredRewardId: "shock_delay_bonus", markPreferred: true }
+    : {});
+}
+
 function applyReward(reward) {
-  reward.apply(game);
+  reward.apply(game, reward);
   game.stage += 1;
   setupStage();
 }
@@ -307,6 +497,7 @@ function updateBest(stage, success) {
 }
 
 function showHelp() {
+  if (game.tutorialInputLocked) return;
   if (game.turn === TURN.ENDING) {
     flashLog("결과 화면에서는 보상 카드나 진행 버튼을 선택하세요.");
     return;
@@ -318,6 +509,60 @@ function showHelp() {
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });
+}
+
+function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
+  if (game.stage === 1 && game.turn === TURN.ATTACK && !game.tutorialFlags.stage1Intro) {
+    game.tutorialFlags.stage1Intro = true;
+    showDialogueSequence("해커", STAGE_ONE_HACKER_DIALOGUE, {
+      finalButtonText: "침투 시작",
+    });
+    return;
+  }
+
+  if (
+    game.stage === 2 &&
+    game.turn === TURN.DEFENSE_BUILD &&
+    !keepDefenseTraps &&
+    !game.tutorialFlags.stage2Defense
+  ) {
+    game.tutorialFlags.stage2Defense = true;
+    showDialogueSequence("AI 시스템", STAGE_TWO_DEFENSE_DIALOGUE, {
+      finalButtonText: "방어 준비",
+    });
+  }
+}
+
+function showDialogueSequence(title, lines, options = {}) {
+  let index = 0;
+  game.tutorialInputLocked = true;
+  uiModule.keys.clear();
+
+  const showLine = () => {
+    const isLast = index >= lines.length - 1;
+    uiModule.showOverlay({
+      title,
+      text: lines[index],
+      buttonText: isLast ? (options.finalButtonText || "확인") : "다음",
+      onButton: () => {
+        if (!isLast) {
+          index += 1;
+          showLine();
+          return;
+        }
+
+        game.tutorialInputLocked = false;
+        uiModule.keys.clear();
+        if (typeof options.onComplete === "function") {
+          options.onComplete();
+        } else {
+          uiModule.hideOverlay();
+        }
+      },
+    });
+  };
+
+  showLine();
 }
 
 function handleCanvasClick(pos) {
@@ -348,7 +593,11 @@ function resetGame() {
   game.infiniteBest = 0;
   game.lastAttackRecording = [];
   game.carriedTrapsByStage.clear();
+  game.activeEffects = [];
+  game.stageState = createStageState();
   game.mods = createDefaultMods();
+  game.tutorialFlags = createTutorialFlags();
+  game.tutorialInputLocked = false;
   setupStage();
 }
 
