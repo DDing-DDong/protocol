@@ -71,6 +71,7 @@ const uiModule = initUI({
 const game = {
   stage: 1,
   turn: TURN.ATTACK,
+  bannerTurn: TURN.ATTACK,
   timer: 30,
   attackTimerStarted: false,
   attackPaused: false,
@@ -231,6 +232,7 @@ function setupStage(options = {}) {
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   const preservedTrapSlotEffects = keepDefenseTraps ? snapshotTrapSlotEffects(game.trapSlots) : [];
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
+  game.bannerTurn = game.turn;
   applyActiveEffectsForStage(isAttack ? "attack" : "defense");
   game.stageState = createStageState(game.mods);
   game.timer = getStageTime(game.stage);
@@ -413,6 +415,7 @@ function endStage(success, text) {
   const completedStage = game.stage;
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;
+  game.bannerTurn = completedTurn;
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
   game.showSuccessDefenseLayout = success && completedTurn === TURN.DEFENSE_REPLAY;
   updateBest(completedStage, success);

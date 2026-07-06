@@ -100,10 +100,13 @@ export function initUI(callbacks) {
     restartBtn: document.getElementById("restartBtn"),
     helpBtn: document.getElementById("helpBtn"),
   };
+  prepareStatusBar(ui);
+  prepareAttackSkillPanel(ui, canvas);
 
   let overlayAction = null;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
+  let attackSkillsPanelOpen = false;
   const keys = new Set();
   const attackResumeKeys = new Set([
     "Space",
@@ -117,6 +120,69 @@ export function initUI(callbacks) {
 
   function setLog(text) {
     ui.logText.textContent = text;
+  }
+
+  function prepareStatusBar(ui) {
+    const statusBar = document.querySelector(".in-game-status");
+    if (!statusBar) return;
+
+    statusBar.querySelectorAll(".stat-stage, .stat-turn, .stat-objective")
+      .forEach((node) => node.remove());
+
+    if (!ui.logText || ui.logText.closest(".in-game-status")) return;
+
+    const oldLogPanel = ui.logText.closest(".panel-block");
+    const logBox = document.createElement("div");
+    logBox.className = "status-log";
+
+    const label = document.createElement("span");
+    label.textContent = "로그";
+    logBox.append(label, ui.logText);
+
+    statusBar.append(logBox);
+    oldLogPanel?.remove();
+  }
+
+  function prepareAttackSkillPanel(ui, canvas) {
+    const hud = document.createElement("div");
+    hud.id = "attackSkills";
+    hud.className = "attack-skills-hud hidden";
+
+    const toggle = document.createElement("button");
+    toggle.id = "attackSkillsToggle";
+    toggle.className = "attack-skills-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "스킬 정보";
+
+    const panel = document.createElement("div");
+    panel.id = "attackSkillsPanel";
+    panel.className = "attack-skills-panel hidden";
+    panel.setAttribute("aria-label", "공격 스킬 정보");
+
+    panel.innerHTML = `
+      <h2>스킬 정보</h2>
+      <div class="skill-info-grid">
+        <div class="skill-info-row">
+          <strong>대시</strong>
+          <span class="keycap">SHIFT</span>
+          <span class="skill-targets">감전패널 · EMP <em>통과</em></span>
+          <span class="skill-effect">대시 거리 : 53</span>
+        </div>
+        <div class="skill-info-row">
+          <strong>해킹</strong>
+          <span class="keycap">SPACE BAR</span>
+          <span class="skill-targets">레이저 · 카메라 <em>무력화</em></span>
+          <span class="skill-effect">지속 시간 : 1초</span>
+        </div>
+      </div>
+    `;
+
+    hud.append(toggle, panel);
+    canvas.parentElement?.appendChild(hud);
+    ui.attackSkills = hud;
+    ui.attackSkillsToggle = toggle;
+    ui.attackSkillsPanel = panel;
   }
 
   function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton }) {
@@ -175,6 +241,11 @@ export function initUI(callbacks) {
     ui.defenseTools?.classList.toggle("hidden", !showDefenseTools);
     ui.trapToolsToggle?.setAttribute("aria-expanded", showDefenseTools && trapToolsPanelOpen ? "true" : "false");
     ui.trapToolsPanel?.classList.toggle("hidden", !showDefenseTools || !trapToolsPanelOpen);
+    const showAttackSkills = game.turn === TURN.ATTACK;
+    if (!showAttackSkills) attackSkillsPanelOpen = false;
+    ui.attackSkills?.classList.toggle("hidden", !showAttackSkills);
+    ui.attackSkillsToggle?.setAttribute("aria-expanded", showAttackSkills && attackSkillsPanelOpen ? "true" : "false");
+    ui.attackSkillsPanel?.classList.toggle("hidden", !showAttackSkills || !attackSkillsPanelOpen);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.deleteTrapBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
     ui.pauseAttackBtn.disabled = game.turn !== TURN.ATTACK;
@@ -1444,14 +1515,15 @@ export function initUI(callbacks) {
 
 
   function drawStageBanner(ctx, game) {
+    const bannerTurn = getStageBannerTurn(game);
     ctx.save();
     ctx.fillStyle = "rgba(3, 8, 13, 0.66)";
     ctx.fillRect(16, 16, 390, 54);
-    ctx.fillStyle = "#18e0ff";
+    ctx.fillStyle = bannerTurn === TURN.ATTACK ? "#ff446a" : "#18e0ff";
     ctx.font = "bold 16px system-ui";
     ctx.fillText(
       `STAGE ${game.stage} / ${
-        game.turn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
+        bannerTurn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
       }`,
       30,
       40
@@ -1466,6 +1538,11 @@ export function initUI(callbacks) {
     }
 
     ctx.restore();
+  }
+
+  function getStageBannerTurn(game) {
+    if (game?.turn === TURN.ENDING && game?.bannerTurn) return game.bannerTurn;
+    return game?.turn;
   }
 
   function roundRect(context, x, y, w, h, r) {
@@ -1577,6 +1654,14 @@ export function initUI(callbacks) {
       trapToolsPanelOpen = !trapToolsPanelOpen;
       ui.trapToolsToggle.setAttribute("aria-expanded", trapToolsPanelOpen ? "true" : "false");
       ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
+    });
+
+    ui.attackSkillsToggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      attackSkillsPanelOpen = !attackSkillsPanelOpen;
+      ui.attackSkillsToggle.setAttribute("aria-expanded", attackSkillsPanelOpen ? "true" : "false");
+      ui.attackSkillsPanel?.classList.toggle("hidden", !attackSkillsPanelOpen);
     });
 
     ui.restartBtn.addEventListener(
