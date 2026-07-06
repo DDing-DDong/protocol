@@ -714,7 +714,7 @@ export function initUI(callbacks) {
     const rect = getRenderableRect(platform);
     if (!rect) return;
 
-    const visualH = Math.max(VISUAL_TILE_SIZE, Math.ceil(rect.h / VISUAL_TILE_SIZE) * VISUAL_TILE_SIZE);
+    const visualH = rect.h;
     const visualW = getPlatformVisualTileWidth(rect);
     if (visualW <= 0) return;
 
@@ -757,9 +757,7 @@ export function initUI(callbacks) {
   }
 
   function getPlatformVisualTileWidth(platform) {
-    const tileCount = Math.floor(platform.w / VISUAL_TILE_SIZE);
-    if (tileCount <= 0) return 0;
-    return tileCount * VISUAL_TILE_SIZE;
+    return platform.w;
   }
 
   function getRenderableRect(rect) {

@@ -13,6 +13,7 @@ import {
   HEIGHT,
   CORE_X,
   SAMPLE_STEP,
+  pickStageOneLayoutPresetId,
 } from "./data.js";
 import { createHacker, updateAttack, activateShield } from "./player.js";
 import { initUI } from "./ui.js";
@@ -93,6 +94,7 @@ const game = {
   mods: createDefaultMods(),
   activeEffects: [],
   stageState: createStageState(),
+  stageLayoutSelections: {},
   defenseBudget: 4,
   infiniteBest: Number(localStorage.getItem("traceProtocolBest") || 0),
   hacker: null,
@@ -224,6 +226,7 @@ function setupStage(options = {}) {
   uiModule.hideOverlay();
   uiModule.keys.clear();
   const isAttack = isAttackStage(game.stage);
+  syncStageLayoutSelection();
   const keepDefenseTraps = Boolean(options.keepDefenseTraps && !isAttack);
   const preservedDefenseTraps = keepDefenseTraps ? snapshotDefenseTraps(game.placedTraps) : [];
   const preservedTrapSlotEffects = keepDefenseTraps ? snapshotTrapSlotEffects(game.trapSlots) : [];
@@ -247,7 +250,7 @@ function setupStage(options = {}) {
   game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
-  game.platforms = createPlatforms(game.stage);
+  game.platforms = createPlatforms(game.stage, game);
   game.core = { x: CORE_X, y: 392, w: 42, h: 70 };
   game.baseHazards = createBaseHazards(game.stage, game);
   game.trapSlots = createTrapSlots(game.stage, game);
@@ -347,6 +350,13 @@ function restoreDefenseTraps(traps) {
     registerRestoredTrapUsage(restoredTrap);
     game.placedTraps.push(restoredTrap);
   }
+}
+
+function syncStageLayoutSelection() {
+  if (game.stage !== 1 && game.stage !== 2) return;
+  if (game.stageLayoutSelections[1]) return;
+
+  game.stageLayoutSelections[1] = pickStageOneLayoutPresetId();
 }
 
 function getRemainingDefenseBudget() {
@@ -595,6 +605,7 @@ function resetGame() {
   game.carriedTrapsByStage.clear();
   game.activeEffects = [];
   game.stageState = createStageState();
+  game.stageLayoutSelections = {};
   game.mods = createDefaultMods();
   game.tutorialFlags = createTutorialFlags();
   game.tutorialInputLocked = false;
