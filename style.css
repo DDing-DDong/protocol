@@ -301,6 +301,60 @@ button.secondary {
   transform: translate(-50%, 0);
 }
 
+.hud-tutorial-bubble {
+  position: absolute;
+  z-index: 65;
+  width: min(330px, calc(100% - 24px));
+  transform: translateX(-50%);
+  padding: 11px 13px 10px;
+  background: rgba(6, 18, 28, 0.96);
+  border: 1px solid rgba(138, 242, 255, 0.78);
+  border-radius: 8px;
+  box-shadow: 0 0 18px rgba(24, 224, 255, 0.18), 0 12px 26px rgba(0, 0, 0, 0.32);
+  color: #e9f8ff;
+  pointer-events: auto;
+}
+
+.hud-tutorial-bubble::before {
+  content: "";
+  position: absolute;
+  left: var(--bubble-arrow-x, 50%);
+  top: -8px;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(6, 18, 28, 0.96);
+  border-left: 1px solid rgba(138, 242, 255, 0.78);
+  border-top: 1px solid rgba(138, 242, 255, 0.78);
+}
+
+.hud-tutorial-bubble.above-target::before {
+  top: auto;
+  bottom: -8px;
+  border: 0;
+  border-right: 1px solid rgba(138, 242, 255, 0.78);
+  border-bottom: 1px solid rgba(138, 242, 255, 0.78);
+}
+
+.hud-tutorial-bubble p {
+  position: relative;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.hud-tutorial-bubble span {
+  display: block;
+  margin-top: 7px;
+  color: #8af2ff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
 .objective-hud {
   position: absolute;
   z-index: 12;
@@ -948,7 +1002,7 @@ button.secondary {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.28;
   text-align: left;
   white-space: pre-line;
   transform: translate(-50%, 4px);
@@ -1048,10 +1102,105 @@ kbd {
   box-shadow: 0 0 40px rgba(24, 224, 255, 0.14);
 }
 
+.dialogue-overlay {
+  place-items: end center;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, rgba(3, 8, 13, 0.22), rgba(3, 8, 13, 0.76));
+}
+
+.dialogue-overlay .overlay-card {
+  width: min(900px, calc(100% - 20px));
+  height: 122px;
+  min-height: 122px;
+  align-items: flex-start;
+  gap: 6px 10px;
+  padding: 12px 16px 14px;
+  cursor: pointer;
+}
+
+.dialogue-overlay .overlay-card.click-advances::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  bottom: 13px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid rgba(138, 242, 255, 0.94);
+  filter: drop-shadow(0 0 8px rgba(24, 224, 255, 0.6));
+  animation: dialogue-arrow-blink 1.05s steps(2, start) infinite;
+}
+
+.dialogue-overlay .overlay-card.typing::after {
+  opacity: 0;
+}
+
+.dialogue-overlay .overlay-card > button {
+  display: none;
+}
+
+.overlay-card.has-portrait {
+  display: flex;
+}
+
+.dialogue-portrait {
+  position: absolute;
+  left: -20px;
+  bottom: calc(100% - 10px);
+  width: clamp(205px, 24vw, 285px);
+  height: clamp(192px, 22.5vw, 266px);
+  overflow: hidden;
+  border: 1px solid rgba(138, 242, 255, 0.38);
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 24%, rgba(24, 224, 255, 0.18), rgba(3, 8, 13, 0.72));
+  box-shadow: inset 0 1px 0 rgba(233, 248, 255, 0.10), 0 0 16px rgba(24, 224, 255, 0.12);
+  pointer-events: none;
+}
+
+.dialogue-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(233, 248, 255, 0.10) 0,
+    rgba(233, 248, 255, 0.10) 1px,
+    transparent 1px,
+    transparent 5px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.48;
+  animation: portrait-scan-lines 1.4s linear infinite;
+}
+
+.dialogue-portrait img {
+  width: 104%;
+  height: 106%;
+  object-fit: contain;
+  object-position: center bottom;
+  display: block;
+  transform: translate(-5px, -7px);
+  transform-origin: center bottom;
+  filter: drop-shadow(0 0 18px rgba(187, 92, 255, 0.42)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
+}
+
+.dialogue-portrait-ai img {
+  object-fit: contain;
+  object-position: center bottom;
+  transform: translate(-6px, -8px) scale(1.04);
+}
+
 .overlay-card h2 {
   margin: 0;
   color: #18e0ff;
   text-align: center;
+}
+
+.dialogue-overlay .overlay-card h2 {
+  text-align: left;
+  font-size: 17px;
 }
 
 .overlay-card p {
@@ -1061,6 +1210,54 @@ kbd {
   line-height: 1.5;
   text-align: center;
   white-space: pre-line;
+}
+
+.dialogue-overlay .overlay-card p {
+  width: 100%;
+  min-height: 54px;
+  padding-right: 34px;
+  text-align: left;
+}
+
+.dialogue-skip-btn {
+  position: absolute;
+  z-index: 72;
+  top: 12px;
+  left: 14px;
+  min-width: 78px;
+  min-height: 30px;
+  padding: 6px 10px;
+  background: rgba(3, 8, 13, 0.72);
+  color: #8af2ff;
+  border: 1px solid rgba(138, 242, 255, 0.56);
+  border-radius: 6px;
+  box-shadow: 0 0 14px rgba(24, 224, 255, 0.14);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@keyframes dialogue-arrow-blink {
+  0%,
+  42% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  43%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes portrait-scan-lines {
+  from {
+    background-position-y: 0;
+  }
+
+  to {
+    background-position-y: 12px;
+  }
 }
 
 .speaker-ai .overlay-card p {
@@ -1103,6 +1300,13 @@ kbd {
   border-color: #ffcc33;
   background: linear-gradient(180deg, rgba(255, 204, 51, 0.18), rgba(19, 34, 52, 0.96));
   box-shadow: 0 0 18px rgba(255, 204, 51, 0.22);
+}
+
+.reward-card.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(0.4);
 }
 
 .reward-card strong {
@@ -1258,6 +1462,33 @@ kbd {
 
   .timer-pause-btn {
     min-width: 0;
+  }
+
+  .dialogue-overlay {
+    padding: 10px 12px;
+  }
+
+  .dialogue-overlay .overlay-card {
+    width: 100%;
+    height: 104px;
+    min-height: 104px;
+    padding: 10px 12px 14px;
+  }
+
+  .overlay-card.has-portrait {
+    display: flex;
+  }
+
+  .dialogue-portrait {
+    left: -2px;
+    bottom: calc(100% - 6px);
+    width: 120px;
+    height: 116px;
+  }
+
+  .dialogue-overlay .overlay-card p {
+    min-height: 46px;
+    padding-right: 30px;
   }
 }
 
@@ -1564,6 +1795,38 @@ kbd {
     width: min(calc(100% - var(--mobile-game-margin) * 2), calc((100dvh - var(--mobile-game-margin) * 2) * 16 / 9));
     max-width: min(calc(100% - var(--mobile-game-margin) * 2), calc((100dvh - var(--mobile-game-margin) * 2) * 16 / 9));
   }
+
+  .dialogue-overlay {
+    padding: 8px 10px;
+  }
+
+  .dialogue-overlay .overlay-card {
+    height: 92px;
+    min-height: 92px;
+    padding: 9px 11px 13px;
+  }
+
+  .overlay-card.has-portrait {
+    display: flex;
+  }
+
+  .dialogue-overlay .overlay-card h2 {
+    font-size: 13px;
+  }
+
+  .dialogue-portrait {
+    left: -3px;
+    bottom: calc(100% - 5px);
+    width: 112px;
+    height: 108px;
+  }
+
+  .speaker-ai .overlay-card p,
+  .speaker-hacker .overlay-card p {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {

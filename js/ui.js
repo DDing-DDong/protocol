@@ -9,11 +9,9 @@ import {
   getDefenseObjectiveItems,
   getFirewallBlockTime,
   getCameraEmpowerCount,
-  FIREWALL_REWARD_BLOCK_BONUS,
-  SHOCK_SLOW_TIME,
+  getShockDelay,
+  getShockSlowTime,
   SHOCK_SLOW_MULTIPLIER,
-  SHOCK_EMPOWERED_DURATION_BONUS,
-  CAMERA_NETWORK_EMPOWER_BONUS,
 } from "./data.js?v=20260707-mobile-panels-fit2";
 import {
   getCameraHazardBox,
@@ -44,13 +42,30 @@ const TRAP_IMAGE_FILES = {
 };
 const trapImages = createTrapImages();
 const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
+const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
+const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
 const HACKER_IMAGE_FILES = {
   idle: ["idle-1.png", "idle-2.png", "idle-3.png", "idle-4.png"],
   run: ["run-1.png", "run-2.png", "run-3.png", "run-4.png", "run-5.png"],
   jump: ["jump-1.png", "jump-2.png", "jump-3.png", "jump-4.png"],
   slide: ["slide-1.png", "slide-2.png", "slide-3.png"],
 };
+const HACKER_SCRIPT_IMAGE_FILES = {
+  idle: "idle.png",
+  happy: "happy.png",
+  frown: "frown.png",
+  angry: "angry.png",
+  surprised: "surprised.png",
+};
+const AI_SCRIPT_IMAGE_FILES = {
+  idle: "idle.gif",
+  error: "error.gif",
+  eyes_closed: "eyes_closed.gif",
+  happy: "happy.gif",
+};
 const hackerImages = createHackerImages();
+const hackerScriptImages = createScriptImages(HACKER_SCRIPT_IMAGE_FILES, HACKER_SCRIPT_IMAGE_BASE_URL);
+const aiScriptImages = createScriptImages(AI_SCRIPT_IMAGE_FILES, AI_SCRIPT_IMAGE_BASE_URL);
 const transparentHackerFrames = new WeakMap();
 const DEFAULT_BACKGROUND_LAYERS = {
   far: ["future-city"],
@@ -119,6 +134,18 @@ function createHackerImages() {
   return groups;
 }
 
+function createScriptImages(filesByKey, baseUrl) {
+  const images = {};
+  for (const [key, file] of Object.entries(filesByKey)) {
+    const image = new Image();
+    const url = new URL(file, baseUrl);
+    url.searchParams.set("v", ASSET_VERSION);
+    image.src = url.href;
+    images[key] = image;
+  }
+  return images;
+}
+
 function isImageReady(image) {
   return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 }
@@ -160,6 +187,7 @@ export function initUI(callbacks) {
     defenseTools: document.getElementById("defenseTools"),
     logText: document.getElementById("logText"),
     overlay: document.getElementById("overlay"),
+    overlayCard: document.querySelector("#overlay .overlay-card"),
     overlayTitle: document.getElementById("overlayTitle"),
     overlayText: document.getElementById("overlayText"),
     overlayButton: document.getElementById("overlayButton"),
@@ -176,6 +204,9 @@ export function initUI(callbacks) {
   prepareMobileControls(ui, canvas);
 
   let overlayAction = null;
+  let overlayTyping = null;
+  let guideBubble = null;
+  let guideBubbleInputLocked = false;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
   let attackSkillsPanelOpen = false;
@@ -279,37 +310,155 @@ export function initUI(callbacks) {
     ui.mobileControls = controls;
   }
 
-  function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton, speaker = "" }) {
+  function showOverlay({
+    title,
+    text,
+    rewards = [],
+    buttonText = "확인",
+    onButton,
+    speaker = "",
+    portrait = "",
+    advanceOnCardClick = false,
+    lockRecommendedReward = false,
+    onSkip,
+  }) {
+    stopOverlayTyping();
     overlayAction = typeof onButton === "function" ? onButton : hideOverlay;
     ui.overlay.classList.remove("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay");
+    ui.overlayCard?.classList.remove("has-portrait", "click-advances", "typing");
+    setOverlaySkip(null);
     if (speaker) ui.overlay.classList.add(`speaker-${speaker}`);
+    if (advanceOnCardClick) {
+      ui.overlay.classList.add("dialogue-overlay");
+      ui.overlayCard?.classList.add("click-advances");
+      setOverlaySkip(onSkip);
+    }
     ui.overlayTitle.textContent = title;
-    ui.overlayText.textContent = text;
+    setOverlayText(text, { typewriter: advanceOnCardClick });
     ui.overlayButton.textContent = buttonText;
     ui.rewardList.innerHTML = "";
+    setOverlayPortrait(portrait, speaker);
 
     for (const reward of rewards) {
+      const locked = Boolean(lockRecommendedReward && !reward.recommended);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `reward-card${reward.recommended ? " recommended selected" : ""}`;
+      btn.className = `reward-card${reward.recommended ? " recommended selected" : ""}${locked ? " disabled" : ""}`;
+      btn.disabled = locked;
+      btn.setAttribute("aria-disabled", locked ? "true" : "false");
       btn.innerHTML = reward.recommended
         ? `<strong>${escapeHTML(reward.name)} <em class="reward-badge">선택됨</em></strong><span>${escapeHTML(reward.desc)}</span>`
         : `<strong>${escapeHTML(reward.name)}</strong><span>${escapeHTML(reward.desc)}</span>`;
-      btn.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        callbacks.onApplyReward(reward);
-      });
+      if (!locked) {
+        btn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          callbacks.onApplyReward(reward);
+        });
+      }
       ui.rewardList.appendChild(btn);
     }
   }
 
   function hideOverlay() {
+    stopOverlayTyping();
     ui.overlay.classList.add("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay");
+    ui.overlayCard?.classList.remove("has-portrait", "click-advances");
+    setOverlaySkip(null);
+    setOverlayPortrait("");
     ui.rewardList.innerHTML = "";
     overlayAction = null;
+  }
+
+  function runOverlayAction() {
+    if (finishOverlayTyping()) return;
+
+    const action = overlayAction;
+
+    if (typeof action === "function") {
+      action();
+    } else {
+      hideOverlay();
+    }
+  }
+
+  function setOverlayText(text, { typewriter = false } = {}) {
+    if (!typewriter) {
+      ui.overlayText.textContent = text;
+      return;
+    }
+
+    const fullText = String(text || "");
+    ui.overlayText.textContent = "";
+    ui.overlayCard?.classList.add("typing");
+    overlayTyping = {
+      fullText,
+      index: 0,
+      done: false,
+      timer: window.setInterval(() => {
+        if (!overlayTyping) return;
+        overlayTyping.index = Math.min(overlayTyping.fullText.length, overlayTyping.index + 1);
+        ui.overlayText.textContent = overlayTyping.fullText.slice(0, overlayTyping.index);
+        if (overlayTyping.index >= overlayTyping.fullText.length) finishOverlayTyping({ keepAction: true });
+      }, 18),
+    };
+  }
+
+  function finishOverlayTyping({ keepAction = false } = {}) {
+    if (!overlayTyping || overlayTyping.done) return false;
+
+    window.clearInterval(overlayTyping.timer);
+    ui.overlayText.textContent = overlayTyping.fullText;
+    ui.overlayCard?.classList.remove("typing");
+    overlayTyping.done = true;
+    if (!keepAction) overlayTyping = null;
+    return true;
+  }
+
+  function stopOverlayTyping() {
+    if (!overlayTyping) return;
+    window.clearInterval(overlayTyping.timer);
+    overlayTyping = null;
+    ui.overlayCard?.classList.remove("typing");
+  }
+
+  function setOverlayPortrait(portrait, speaker = "") {
+    ui.overlayCard?.querySelector(".dialogue-portrait")?.remove();
+    if (!portrait || !ui.overlayCard) return;
+
+    const isAi = speaker === "ai";
+    const images = isAi ? aiScriptImages : hackerScriptImages;
+    const baseUrl = isAi ? AI_SCRIPT_IMAGE_BASE_URL : HACKER_SCRIPT_IMAGE_BASE_URL;
+    const image = images[portrait] || images.idle;
+    const frame = document.createElement("div");
+    frame.className = `dialogue-portrait ${isAi ? "dialogue-portrait-ai" : "dialogue-portrait-hacker"}`;
+    frame.setAttribute("aria-hidden", "true");
+
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = image?.src || new URL(isAi ? "idle.gif" : "idle.png", baseUrl).href;
+    frame.appendChild(img);
+    ui.overlayCard.prepend(frame);
+    ui.overlayCard.classList.add("has-portrait");
+  }
+
+  function setOverlaySkip(onSkip) {
+    ui.overlay.querySelector(".dialogue-skip-btn")?.remove();
+    if (typeof onSkip !== "function") return;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dialogue-skip-btn";
+    button.textContent = "SKIP>>";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      stopOverlayTyping();
+      onSkip();
+    });
+    ui.overlay.appendChild(button);
   }
 
   function updateUI(game) {
@@ -386,32 +535,62 @@ export function initUI(callbacks) {
   }
 
   function updateTrapTooltips(game) {
+    const laserBtn = ui.defenseTools?.querySelector('[data-trap="laser"]');
+    if (laserBtn) {
+      laserBtn.dataset.tooltip = [
+        "해커를 탐지 및 공격합니다.",
+        "",
+        "공격턴: 해커에게 피해 1",
+        "",
+        "수비턴: 탐지 +1합니다.",
+        "",
+        "선택된 상태에서 다시 클릭하면 회전합니다.",
+      ].join("\n");
+    }
+
     const shockBtn = ui.defenseTools?.querySelector('[data-trap="shock"]');
     if (shockBtn) {
       shockBtn.dataset.tooltip = [
-        "해커를 감전시켜 이동을 지연시키고 이동속도를 낮춥니다.",
-        `공격턴: 이동속도 ${formatPercent(1 - SHOCK_SLOW_MULTIPLIER)} 감소 ${formatSeconds(SHOCK_SLOW_TIME)}`,
-        `강화: 지연/감속 지속 +${formatSeconds(SHOCK_EMPOWERED_DURATION_BONUS)}`,
+        "해커를 감전시킵니다.",
+        "",
+        `공격턴: ${formatSeconds(getShockSlowTime(null, game))}간 이동속도 -${formatPercent(1 - SHOCK_SLOW_MULTIPLIER)}`,
+        "",
+        `수비턴: 해커 (현재 ${formatSeconds(getShockDelay(null, game))}) 지연`,
       ].join("\n");
     }
 
     const cameraBtn = ui.defenseTools?.querySelector('[data-trap="camera"]');
     if (cameraBtn) {
       cameraBtn.dataset.tooltip = [
-        "피해를 주지않지만 해커를 탐지해 경보를 충전합니다.",
-        `경보는 설치 순서대로 다음 함정 ${getCameraEmpowerCount(game)}개를 강화합니다.`,
-        `감시 네트워크 보상: 강화 +${CAMERA_NETWORK_EMPOWER_BONUS}개`,
+        "해커를 탐지합니다.",
+        "",
+        getCameraEmpowerCount(game) > 1
+          ? `설치된 순서대로 함정 ${getCameraEmpowerCount(game)}개를 강화합니다.`
+          : "설치된 순서대로 함정을 강화합니다.",
+        "",
+        "레이저: 탐지+1, 감전패널: 지연/감속 +0.8초",
+        "",
+        "방화벽: 경로차단, EMP패널: 에너지흡수 +10",
       ].join("\n");
     }
 
     const firewallBtn = ui.defenseTools?.querySelector('[data-trap="firewall"]');
-    if (!firewallBtn) return;
+    if (firewallBtn) {
+      firewallBtn.dataset.tooltip = [
+        "카메라 탐지 전에는 작동하지않습니다.",
+        "",
+        `카메라 탐지시 (현재 ${formatSeconds(getFirewallBlockTime(game))}) 차단`,
+      ].join("\n");
+    }
 
-    firewallBtn.dataset.tooltip = [
-      "기본 상태에서는 열려 있습니다.",
-      `강화: 현재 ${formatSeconds(getFirewallBlockTime(game))} 동안 경로 차단`,
-      `방화벽 강화 보상: +${formatSeconds(FIREWALL_REWARD_BLOCK_BONUS)}`,
-    ].join("\n");
+    const empBtn = ui.defenseTools?.querySelector('[data-trap="emp"]');
+    if (empBtn) {
+      empBtn.dataset.tooltip = [
+        "해커의 에너지를 흡수합니다.",
+        "",
+        "에너지를 (현재 20)흡수합니다.",
+      ].join("\n");
+    }
   }
 
   function updateLaserDirection(rotation) {
@@ -559,6 +738,7 @@ export function initUI(callbacks) {
     for (const item of items) {
       const row = document.createElement("div");
       row.className = "objective-check-row";
+      row.dataset.objectiveId = item.id;
       row.classList.toggle("complete", item.complete);
 
       const box = document.createElement("span");
@@ -578,6 +758,207 @@ export function initUI(callbacks) {
     }
 
     ui.objectivePanel.appendChild(list);
+  }
+
+  function showDefenseGuideBubbles({ onComplete } = {}) {
+    const steps = [
+      {
+        target: () => ui.objectiveToggle,
+        text: "해당 스테이지의 수비 목표를 확인하십시오.",
+      },
+      {
+        target: () => ui.trapToolsToggle,
+        text: "함정배치 버튼을 눌러 현재 가진 함정 토큰과 설치할 수 있는 함정을 확인하십시오.",
+      },
+      {
+        before: openTrapToolsPanel,
+        target: () => ui.defenseTools?.querySelector('[data-trap="shock"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="shock"]'),
+        text: "감전패널은 공격때는 이동속도를 감소시킵니다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="shock"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="shock"]'),
+        text: "수비때는 기본적으로 1초를 지연시키지만, 선택한 강화효과로 1초가 증가했습니다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="emp"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="emp"]'),
+        text: "이번에는 에너지 흡수를 위해 EMP패널을 설치합시다.",
+      },
+    ];
+
+    showGuideBubbleSequence(steps, onComplete);
+  }
+
+  function showReplayStartGuideBubble() {
+    if (!ui.startReplayBtn) return;
+    showGuideBubble(
+      ui.startReplayBtn,
+      "함정 설치가 완료되었다면 리플레이를 재생해서 수비목표를 모두 달성합시다."
+    );
+  }
+
+  function showStageFourGuideBubbles({ onComplete } = {}) {
+    const steps = [
+      {
+        target: () => ui.objectiveToggle,
+        text: "수비 목표를 확인합시다.",
+      },
+      {
+        before: openObjectivePanel,
+        target: () => ui.objectivePanel?.querySelector('[data-objective-id="delay"]') || ui.objectiveToggle,
+        text: "다량의 지연시간이 필요합니다.",
+      },
+      {
+        target: () => ui.trapToolsToggle,
+        text: "방화벽을 사용해봅시다.",
+      },
+      {
+        before: openTrapToolsPanel,
+        target: () => ui.defenseTools?.querySelector('[data-trap="firewall"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="firewall"]'),
+        text: "방화벽은 기본적으로 아무런 효과가 없지만, 카메라에 탐지되면 긴 지연의 차단벽을 설치합니다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="camera"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="camera"]'),
+        text: "카메라와 방화벽을 설치해, 수비목표의 지연 6초를 달성해봅시다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="laser"]'),
+        text: "레이저는 카메라보다 유연한 방향으로 해커를 탐지할 수 있습니다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="laser"]'),
+        text: "레이저를 다시 클릭하면 회전이 가능합니다.",
+      },
+      {
+        target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
+          ui.defenseTools?.querySelector('[data-trap="laser"]'),
+        text: "이제 지속적으로 보안을 강화하며, 해커를 차단해봅시다.",
+      },
+    ];
+
+    showGuideBubbleSequence(steps, onComplete);
+  }
+
+  function showGuideBubbleSequence(steps, onComplete, index = 0) {
+    if (!Array.isArray(steps) || index >= steps.length) {
+      hideGuideBubble();
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    const step = steps[index];
+    step.before?.();
+    window.requestAnimationFrame(() => {
+      const target = step.target?.();
+      if (!target) {
+        showGuideBubbleSequence(steps, onComplete, index + 1);
+        return;
+      }
+
+      showGuideBubble(target, step.text, () => {
+        showGuideBubbleSequence(steps, onComplete, index + 1);
+      });
+    });
+  }
+
+  function openTrapToolsPanel() {
+    trapToolsPanelOpen = true;
+    ui.trapToolsToggle?.setAttribute("aria-expanded", "true");
+    ui.trapToolsPanel?.classList.remove("hidden");
+  }
+
+  function openObjectivePanel() {
+    objectivePanelOpen = true;
+    ui.objectiveToggle?.setAttribute("aria-expanded", "true");
+    ui.objectivePanel?.classList.remove("hidden");
+  }
+
+  function showGuideBubble(target, text, onAdvance) {
+    hideGuideBubble();
+
+    const bubble = document.createElement("div");
+    bubble.className = "hud-tutorial-bubble";
+    bubble.innerHTML = `<p>${escapeHTML(text)}</p>`;
+    canvas.parentElement?.appendChild(bubble);
+    guideBubble = {
+      element: bubble,
+      target,
+      onAdvance,
+      cleanup: null,
+    };
+    positionGuideBubble();
+    guideBubbleInputLocked = true;
+    window.setTimeout(() => {
+      guideBubbleInputLocked = false;
+    }, 160);
+
+    const advance = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (guideBubbleInputLocked) return;
+      const next = guideBubble?.onAdvance;
+      hideGuideBubble();
+      if (typeof next === "function") next();
+    };
+    const advanceAfterTargetClick = () => {
+      window.setTimeout(() => {
+        if (guideBubbleInputLocked) return;
+        const next = guideBubble?.onAdvance;
+        hideGuideBubble();
+        if (typeof next === "function") next();
+      }, 0);
+    };
+    const onResize = () => positionGuideBubble();
+    const clickTarget = target.closest?.("button") || target;
+    window.addEventListener("keydown", advance, true);
+    window.addEventListener("resize", onResize);
+    bubble.addEventListener("pointerdown", advance);
+    clickTarget.addEventListener("click", advanceAfterTargetClick);
+    guideBubble.cleanup = () => {
+      window.removeEventListener("keydown", advance, true);
+      window.removeEventListener("resize", onResize);
+      clickTarget.removeEventListener("click", advanceAfterTargetClick);
+    };
+  }
+
+  function positionGuideBubble() {
+    if (!guideBubble?.element || !guideBubble.target) return;
+
+    const hostRect = canvas.parentElement?.getBoundingClientRect();
+    const targetRect = guideBubble.target.getBoundingClientRect();
+    if (!hostRect || !targetRect) return;
+
+    const bubble = guideBubble.element;
+    const bubbleRect = bubble.getBoundingClientRect();
+    const margin = 12;
+    const halfWidth = Math.max(60, bubbleRect.width / 2);
+    const targetCenter = targetRect.left + targetRect.width / 2 - hostRect.left;
+    const minLeft = halfWidth + margin;
+    const maxLeft = hostRect.width - halfWidth - margin;
+    const left = Math.max(minLeft, Math.min(maxLeft, targetCenter));
+    const belowTop = targetRect.bottom - hostRect.top + 10;
+    const aboveTop = targetRect.top - hostRect.top - bubbleRect.height - 10;
+    const placeAbove = belowTop + bubbleRect.height > hostRect.height - margin;
+    const top = placeAbove ? Math.max(margin, aboveTop) : belowTop;
+    const arrowX = Math.max(16, Math.min(bubbleRect.width - 16, targetCenter - (left - halfWidth)));
+
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+    bubble.style.setProperty("--bubble-arrow-x", `${arrowX}px`);
+    bubble.classList.toggle("above-target", placeAbove);
+  }
+
+  function hideGuideBubble() {
+    guideBubble?.cleanup?.();
+    guideBubble?.element?.remove();
+    guideBubble = null;
+    guideBubbleInputLocked = false;
   }
 
   function summarizeTrapTypes(traps) {
@@ -633,6 +1014,7 @@ export function initUI(callbacks) {
       drawSafely(ctx, () => drawObjectiveSpark(ctx, game));
     }
 
+    drawSafely(ctx, () => drawTutorialBubble(ctx, game?.tutorialBubble));
     drawSafely(ctx, () => drawStageBanner(ctx, game));
   }
 
@@ -1014,6 +1396,86 @@ export function initUI(callbacks) {
       if (hazard.empowered) drawEmpoweredMark(ctx, box);
       drawHackStatus(ctx, hazard, box);
     }
+  }
+
+  function drawTutorialBubble(ctx, bubble) {
+    if (!bubble?.text) return;
+
+    const alpha = Math.min(1, Math.max(0, (bubble.time || 0) / 0.25));
+    const paddingX = 12;
+    const paddingY = 10;
+    const maxWidth = 330;
+    const lineHeight = 18;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = "bold 14px PfStardust30, system-ui, sans-serif";
+    const lines = wrapCanvasText(ctx, bubble.text, maxWidth - paddingX * 2);
+    const prompt = bubble.waitsForInput ? "아무 키나 입력하세요." : "";
+    const promptHeight = prompt ? lineHeight + 7 : 0;
+    const measuredLineWidths = lines.map((line) => ctx.measureText(line).width);
+    if (prompt) measuredLineWidths.push(ctx.measureText(prompt).width);
+    const textWidth = Math.min(maxWidth - paddingX * 2, Math.max(...measuredLineWidths));
+    const width = Math.ceil(textWidth + paddingX * 2);
+    const height = Math.ceil(lines.length * lineHeight + promptHeight + paddingY * 2);
+    const x = clampNumber(bubble.x - width / 2, 16, CANVAS_WIDTH - width - 16);
+    const y = clampNumber(bubble.y - height - 18, 72, CANVAS_HEIGHT - height - 86);
+    const tailX = clampNumber(bubble.x, x + 18, x + width - 18);
+    const tailY = y + height;
+
+    ctx.shadowColor = "rgba(24, 224, 255, 0.34)";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "rgba(6, 18, 28, 0.94)";
+    ctx.strokeStyle = "rgba(138, 242, 255, 0.82)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x, y, width, height, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(tailX - 9, tailY - 1);
+    ctx.lineTo(tailX, tailY + 10);
+    ctx.lineTo(tailX + 9, tailY - 1);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(6, 18, 28, 0.94)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(138, 242, 255, 0.82)";
+    ctx.stroke();
+
+    ctx.fillStyle = "#e9f8ff";
+    ctx.textBaseline = "top";
+    lines.forEach((line, index) => {
+      ctx.fillText(line, x + paddingX, y + paddingY + index * lineHeight);
+    });
+    if (prompt) {
+      ctx.fillStyle = "#8af2ff";
+      ctx.font = "bold 13px PfStardust30, system-ui, sans-serif";
+      ctx.fillText(prompt, x + paddingX, y + paddingY + lines.length * lineHeight + 7);
+    }
+    ctx.restore();
+  }
+
+  function wrapCanvasText(ctx, text, maxWidth) {
+    const lines = [];
+    for (const paragraph of String(text).split("\n")) {
+      let line = "";
+      for (const char of paragraph) {
+        const nextLine = `${line}${char}`;
+        if (line && ctx.measureText(nextLine).width > maxWidth) {
+          lines.push(line);
+          line = char;
+        } else {
+          line = nextLine;
+        }
+      }
+      if (line) lines.push(line);
+    }
+    return lines.length ? lines : [""];
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
   }
 
   function drawTrapSlots(ctx, trapSlots) {
@@ -1933,6 +2395,12 @@ export function initUI(callbacks) {
         return;
       }
 
+      if (!event.repeat && callbacks.onTutorialBubbleInput?.()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       if (event.code === "Escape" && !event.repeat) {
         event.preventDefault();
         callbacks.onToggleAttackPause();
@@ -1962,17 +2430,17 @@ export function initUI(callbacks) {
       event.stopPropagation()
     );
 
+    ui.overlayCard?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!ui.overlayCard.classList.contains("click-advances")) return;
+      runOverlayAction();
+    });
+
     ui.overlayButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-
-      const action = overlayAction;
-
-      if (typeof action === "function") {
-        action();
-      } else {
-        hideOverlay();
-      }
+      runOverlayAction();
     });
 
     ui.startReplayBtn.addEventListener(
@@ -2061,6 +2529,10 @@ export function initUI(callbacks) {
       event.preventDefault();
       event.stopPropagation();
       unlockAudio();
+      if (callbacks.onTutorialBubbleInput?.()) {
+        releaseKey(button);
+        return;
+      }
       keys.add(code);
       button.classList.add("pressed");
       callbacks.onResumeAttackPause?.();
@@ -2111,6 +2583,10 @@ export function initUI(callbacks) {
     bindEvents,
     showOverlay,
     hideOverlay,
+    showDefenseGuideBubbles,
+    showStageFourGuideBubbles,
+    showReplayStartGuideBubble,
+    hideGuideBubble,
     setLog,
     updateLaserDirection,
     setDeleteMode,

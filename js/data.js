@@ -43,13 +43,13 @@ export const DEFENSE_OBJECTIVE_EPSILON = 0.01;
 
 export const DEFENSE_OBJECTIVES = {
   2: {
-    delay: 3,
+    delay: 2,
+    energyDrained: 20,
     maxTraps: 2,
-    requiredTrapTypes: ["shock"],
   },
   4: {
     detections: 2,
-    delay: 1,
+    delay: 6,
     maxTraps: 3,
     requiredTrapTypes: ["laser"],
   },
@@ -95,6 +95,7 @@ export const rewardPool = {
       applyEffect: (game) => { game.mods.laserBoost += LASER_LENGTH_REWARD_BONUS; },
     }),
     createEffectReward({
+      id: "firewall_delay_bonus",
       name: "방화벽 강화",
       desc: "방화벽의 차단 시간이 1초 증가합니다.",
       target: "defense",
@@ -194,6 +195,7 @@ export const rewardPool = {
       applyEffect: (game) => { game.mods.skillEnergyCostMultiplier *= 1 - SKILL_ENERGY_COST_REDUCTION; },
     }),
     createEffectReward({
+      id: "dash_duration_bonus",
       name: "슬라이딩 거리 증가",
       desc: "공격 턴 대시 지속 시간이 증가해 더 멀리 이동합니다.",
       target: "attack",
