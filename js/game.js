@@ -14,25 +14,42 @@ import {
   CORE_X,
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
-} from "./data.js";
-import { createHacker, updateAttack, activateHack } from "./player.js";
-import { initUI } from "./ui.js";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js";
+} from "./data.js?v=20260707-mobile-ui";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-ui";
+import { initUI } from "./ui.js?v=20260707-mobile-ui";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-ui";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js";
-import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js";
+} from "./trap.js?v=20260707-mobile-ui";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-ui";
+import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260707-mobile-ui";
 
 const BGM_TRACKS = {
   lobby: "neon-protocol.mp3",
   play: "neon-circuit-drift.mp3",
   ending: "clear-bgm.mp3",
 };
+
+function setupLandscapeOrientationLock() {
+  const canUseOrientationLock = () =>
+    window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches &&
+    screen.orientation?.lock;
+
+  const requestLandscape = () => {
+    if (!canUseOrientationLock()) return;
+    Promise.resolve(screen.orientation.lock("landscape")).catch(() => {});
+  };
+
+  requestLandscape();
+  window.addEventListener("orientationchange", requestLandscape);
+  window.addEventListener("pointerdown", requestLandscape, { once: true });
+}
+
+setupLandscapeOrientationLock();
 
 function playLobbyBgm() {
   playBgm(BGM_TRACKS.lobby, { force: true });
@@ -66,6 +83,7 @@ const uiModule = initUI({
   },
   onRestart: resetGame,
   onHelp: showHelp,
+  onExitGame: exitGame,
   onTrapSelected: (type, wasSelected) => {
     game.deleteMode = false;
     uiModule.setDeleteMode(false);
@@ -572,6 +590,21 @@ function showHelp() {
     buttonText: "닫기",
     onButton: uiModule.hideOverlay,
   });
+}
+
+function exitGame() {
+  stopBgm();
+  try {
+    window.close();
+  } catch {
+  }
+
+  if (history.length > 1) {
+    history.back();
+    return;
+  }
+
+  flashLog("브라우저에서 창 닫기가 차단되었습니다. 뒤로가기를 눌러 종료하세요.");
 }
 
 function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {

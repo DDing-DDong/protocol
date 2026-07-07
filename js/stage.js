@@ -1,8 +1,8 @@
 ﻿// stage.js
 // 책임: 스테이지 로딩과 맵 생성만 담당합니다.
 
-import { GROUND_Y, INFINITE_STAGE_START, LASER_BASE_LENGTH, WIDTH, getFirewallBlockTime, getStageById } from "./data.js";
-import { getOrientedTrapBox } from "./trap.js";
+import { GROUND_Y, INFINITE_STAGE_START, LASER_BASE_LENGTH, WIDTH, getFirewallBlockTime, getStageById } from "./data.js?v=20260707-mobile-ui";
+import { getOrientedTrapBox } from "./trap.js?v=20260707-mobile-ui";
 
 const TRAP_SLOT_SPACING = 48;
 const START_SLOT_BLOCK_X = 150;

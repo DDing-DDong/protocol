@@ -12,15 +12,15 @@ import {
   clamp,
   rectsOverlap,
   approach,
-} from "./data.js";
+} from "./data.js?v=20260707-mobile-ui";
 import {
   empowerNextHazardsByPlacementOrder,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js";
-import { recordHacker } from "./replay.js";
-import { playSfx, stopSfx } from "./audio.js";
+} from "./trap.js?v=20260707-mobile-ui";
+import { recordHacker } from "./replay.js?v=20260707-mobile-ui";
+import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-ui";
 
 const ATTACK_INPUT_CODES = new Set([
   "ArrowLeft",

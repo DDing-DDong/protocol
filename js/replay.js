@@ -10,7 +10,7 @@ import {
   getShockDelay,
   getDefenseObjectiveItems,
   rectsOverlap,
-} from "./data.js";
+} from "./data.js?v=20260707-mobile-ui";
 import {
   getTrapHitbox,
   getOrientedTrapBox,
@@ -18,8 +18,8 @@ import {
   isEntityInCameraView,
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js";
-import { playSfx, stopSfx } from "./audio.js";
+} from "./trap.js?v=20260707-mobile-ui";
+import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-ui";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;
