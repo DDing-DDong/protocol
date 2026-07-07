@@ -7,9 +7,12 @@ import { getOrientedTrapBox } from "./trap.js?v=20260707-mobile-panels-fit2";
 const TRAP_SLOT_SPACING = 48;
 const START_SLOT_BLOCK_X = 150;
 const START_SLOT_BLOCK_Y = 96;
+const HACKER_START_WIDTH = 30;
 const HACKER_START_HEIGHT = 54;
 const OVERHEAD_SLOT_BLOCK_DISTANCE = 56;
 const OVERHEAD_SLOT_BLOCK_MARGIN = 4;
+const DEFENSE_SOLID_COVER_DISTANCE = 12;
+const DEFENSE_SOLID_COVER_MARGIN = 2;
 const ROUTE_HINT_RADIUS = 112;
 const CHOKE_HINT_RADIUS = 132;
 const REPLAY_SLOT_X_RADIUS = 104;
@@ -120,12 +123,16 @@ export function trapToAttackHazard(trap, game) {
 }
 
 export function createTrapSlots(stage, game) {
-  const slots = [];
-  let id = 0;
-
-  if (!Array.isArray(game?.platforms)) return slots;
+  if (!Array.isArray(game?.platforms)) return [];
 
   const stageData = getStageById(stage, getLayoutOptions(stage, game));
+  if (isDefenseStage(stageData, stage)) return createDefenseTrapSlots(stage, game);
+  return createAttackTrapSlots(stage, game, stageData);
+}
+
+function createAttackTrapSlots(stage, game, stageData) {
+  const slots = [];
+  let id = 0;
 
   for (const platform of game.platforms) {
     if (!isValidPlatformRect(platform)) continue;
@@ -157,10 +164,72 @@ export function createTrapSlots(stage, game) {
   return slots;
 }
 
+function createDefenseTrapSlots(stage, game) {
+  const slots = [];
+  let id = 0;
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
+  const debug = createDefenseTrapSlotDebug(stageData);
+
+  for (const platform of game.platforms) {
+    if (!isValidPlatformRect(platform)) {
+      countDefenseTrapSlotRemoval(debug, null, "skippedNotTopSurface");
+      continue;
+    }
+    if (!canCreateDefenseTrapSlotsOnPlatform(platform)) {
+      countDefenseTrapSlotRemoval(debug, createDefenseTrapSlotDebugRow(platform, null, null), "skippedByDataFlag");
+      continue;
+    }
+
+    const cols = Math.floor(platform.w / TRAP_SLOT_SPACING);
+    if (cols <= 0) {
+      countDefenseTrapSlotRemoval(debug, createDefenseTrapSlotDebugRow(platform, null, null), "skippedNotTopSurface");
+      continue;
+    }
+
+    for (let col = 0; col < cols; col += 1) {
+      const x = platform.x + col * TRAP_SLOT_SPACING + TRAP_SLOT_SPACING / 2;
+      const y = platform.y;
+      const debugRow = createDefenseTrapSlotDebugRow(platform, x, y);
+      countDefenseTrapSlotCandidate(debug);
+      if (x < 80 || x > WIDTH - 70) {
+        countDefenseTrapSlotRemoval(debug, debugRow, "removedByOutOfBounds");
+        continue;
+      }
+      if (Math.abs(x - game.core.x) < 46 && y >= GROUND_Y - 4) {
+        countDefenseTrapSlotRemoval(debug, debugRow, "removedByCore");
+        continue;
+      }
+      const wallFootprintBlock = getWallFootprintBlockInfo(x, y, platform, game.platforms);
+      if (wallFootprintBlock) {
+        countDefenseTrapSlotRemoval(debug, debugRow, "removedByWallFootprint", wallFootprintBlock);
+        continue;
+      }
+      if (isDefenseSlotCoveredBySolid(x, y, platform, game.platforms)) {
+        countDefenseTrapSlotRemoval(debug, debugRow, "removedBySolidCover");
+        continue;
+      }
+      if (isOverlappingDefensePlayerStartSlot(stage, x, y, game)) {
+        countDefenseTrapSlotRemoval(debug, debugRow, "removedBySpawn");
+        continue;
+      }
+      countDefenseTrapSlotCreated(debug, debugRow);
+      slots.push({ x, y, id, occupied: false });
+      id += 1;
+    }
+  }
+
+  logDefenseTrapSlotDebug(stageData, debug, slots.length);
+  return slots;
+}
+
 function canCreateTrapSlotsOnPlatform(platform) {
   if (platform.trapSlots === false) return false;
   if (platform.role === "chokepoint-wall") return false;
   return platform.h < TRAP_SLOT_SPACING * 2;
+}
+
+function canCreateDefenseTrapSlotsOnPlatform(platform) {
+  return platform.defenseTrapSlots !== false;
 }
 
 function getTrapSlotColumns(platform, cols, stageData) {
@@ -216,6 +285,91 @@ function usesReplayPathGuideFilter(stageData, replayPath) {
   return Number(stageData?.id) % 2 === 0 && Array.isArray(replayPath) && replayPath.length >= 2;
 }
 
+function isDefenseStage(stageData, stageId = stageData?.id) {
+  return Number(stageId) % 2 === 0;
+}
+
+function createDefenseTrapSlotDebug(stageData) {
+  return {
+    stageId: Number(stageData?.id),
+    totalCandidates: 0,
+    createdSlots: 0,
+    removedByOutOfBounds: 0,
+    removedBySpawn: 0,
+    removedByCore: 0,
+    removedByWallFootprint: 0,
+    removedBySolidCover: 0,
+    removedByDuplicate: 0,
+    skippedNotTopSurface: 0,
+    skippedByDataFlag: 0,
+    removedSlots: [],
+    createdSlotRows: [],
+  };
+}
+
+function createDefenseTrapSlotDebugRow(platform, x, y) {
+  const slotX = Number.isFinite(x) ? x : null;
+  const slotY = Number.isFinite(y) ? y : null;
+  return {
+    sourceType: getDefenseTrapSlotSourceType(platform),
+    platformId: platform?.id || "(no-id)",
+    role: platform?.role || "(no-role)",
+    x: slotX,
+    y: slotY,
+    tileX: Number.isFinite(slotX) ? Math.floor(slotX / TRAP_SLOT_SPACING) : null,
+    tileY: Number.isFinite(slotY) ? Math.floor(slotY / TRAP_SLOT_SPACING) : null,
+    width: platform?.w ?? null,
+    height: platform?.h ?? null,
+  };
+}
+
+function getDefenseTrapSlotSourceType(platform) {
+  if (platform?.role === "chokepoint-wall") return "wall";
+  if (isGroundTopSurfacePlatform(platform)) return "ground";
+  return "platform";
+}
+
+function countDefenseTrapSlotCandidate(debug) {
+  if (!debug) return;
+  debug.totalCandidates += 1;
+}
+
+function countDefenseTrapSlotRemoval(debug, row, reason, details = null) {
+  if (!debug) return;
+  debug[reason] = (debug[reason] || 0) + 1;
+  if (row) debug.removedSlots.push({ ...row, reason, ...(details || {}) });
+}
+
+function countDefenseTrapSlotCreated(debug, row) {
+  if (!debug) return;
+  debug.createdSlots += 1;
+  debug.createdSlotRows.push({ ...row, reason: "created" });
+}
+
+function logDefenseTrapSlotDebug(stageData, debug, createdSlotCount) {
+  if (!debug || typeof console === "undefined") return;
+
+  const summary = [{
+    stageId: Number(stageData?.id),
+    totalCandidates: debug.totalCandidates,
+    createdSlots: createdSlotCount,
+    removedByOutOfBounds: debug.removedByOutOfBounds,
+    removedBySpawn: debug.removedBySpawn,
+    removedByCore: debug.removedByCore,
+    removedByWallFootprint: debug.removedByWallFootprint,
+    removedBySolidCover: debug.removedBySolidCover,
+    removedByDuplicate: debug.removedByDuplicate,
+    skippedNotTopSurface: debug.skippedNotTopSurface,
+    skippedByDataFlag: debug.skippedByDataFlag,
+  }];
+
+  console.group("[DefenseTrapSlots Debug]");
+  console.log("stageId:", Number(stageData?.id));
+  console.table(summary);
+  console.table(debug.removedSlots);
+  console.groupEnd();
+}
+
 function isOnStrategicPlatform(platform) {
   return platform.role === "main-route" || STAGE_LAYOUT_GUIDE_ROLES.has(platform.role);
 }
@@ -234,6 +388,71 @@ function isSlotCoveredByOverheadSolid(x, y, currentPlatform, platforms) {
   }
 
   return false;
+}
+
+function isDefenseSlotCoveredBySolid(x, y, currentPlatform, platforms) {
+  for (const platform of platforms || []) {
+    if (platform === currentPlatform || !isValidPlatformRect(platform)) continue;
+    if (isGroundTopSurfacePlatform(currentPlatform) && platform.role === "chokepoint-wall") continue;
+    if (platform.y >= y) continue;
+
+    const verticalGap = y - (platform.y + platform.h);
+    if (verticalGap < 0 || verticalGap > DEFENSE_SOLID_COVER_DISTANCE) continue;
+
+    const horizontallyCovered = x >= platform.x - DEFENSE_SOLID_COVER_MARGIN &&
+      x <= platform.x + platform.w + DEFENSE_SOLID_COVER_MARGIN;
+    if (horizontallyCovered) return true;
+  }
+
+  return false;
+}
+
+function isBlockedByWallFootprint(x, y, currentPlatform, platforms) {
+  return Boolean(getWallFootprintBlockInfo(x, y, currentPlatform, platforms));
+}
+
+function getWallFootprintBlockInfo(x, y, currentPlatform, platforms) {
+  if (isGroundTopSurfacePlatform(currentPlatform)) return null;
+
+  for (const platform of platforms || []) {
+    if (platform === currentPlatform || platform.role !== "chokepoint-wall" || !isValidPlatformRect(platform)) continue;
+
+    const wallLeft = platform.x - TRAP_SLOT_SPACING / 2;
+    const wallRight = platform.x + platform.w + TRAP_SLOT_SPACING / 2;
+    const wallTop = platform.y;
+    const wallBottom = platform.y + platform.h;
+    const wallCenter = platform.x + platform.w / 2;
+    const slotCenter = x;
+    const overlapsFootprint = x > wallLeft && x < wallRight;
+    const belowWallTop = y > platform.y;
+    if (overlapsFootprint && belowWallTop) {
+      return {
+        wallId: platform.id || "(no-id)",
+        wallX: platform.x,
+        wallY: platform.y,
+        wallWidth: platform.w,
+        wallHeight: platform.h,
+        wallLeft,
+        wallRight,
+        wallTop,
+        wallBottom,
+        slotX: x,
+        slotY: y,
+        slotCenter,
+        wallCenter,
+        distanceToWallCenter: Math.abs(slotCenter - wallCenter),
+        conditionSlotWithinWallFootprint: overlapsFootprint,
+        conditionSlotBelowWallTop: belowWallTop,
+        matchedCondition: "slot.x > wall.left && slot.x < wall.right && slot.y > wall.top",
+      };
+    }
+  }
+
+  return null;
+}
+
+function isGroundTopSurfacePlatform(platform) {
+  return platform?.role === "main-route" || platform?.y >= GROUND_Y - 1;
 }
 
 function isNearReplayPath(x, y, replayPath) {
@@ -468,6 +687,19 @@ function isNearPlayerStartSlot(stage, x, y, game) {
   const startFeetY = playerStart.y + HACKER_START_HEIGHT;
   return Math.abs(x - playerStart.x) <= START_SLOT_BLOCK_X &&
     Math.abs(y - startFeetY) <= START_SLOT_BLOCK_Y;
+}
+
+function isOverlappingDefensePlayerStartSlot(stage, x, y, game) {
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
+  const playerStart = stageData?.playerStart || { x: 64, y: 388 };
+  const startLeft = playerStart.x;
+  const startRight = playerStart.x + HACKER_START_WIDTH;
+  const startTop = playerStart.y;
+  const startBottom = playerStart.y + HACKER_START_HEIGHT;
+  return x >= startLeft &&
+    x <= startRight &&
+    y >= startTop &&
+    y <= startBottom;
 }
 
 // 수정 이유:

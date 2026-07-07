@@ -541,8 +541,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 78,
         role: "main-route",
         mapObject: "research-lab-floor",
-        trapSlots: [14, 15, 20, 21],
-        defenseTrapSlots: [13, 14, 15, 20, 21],
         intent: "중앙 Choke Point 전후의 바닥 이동과 방어 슬롯을 모두 받쳐주는 기준 바닥",
       },
       {
@@ -553,8 +551,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "entry-step",
         mapObject: "server-rack-step",
-        trapSlots: [1],
-        defenseTrapSlots: [1, 2],
         intent: "중앙 서버 랙에 진입하기 전 기본 점프와 착지를 유도하는 진입 발판",
       },
       {
@@ -565,8 +561,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "low-bypass",
         mapObject: "cooling-unit",
-        trapSlots: [1, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Wall Jump 없이도 중앙 기둥 왼쪽에서 낮은 우회 루트를 탈 수 있게 하는 보조 발판",
       },
       {
@@ -577,7 +571,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 144,
         role: "chokepoint-wall",
         mapObject: "security-pillar",
-        trapSlots: false,
         intent: "상단 빠른 루트와 하단 우회 루트를 나누는 중앙 랜드마크로 이동 선택과 벽면 함정 설치 이유를 만든다.",
       },
       {
@@ -588,8 +581,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "wall-jump-fast-route",
         mapObject: "data-bridge",
-        trapSlots: [0, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Wall Jump를 사용한 플레이어가 중앙 기둥을 넘어 빠르게 착지하는 상단 연결 발판",
       },
       {
@@ -600,8 +591,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "exit-step",
         mapObject: "server-rack-step",
-        trapSlots: [0, 1],
-        defenseTrapSlots: [0, 1, 2],
         intent: "중앙 기둥을 넘거나 돌아 나온 플레이어가 Goal 방향으로 회복하는 우측 발판",
       },
       {
@@ -612,8 +601,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "goal-approach",
         mapObject: "data-bridge",
-        trapSlots: [0, 1],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Goal 직전 마지막 점프 흐름을 유지하면서 Replay 경로를 조금 더 길게 만든다.",
       },
     ],
@@ -692,8 +679,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 78,
         role: "main-route",
         mapObject: "research-lab-floor",
-        trapSlots: [14, 15, 20, 21],
-        defenseTrapSlots: [13, 14, 15, 20, 21],
         intent: "오른쪽으로 밀린 Choke Point 때문에 Replay가 더 오래 관찰되는 기준 바닥",
       },
       {
@@ -704,8 +689,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "entry-step",
         mapObject: "server-rack-step",
-        trapSlots: [1],
-        defenseTrapSlots: [1, 2],
         intent: "기존 초반 점프 감각을 유지하면서 중앙 진입 각도를 조금 바꾼다.",
       },
       {
@@ -716,8 +699,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "aux-bypass",
         mapObject: "cooling-unit",
-        trapSlots: [1, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "일반 점프로 오른쪽 기둥을 돌아갈 수 있게 하는 작은 보조 플랫폼",
       },
       {
@@ -728,7 +709,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 144,
         role: "chokepoint-wall",
         mapObject: "firewall-barrier",
-        trapSlots: false,
         intent: "오른쪽으로 치우친 수직 충돌면으로 하단 우회와 상단 빠른 루트를 분리하는 병목을 만든다.",
       },
       {
@@ -739,8 +719,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "fast-exit",
         mapObject: "data-bridge",
-        trapSlots: [0, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "벽면을 활용한 플레이어가 더 빠르게 Goal 쪽으로 빠지는 상단 Wall Jump 루트",
       },
       {
@@ -751,8 +729,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "low-route-exit",
         mapObject: "server-rack-step",
-        trapSlots: [0, 1],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Wall Jump를 쓰지 않는 플레이어가 방화벽 아래를 지나 Goal 접근 발판으로 이어지는 하단 출구",
       },
       {
@@ -763,8 +739,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "goal-approach",
         mapObject: "server-rack-step",
-        trapSlots: [0, 1],
-        defenseTrapSlots: [0, 1, 2],
         intent: "상단 루트와 바닥 우회 루트를 Goal 앞에서 다시 합류시킨다.",
       },
     ],
@@ -843,8 +817,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 78,
         role: "main-route",
         mapObject: "research-lab-floor",
-        trapSlots: [15, 16, 20, 21],
-        defenseTrapSlots: [14, 15, 16, 20, 21],
         intent: "Wall Jump 루트 실패 시에도 정상 클리어 가능한 바닥 우회 루트를 유지한다.",
       },
       {
@@ -855,8 +827,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "entry-step",
         mapObject: "server-rack-step",
-        trapSlots: [1],
-        defenseTrapSlots: [1, 2],
         intent: "중앙 상단 루트와 일반 우회 루트로 갈라지기 전 안정적인 진입 발판",
       },
       {
@@ -867,8 +837,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "low-bypass",
         mapObject: "cooling-unit",
-        trapSlots: [1, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Wall Jump 없이도 중앙 기둥을 돌아갈 수 있게 하는 낮은 보조 발판",
       },
       {
@@ -879,7 +847,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 192,
         role: "chokepoint-wall",
         mapObject: "ai-core-pillar",
-        trapSlots: false,
         intent: "프리셋 중 가장 강한 수직 랜드마크로 벽점프 접촉면과 Trap 설치 이유를 동시에 확보한다.",
       },
       {
@@ -890,8 +857,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "wall-jump-fast-route",
         mapObject: "data-overpass",
-        trapSlots: [0, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Wall Jump를 활용하면 빠르게 올라탈 수 있는 상단 발판",
       },
       {
@@ -902,8 +867,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "exit-step",
         mapObject: "server-rack-step",
-        trapSlots: [1, 2],
-        defenseTrapSlots: [0, 1, 2],
         intent: "상단 빠른 루트와 낮은 우회 루트가 다시 합쳐지는 출구 발판",
       },
       {
@@ -914,8 +877,6 @@ export const STAGE_ONE_LAYOUT_PRESETS = [
         h: 48,
         role: "goal-approach",
         mapObject: "data-bridge",
-        trapSlots: [0, 1],
-        defenseTrapSlots: [0, 1, 2],
         intent: "Goal 직전 접근을 조금 더 길게 만들어 Defense 분석 시간을 늘린다.",
       },
     ],
