@@ -1,7 +1,7 @@
 // trap.js
 // 책임: 함정 생성, 배치, 트랩 판정과 관련된 로직을 담당합니다.
 
-import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js";
+import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js?v=20260707-mobile-panels-fit2";
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;

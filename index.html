@@ -2,9 +2,14 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Trace Protocol MVP</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta name="theme-color" content="#071019" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="screen-orientation" content="landscape" />
+  <link rel="manifest" href="./manifest.webmanifest?v=20260707-landscape" />
+  <link rel="stylesheet" href="./style.css?v=20260707-mobile-panels-fit2" />
 </head>
 <body>
   <div id="app">
@@ -17,6 +22,7 @@
         <button id="restartBtn" class="secondary" type="button">처음부터</button>
         <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
         <button id="helpBtn" class="secondary" type="button">도움말</button>
+        <button id="exitBtn" class="secondary" type="button" aria-label="게임 종료">X</button>
       </div>
     </header>
 
@@ -49,7 +55,7 @@
         </div>
         <div class="stat-row stat-time play-timer">
           <span>시간</span>
-          <strong id="timerLabel">48.0</strong>
+          <strong id="timerLabel">30.0</strong>
         </div>
 
         <div id="overlay" class="overlay hidden">
@@ -93,6 +99,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js"></script>
+  <script type="module" src="./js/game.js?v=20260707-mobile-panels-fit2"></script>
 </body>
 </html>

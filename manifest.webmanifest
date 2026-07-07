@@ -1,0 +1,12 @@
+{
+  "name": "Trace Protocol",
+  "short_name": "Trace Protocol",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#071019",
+  "theme_color": "#071019",
+  "orientation": "landscape",
+  "categories": ["games"],
+  "lang": "ko"
+}
