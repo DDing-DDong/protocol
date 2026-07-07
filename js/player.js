@@ -12,15 +12,15 @@ import {
   clamp,
   rectsOverlap,
   approach,
-} from "./data.js?v=20260707-mobile-ui";
+} from "./data.js?v=20260707-mobile-panels-fit2";
 import {
   empowerNextHazardsByPlacementOrder,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260707-mobile-ui";
-import { recordHacker } from "./replay.js?v=20260707-mobile-ui";
-import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-ui";
+} from "./trap.js?v=20260707-mobile-panels-fit2";
+import { recordHacker } from "./replay.js?v=20260707-mobile-panels-fit2";
+import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-panels-fit2";
 
 const ATTACK_INPUT_CODES = new Set([
   "ArrowLeft",

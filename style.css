@@ -350,6 +350,11 @@ button.secondary {
   gap: 8px;
 }
 
+.defense-tools-hud {
+  top: 16px;
+  right: 18px;
+}
+
 .defense-tools-toggle,
 .attack-skills-toggle {
   min-height: 32px;
@@ -732,6 +737,10 @@ button.secondary {
   white-space: nowrap;
 }
 
+.play-timer.hidden {
+  display: none;
+}
+
 .play-timer strong {
   color: #e9f8ff;
   font-size: 26px;
@@ -752,6 +761,10 @@ button.secondary {
 
 .timer-pause-btn:disabled {
   opacity: 0.35;
+}
+
+.mobile-controls {
+  display: none;
 }
 
 .meter {
@@ -1302,6 +1315,183 @@ kbd {
 
   #exitBtn {
     min-width: 42px;
+  }
+
+  .objective-hud {
+    top: 56px;
+    left: 14px;
+  }
+
+  .objective-panel {
+    width: min(176px, calc(100dvh - 112px));
+    padding: 8px 9px;
+  }
+
+  .objective-panel-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .objective-checklist {
+    gap: 5px;
+  }
+
+  .objective-check-row {
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 28px;
+    padding: 3px 0;
+  }
+
+  .objective-check-label {
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .objective-check-progress {
+    grid-column: 2;
+    text-align: left;
+    font-size: 10px;
+    line-height: 1.15;
+    opacity: 0.86;
+  }
+
+  .defense-tools-hud {
+    top: 42px;
+    right: 14px;
+  }
+
+  .defense-tools-panel {
+    width: min(390px, calc(100dvh - 42px));
+    max-height: calc(100dvw - 132px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 8px 10px;
+  }
+
+  .defense-tools-panel .hint {
+    margin-bottom: 5px;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .defense-tools-panel .trap-budget-row {
+    min-height: 27px;
+    margin-bottom: 6px;
+    padding: 4px 8px;
+  }
+
+  .defense-tools-panel .trap-grid {
+    overflow: visible;
+    padding-right: 2px;
+    gap: 6px;
+  }
+
+  .defense-tools-panel .trap-btn {
+    min-height: 34px;
+    padding: 5px 8px;
+  }
+
+  .defense-tools-panel .tool-actions {
+    flex: 0 0 auto;
+    margin-top: 6px;
+  }
+
+  .mobile-controls:not(.hidden) {
+    position: absolute;
+    z-index: 22;
+    inset: auto 0 62px;
+    display: block;
+    pointer-events: none;
+  }
+
+  .mobile-control-btn {
+    position: absolute;
+    border: 1px solid rgba(138, 242, 255, 0.58);
+    background: rgba(3, 8, 13, 0.46);
+    color: #e9f8ff;
+    box-shadow: 0 0 16px rgba(24, 224, 255, 0.18), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .mobile-control-btn.pressed {
+    background: rgba(24, 224, 255, 0.28);
+    border-color: #8af2ff;
+    color: #ffffff;
+    transform: scale(0.96);
+  }
+
+  .mobile-action-pad {
+    position: absolute;
+    left: 22px;
+    bottom: 0;
+    display: flex;
+    gap: 8px;
+    height: 54px;
+    pointer-events: none;
+  }
+
+  .mobile-action-btn {
+    position: relative;
+    width: 54px;
+    height: 54px;
+    margin: 0;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .mobile-action-btn[data-code="ShiftLeft"] {
+    border-color: rgba(255, 68, 106, 0.72);
+    box-shadow: 0 0 16px rgba(255, 68, 106, 0.22), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  }
+
+  .mobile-action-btn[data-code="Space"] {
+    border-color: rgba(39, 255, 200, 0.72);
+    box-shadow: 0 0 16px rgba(39, 255, 200, 0.20), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  }
+
+  .mobile-dpad {
+    position: absolute;
+    right: 22px;
+    bottom: 0;
+    display: flex;
+    gap: 8px;
+    height: 54px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .mobile-dpad-center {
+    display: none;
+  }
+
+  .mobile-dpad-btn {
+    position: relative;
+    width: 58px;
+    height: 54px;
+    padding: 0;
+    border: 1px solid rgba(138, 242, 255, 0.58);
+    border-radius: 8px;
+    background: rgba(3, 8, 13, 0.42);
+    color: rgba(233, 248, 255, 0.96);
+    box-shadow: 0 0 16px rgba(24, 224, 255, 0.16), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .mobile-dpad-btn::before {
+    content: none;
   }
 
   .play-timer {

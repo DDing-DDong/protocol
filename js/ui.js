@@ -14,14 +14,14 @@ import {
   SHOCK_SLOW_MULTIPLIER,
   SHOCK_EMPOWERED_DURATION_BONUS,
   CAMERA_NETWORK_EMPOWER_BONUS,
-} from "./data.js?v=20260707-mobile-ui";
+} from "./data.js?v=20260707-mobile-panels-fit2";
 import {
   getCameraHazardBox,
   getOrientedTrapBox,
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
-} from "./trap.js?v=20260707-mobile-ui";
-import { playSfx, unlockAudio } from "./audio.js?v=20260707-mobile-ui";
+} from "./trap.js?v=20260707-mobile-panels-fit2";
+import { playSfx, unlockAudio } from "./audio.js?v=20260707-mobile-panels-fit2";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -30,7 +30,7 @@ const VISUAL_TILE_DRAW_W = 56;
 const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
-const ASSET_VERSION = "20260707-landscape";
+const ASSET_VERSION = "20260707-mobile-panels-fit2";
 const TRAP_IMAGE_FILES = {
   laser: "laser.png",
   laserEmpowered: "laser-empowered.png",
@@ -173,6 +173,7 @@ export function initUI(callbacks) {
   };
   prepareStatusBar(ui);
   prepareAttackSkillPanel(ui, canvas);
+  prepareMobileControls(ui, canvas);
 
   let overlayAction = null;
   let objectivePanelOpen = false;
@@ -256,6 +257,28 @@ export function initUI(callbacks) {
     ui.attackSkillsPanel = panel;
   }
 
+  function prepareMobileControls(ui, canvas) {
+    const controls = document.createElement("div");
+    controls.id = "mobileControls";
+    controls.className = "mobile-controls";
+    controls.setAttribute("aria-label", "모바일 조작 버튼");
+
+    controls.innerHTML = `
+      <div class="mobile-action-pad" aria-label="스킬 버튼">
+        <button class="mobile-control-btn mobile-action-btn" type="button" data-code="ArrowUp" aria-label="점프">점프</button>
+        <button class="mobile-control-btn mobile-action-btn" type="button" data-code="ShiftLeft" aria-label="대시">대시</button>
+        <button class="mobile-control-btn mobile-action-btn" type="button" data-code="Space" aria-label="해킹">해킹</button>
+      </div>
+      <div class="mobile-dpad" aria-label="이동 버튼">
+        <button class="mobile-control-btn mobile-dpad-btn mobile-dpad-left" type="button" data-code="ArrowLeft" aria-label="왼쪽 이동">&lt;</button>
+        <button class="mobile-control-btn mobile-dpad-btn mobile-dpad-right" type="button" data-code="ArrowRight" aria-label="오른쪽 이동">&gt;</button>
+      </div>
+    `;
+
+    canvas.parentElement?.appendChild(controls);
+    ui.mobileControls = controls;
+  }
+
   function showOverlay({ title, text, rewards = [], buttonText = "확인", onButton, speaker = "" }) {
     overlayAction = typeof onButton === "function" ? onButton : hideOverlay;
     ui.overlay.classList.remove("hidden");
@@ -294,6 +317,7 @@ export function initUI(callbacks) {
     ui.turnLabel.textContent = getTurnLabel(game.turn);
     ui.objectiveLabel.textContent = getObjectiveDisplayText(game);
     ui.timerLabel.textContent = game.turn === TURN.ATTACK ? game.timer.toFixed(1) : "-";
+    ui.timerLabel.closest(".play-timer")?.classList.toggle("hidden", game.turn !== TURN.ATTACK);
 
     if (game.hacker) {
       ui.hpLabel.textContent = `${game.hacker.hp} / ${game.hacker.maxHp}`;
@@ -318,6 +342,8 @@ export function initUI(callbacks) {
     const showAttackSkills = game.turn === TURN.ATTACK;
     if (!showAttackSkills) attackSkillsPanelOpen = false;
     ui.attackSkills?.classList.toggle("hidden", !showAttackSkills);
+    ui.mobileControls?.classList.toggle("hidden", !showAttackSkills);
+    if (!showAttackSkills) clearMobileControlKeys();
     ui.attackSkillsToggle?.setAttribute("aria-expanded", showAttackSkills && attackSkillsPanelOpen ? "true" : "false");
     ui.attackSkillsPanel?.classList.toggle("hidden", !showAttackSkills || !attackSkillsPanelOpen);
     ui.startReplayBtn.disabled = game.turn !== TURN.DEFENSE_BUILD;
@@ -1865,6 +1891,13 @@ export function initUI(callbacks) {
 
   function getCanvasPos(event) {
     const rect = canvas.getBoundingClientRect();
+    if (rect.height > rect.width) {
+      return {
+        x: ((rect.bottom - event.clientY) / rect.height) * canvas.width,
+        y: ((event.clientX - rect.left) / rect.width) * canvas.height,
+      };
+    }
+
     return {
       x: ((event.clientX - rect.left) / rect.width) * canvas.width,
       y: ((event.clientY - rect.top) / rect.height) * canvas.height,
@@ -1882,6 +1915,7 @@ export function initUI(callbacks) {
 
   function bindEvents() {
     initializeTrapButtonIcons();
+    bindMobileControls();
 
     document.addEventListener("pointerdown", unlockAudio);
     document.addEventListener("keydown", unlockAudio);
@@ -1973,6 +2007,13 @@ export function initUI(callbacks) {
       ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
     });
 
+    ui.trapToolsPanel?.addEventListener("click", (event) => {
+      if (event.target?.closest?.("button, input, select, textarea, a")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      callbacks.onCanvasClick(getCanvasPos(event));
+    });
+
     ui.attackSkillsToggle?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -2000,6 +2041,55 @@ export function initUI(callbacks) {
       btn.addEventListener("click", () =>
         selectTrap(btn.dataset.trap)
       );
+    }
+  }
+
+  function bindMobileControls() {
+    const controls = ui.mobileControls;
+    if (!controls) return;
+
+    const releaseKey = (button) => {
+      const code = button?.dataset?.code;
+      if (!code) return;
+      keys.delete(code);
+      button.classList.remove("pressed");
+    };
+
+    const pressKey = (button, event) => {
+      const code = button?.dataset?.code;
+      if (!code) return;
+      event.preventDefault();
+      event.stopPropagation();
+      unlockAudio();
+      keys.add(code);
+      button.classList.add("pressed");
+      callbacks.onResumeAttackPause?.();
+      if (callbacks.canPlayAttackSfx?.()) {
+        if (code === "ArrowUp") playSfx("jump");
+        if (code === "ShiftLeft") playSfx("dash");
+      }
+      button.setPointerCapture?.(event.pointerId);
+    };
+
+    for (const button of controls.querySelectorAll(".mobile-control-btn")) {
+      button.addEventListener("pointerdown", (event) => pressKey(button, event));
+      button.addEventListener("pointerup", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        releaseKey(button);
+      });
+      button.addEventListener("pointercancel", () => releaseKey(button));
+      button.addEventListener("lostpointercapture", () => releaseKey(button));
+      button.addEventListener("contextmenu", (event) => event.preventDefault());
+    }
+  }
+
+  function clearMobileControlKeys() {
+    if (!ui.mobileControls) return;
+    for (const button of ui.mobileControls.querySelectorAll(".mobile-control-btn")) {
+      const code = button.dataset.code;
+      if (code) keys.delete(code);
+      button.classList.remove("pressed");
     }
   }
 

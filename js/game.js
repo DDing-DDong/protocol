@@ -14,19 +14,19 @@ import {
   CORE_X,
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
-} from "./data.js?v=20260707-mobile-ui";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-ui";
-import { initUI } from "./ui.js?v=20260707-mobile-ui";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-ui";
+} from "./data.js?v=20260707-mobile-panels-fit2";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-panels-fit2";
+import { initUI } from "./ui.js?v=20260707-mobile-panels-fit2";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260707-mobile-ui";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-ui";
-import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260707-mobile-ui";
+} from "./trap.js?v=20260707-mobile-panels-fit2";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-panels-fit2";
+import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260707-mobile-panels-fit2";
 
 const BGM_TRACKS = {
   lobby: "neon-protocol.mp3",
