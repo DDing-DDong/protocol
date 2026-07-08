@@ -44,6 +44,31 @@ const trapImages = createTrapImages();
 const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
 const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
 const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
+const AI_ANDROID_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_skin1/", import.meta.url);
+const AI_SKIN_STORAGE_KEY = "traceProtocolAiPortraitSkin";
+const GUIDE_BUBBLE_SKIP_STORAGE_KEY = "traceProtocolSkipGuideBubbles";
+const AI_SCRIPT_SKINS = {
+  classic: {
+    imageBaseUrl: AI_SCRIPT_IMAGE_BASE_URL,
+    className: "ai-skin-classic",
+    files: {
+      idle: "idle.gif",
+      error: "error.gif",
+      eyes_closed: "eyes_closed.gif",
+      happy: "happy.gif",
+    },
+  },
+  android: {
+    imageBaseUrl: AI_ANDROID_SCRIPT_IMAGE_BASE_URL,
+    className: "ai-skin-android",
+    files: {
+      idle: "ai_npc1_idle.gif",
+      error: "ai_npc1_error.gif",
+      eyes_closed: "ai_npc1_eye_close.png",
+      happy: "ai_npc1_smile.gif",
+    },
+  },
+};
 const HACKER_IMAGE_FILES = {
   idle: ["idle-1.png", "idle-2.png", "idle-3.png", "idle-4.png"],
   run: ["run-1.png", "run-2.png", "run-3.png", "run-4.png", "run-5.png"],
@@ -66,6 +91,7 @@ const AI_SCRIPT_IMAGE_FILES = {
 const hackerImages = createHackerImages();
 const hackerScriptImages = createScriptImages(HACKER_SCRIPT_IMAGE_FILES, HACKER_SCRIPT_IMAGE_BASE_URL);
 const aiScriptImages = createScriptImages(AI_SCRIPT_IMAGE_FILES, AI_SCRIPT_IMAGE_BASE_URL);
+const aiScriptImagesBySkin = createAiScriptImagesBySkin();
 const transparentHackerFrames = new WeakMap();
 const DEFAULT_BACKGROUND_LAYERS = {
   far: ["future-city"],
@@ -146,6 +172,27 @@ function createScriptImages(filesByKey, baseUrl) {
   return images;
 }
 
+function createAiScriptImagesBySkin() {
+  const skins = {};
+  for (const [skinId, skin] of Object.entries(AI_SCRIPT_SKINS)) {
+    skins[skinId] = createScriptImages(skin.files, skin.imageBaseUrl);
+  }
+  return skins;
+}
+
+function getSelectedAiSkin() {
+  const stored = localStorage.getItem(AI_SKIN_STORAGE_KEY);
+  return AI_SCRIPT_SKINS[stored] ? stored : "classic";
+}
+
+function shouldSkipGuideBubbles() {
+  return localStorage.getItem(GUIDE_BUBBLE_SKIP_STORAGE_KEY) === "true";
+}
+
+function setGuideBubbleSkipEnabled(enabled) {
+  localStorage.setItem(GUIDE_BUBBLE_SKIP_STORAGE_KEY, enabled ? "true" : "false");
+}
+
 function isImageReady(image) {
   return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 }
@@ -200,6 +247,7 @@ export function initUI(callbacks) {
     settingsPanel: document.getElementById("settingsPanel"),
     bgmVolume: document.getElementById("bgmVolume"),
     sfxVolume: document.getElementById("sfxVolume"),
+    guideBubbleSkipToggle: document.getElementById("guideBubbleSkipToggle"),
     helpBtn: document.getElementById("helpBtn"),
     lobbyBtn: document.getElementById("lobbyBtn"),
   };
@@ -211,6 +259,7 @@ export function initUI(callbacks) {
   let overlayTyping = null;
   let guideBubble = null;
   let guideBubbleInputLocked = false;
+  let guideBubbleSequenceSkip = null;
   let pendingEmpowerPreviewGuide = false;
   let empowerPreviewGuideShown = false;
   let objectivePanelOpen = false;
@@ -235,6 +284,27 @@ export function initUI(callbacks) {
   function syncVolumeInputs() {
     if (ui.bgmVolume) ui.bgmVolume.value = String(Math.round(getBgmVolume() * 100));
     if (ui.sfxVolume) ui.sfxVolume.value = String(Math.round(getSfxVolume() * 100));
+  }
+
+  function syncGuideBubbleSkipToggle() {
+    if (ui.guideBubbleSkipToggle) {
+      ui.guideBubbleSkipToggle.checked = shouldSkipGuideBubbles();
+    }
+  }
+
+  function applyGuideBubbleSkipSetting(enabled) {
+    setGuideBubbleSkipEnabled(enabled);
+    syncGuideBubbleSkipToggle();
+    callbacks.onGuideBubbleSkipChanged?.(enabled);
+    if (!enabled) return;
+
+    pendingEmpowerPreviewGuide = false;
+    if (typeof guideBubbleSequenceSkip === "function") {
+      guideBubbleSequenceSkip();
+      return;
+    }
+
+    hideGuideBubble();
   }
 
   function setSettingsPanelOpen(open) {
@@ -335,6 +405,7 @@ export function initUI(callbacks) {
     title,
     text,
     rewards = [],
+    choices = [],
     buttonText = "확인",
     onButton,
     speaker = "",
@@ -358,6 +429,7 @@ export function initUI(callbacks) {
     ui.overlayTitle.textContent = title;
     setOverlayText(text, { typewriter: advanceOnCardClick });
     ui.overlayButton.textContent = buttonText;
+    ui.overlayButton.classList.toggle("hidden", choices.length > 0);
     ui.rewardList.innerHTML = "";
     setOverlayPortrait(portrait, speaker);
 
@@ -380,6 +452,19 @@ export function initUI(callbacks) {
       }
       ui.rewardList.appendChild(btn);
     }
+
+    for (const choice of choices) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "reward-card choice-card";
+      btn.innerHTML = `<strong>${escapeHTML(choice.name)}</strong><span>${escapeHTML(choice.desc || "")}</span>`;
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof choice.onSelect === "function") choice.onSelect();
+      });
+      ui.rewardList.appendChild(btn);
+    }
   }
 
   function hideOverlay() {
@@ -390,6 +475,7 @@ export function initUI(callbacks) {
     setOverlaySkip(null);
     setOverlayPortrait("");
     ui.rewardList.innerHTML = "";
+    ui.overlayButton.classList.remove("hidden");
     overlayAction = null;
   }
 
@@ -450,16 +536,21 @@ export function initUI(callbacks) {
     if (!portrait || !ui.overlayCard) return;
 
     const isAi = speaker === "ai";
-    const images = isAi ? aiScriptImages : hackerScriptImages;
-    const baseUrl = isAi ? AI_SCRIPT_IMAGE_BASE_URL : HACKER_SCRIPT_IMAGE_BASE_URL;
+    const aiSkinId = getSelectedAiSkin();
+    const aiSkin = AI_SCRIPT_SKINS[aiSkinId] || AI_SCRIPT_SKINS.classic;
+    const images = isAi
+      ? (aiScriptImagesBySkin[aiSkinId] || aiScriptImagesBySkin.classic || aiScriptImages)
+      : hackerScriptImages;
+    const baseUrl = isAi ? aiSkin.imageBaseUrl : HACKER_SCRIPT_IMAGE_BASE_URL;
     const image = images[portrait] || images.idle;
     const frame = document.createElement("div");
-    frame.className = `dialogue-portrait ${isAi ? "dialogue-portrait-ai" : "dialogue-portrait-hacker"}`;
+    frame.className = `dialogue-portrait ${isAi ? `dialogue-portrait-ai ${aiSkin.className}` : "dialogue-portrait-hacker"}`;
+    if (isAi) frame.dataset.skin = aiSkinId;
     frame.setAttribute("aria-hidden", "true");
 
     const img = document.createElement("img");
     img.alt = "";
-    img.src = image?.src || new URL(isAi ? "idle.gif" : "idle.png", baseUrl).href;
+    img.src = image?.src || new URL(isAi ? aiSkin.files.idle : "idle.png", baseUrl).href;
     frame.appendChild(img);
     ui.overlayCard.prepend(frame);
     ui.overlayCard.classList.add("has-portrait");
@@ -785,8 +876,12 @@ export function initUI(callbacks) {
     ui.objectivePanel.appendChild(list);
   }
 
-  function showDefenseGuideBubbles({ onComplete } = {}) {
+  function showDefenseGuideBubbles({ blockedSlot = null, onComplete } = {}) {
     const steps = [
+      {
+        target: () => blockedSlot ? createCanvasPointGuideTarget(blockedSlot.x, blockedSlot.y - 8) : null,
+        text: "기존 함정이 있는 위치에는 중복해서 설치할 수 없습니다.",
+      },
       {
         target: () => ui.objectiveToggle,
         text: "해당 스테이지의 수비 목표를 확인하십시오.",
@@ -817,10 +912,13 @@ export function initUI(callbacks) {
   }
 
   function showReplayStartGuideBubble() {
+    if (shouldSkipGuideBubbles()) return;
     if (!ui.startReplayBtn) return;
     showGuideBubble(
       ui.startReplayBtn,
-      "함정 설치가 완료되었다면 리플레이를 재생해서 수비목표를 모두 달성합시다."
+      "함정 설치가 완료되었다면 리플레이를 재생해서 수비목표를 모두 달성합시다.",
+      null,
+      { blockTargetActivation: true }
     );
   }
 
@@ -874,12 +972,18 @@ export function initUI(callbacks) {
   }
 
   function queueEmpowerPreviewGuideBubbles() {
+    if (shouldSkipGuideBubbles()) return;
     pendingEmpowerPreviewGuide = true;
     empowerPreviewGuideShown = false;
     maybeShowPendingEmpowerPreviewGuide();
   }
 
   function maybeShowPendingEmpowerPreviewGuide() {
+    if (shouldSkipGuideBubbles()) {
+      pendingEmpowerPreviewGuide = false;
+      return;
+    }
+
     if (!pendingEmpowerPreviewGuide || empowerPreviewGuideShown) return;
     if (!ui.empowerPreview || ui.empowerPreview.classList.contains("hidden")) return;
 
@@ -898,11 +1002,25 @@ export function initUI(callbacks) {
   }
 
   function showGuideBubbleSequence(steps, onComplete, index = 0) {
-    if (!Array.isArray(steps) || index >= steps.length) {
+    if (shouldSkipGuideBubbles()) {
       hideGuideBubble();
+      guideBubbleSequenceSkip = null;
       if (typeof onComplete === "function") onComplete();
       return;
     }
+
+    if (!Array.isArray(steps) || index >= steps.length) {
+      hideGuideBubble();
+      guideBubbleSequenceSkip = null;
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    guideBubbleSequenceSkip = () => {
+      hideGuideBubble();
+      guideBubbleSequenceSkip = null;
+      if (typeof onComplete === "function") onComplete();
+    };
 
     const step = steps[index];
     step.before?.();
@@ -931,7 +1049,35 @@ export function initUI(callbacks) {
     ui.objectivePanel?.classList.remove("hidden");
   }
 
-  function showGuideBubble(target, text, onAdvance) {
+  function createCanvasPointGuideTarget(x, y) {
+    return {
+      getBoundingClientRect: () => {
+        const rect = canvas.getBoundingClientRect();
+        const left = rect.left + (x / canvas.width) * rect.width;
+        const top = rect.top + (y / canvas.height) * rect.height;
+        return {
+          x: left - 9,
+          y: top - 9,
+          left: left - 9,
+          top: top - 9,
+          right: left + 9,
+          bottom: top + 9,
+          width: 18,
+          height: 18,
+        };
+      },
+      closest: () => null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+  }
+
+  function showGuideBubble(target, text, onAdvance, options = {}) {
+    if (shouldSkipGuideBubbles()) {
+      if (typeof onAdvance === "function") onAdvance();
+      return;
+    }
+
     hideGuideBubble();
 
     const bubble = document.createElement("div");
@@ -971,10 +1117,15 @@ export function initUI(callbacks) {
     window.addEventListener("keydown", advance, true);
     window.addEventListener("resize", onResize);
     bubble.addEventListener("pointerdown", advance);
-    clickTarget.addEventListener("click", advanceAfterTargetClick);
+    if (options.blockTargetActivation) {
+      clickTarget.addEventListener("click", advance, true);
+    } else {
+      clickTarget.addEventListener("click", advanceAfterTargetClick);
+    }
     guideBubble.cleanup = () => {
       window.removeEventListener("keydown", advance, true);
       window.removeEventListener("resize", onResize);
+      clickTarget.removeEventListener("click", advance, true);
       clickTarget.removeEventListener("click", advanceAfterTargetClick);
     };
   }
@@ -2430,6 +2581,7 @@ export function initUI(callbacks) {
   function bindEvents() {
     initializeTrapButtonIcons();
     syncVolumeInputs();
+    syncGuideBubbleSkipToggle();
     bindMobileControls();
 
     document.addEventListener("pointerdown", unlockAudio);
@@ -2566,6 +2718,10 @@ export function initUI(callbacks) {
 
     ui.sfxVolume?.addEventListener("input", (event) => {
       setSfxVolume(Number(event.target.value) / 100);
+    });
+
+    ui.guideBubbleSkipToggle?.addEventListener("change", (event) => {
+      applyGuideBubbleSkipSetting(Boolean(event.target.checked));
     });
 
     ui.restartBtn.addEventListener(

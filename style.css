@@ -156,6 +156,7 @@ button.secondary {
 }
 
 .lobby-actions {
+  position: relative;
   display: grid;
   gap: 12px;
   width: min(330px, 100%);
@@ -176,6 +177,134 @@ button.secondary {
   background: linear-gradient(90deg, #18e0ff, #27ffc8);
   color: #031018;
   box-shadow: 0 0 24px rgba(24, 224, 255, 0.28);
+}
+
+.lobby-skin-panel {
+  position: absolute;
+  z-index: 2;
+  left: calc(100% + 14px);
+  top: 64px;
+  width: min(260px, calc(100vw - 48px));
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(24, 224, 255, 0.34);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(7, 22, 34, 0.96), rgba(3, 8, 13, 0.96));
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+}
+
+.lobby-skin-option {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid rgba(154, 199, 214, 0.26);
+  border-radius: 4px;
+  background: rgba(8, 24, 37, 0.86);
+  color: #e9f8ff;
+  text-align: left;
+}
+
+.lobby-skin-option.selected {
+  border-color: rgba(39, 255, 200, 0.78);
+  box-shadow: 0 0 18px rgba(39, 255, 200, 0.16);
+}
+
+.lobby-skin-option.locked {
+  color: #9aa5ac;
+  border-color: rgba(154, 165, 172, 0.22);
+  background: rgba(18, 24, 30, 0.82);
+  filter: grayscale(0.86);
+}
+
+.lobby-skin-option.locked::after {
+  content: "구매";
+  justify-self: end;
+  grid-column: 2;
+  margin-top: -2px;
+  color: #c7d2d9;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.lobby-skin-option strong,
+.lobby-skin-option small {
+  display: block;
+}
+
+.lobby-skin-option small {
+  margin-top: 2px;
+  color: #9ac7d6;
+  font-size: 11px;
+}
+
+.lobby-skin-swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(233, 248, 255, 0.34);
+  border-radius: 50%;
+  background: #18e0ff;
+  box-shadow: 0 0 16px rgba(24, 224, 255, 0.34);
+}
+
+.lobby-skin-swatch-android {
+  background: linear-gradient(135deg, #d8f7ff 0%, #48f2c2 45%, #385dff 100%);
+  box-shadow: 0 0 16px rgba(39, 255, 200, 0.34);
+}
+
+.lobby-skin-purchase-modal {
+  position: fixed;
+  z-index: 240;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 8, 13, 0.68);
+}
+
+.lobby-skin-purchase-card {
+  width: min(360px, calc(100vw - 36px));
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(24, 224, 255, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(7, 22, 34, 0.98), rgba(3, 8, 13, 0.98));
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  text-align: center;
+}
+
+.lobby-skin-purchase-card h2 {
+  margin: 0;
+  color: #18e0ff;
+  font-size: 22px;
+}
+
+.lobby-skin-purchase-card p {
+  margin: 0;
+  color: #c4e9f4;
+  line-height: 1.5;
+}
+
+.lobby-skin-purchase-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lobby-skin-purchase-ok {
+  grid-column: 1 / -1;
+}
+
+.lobby-skin-purchase-cancel {
+  background: #192b3f;
+  color: #d4f4ff;
+  border: 1px solid #2d516d;
 }
 
 body.lobby-active .topbar,
@@ -306,6 +435,51 @@ body.lobby-active.lobby-settings-open .topbar {
 .settings-row input[type="range"] {
   width: 100%;
   accent-color: #18e0ff;
+}
+
+.settings-toggle-row {
+  grid-template-columns: minmax(0, 1fr) 0 46px;
+  cursor: pointer;
+}
+
+.settings-switch-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-switch {
+  position: relative;
+  width: 46px;
+  height: 24px;
+  border: 1px solid rgba(154, 199, 214, 0.42);
+  border-radius: 999px;
+  background: rgba(5, 14, 22, 0.88);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.3);
+}
+
+.settings-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9ac7d6;
+  box-shadow: 0 0 8px rgba(154, 199, 214, 0.32);
+  transition: transform 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.settings-switch-input:checked + .settings-switch {
+  border-color: rgba(24, 224, 255, 0.76);
+  background: rgba(12, 86, 104, 0.82);
+}
+
+.settings-switch-input:checked + .settings-switch::after {
+  transform: translateX(22px);
+  background: #18e0ff;
+  box-shadow: 0 0 12px rgba(24, 224, 255, 0.58);
 }
 
 .settings-panel button {
@@ -1396,6 +1570,13 @@ kbd {
   transform: translate(-6px, -8px) scale(1.04);
 }
 
+.dialogue-portrait-ai.ai-skin-android img {
+  width: 100%;
+  height: 104%;
+  transform: translate(-1px, -4px) scale(1.02);
+  filter: drop-shadow(0 0 18px rgba(39, 255, 200, 0.42)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
+}
+
 .overlay-card h2 {
   margin: 0;
   color: #18e0ff;
@@ -1506,6 +1687,15 @@ kbd {
   box-shadow: 0 0 18px rgba(255, 204, 51, 0.22);
 }
 
+.choice-card {
+  min-height: 84px;
+}
+
+.choice-card:hover {
+  border-color: rgba(39, 255, 200, 0.78);
+  box-shadow: 0 0 18px rgba(39, 255, 200, 0.14);
+}
+
 .reward-card.disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -1595,6 +1785,12 @@ kbd {
   }
 
   .lobby-actions {
+    width: 100%;
+  }
+
+  .lobby-skin-panel {
+    left: 0;
+    top: calc(100% + 10px);
     width: 100%;
   }
 

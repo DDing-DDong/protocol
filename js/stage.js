@@ -18,6 +18,7 @@ const CHOKE_HINT_RADIUS = 132;
 const REPLAY_SLOT_X_RADIUS = 104;
 const REPLAY_SLOT_Y_RADIUS = 136;
 const HACKER_REPLAY_WIDTH = 30;
+const STAGE_HAZARD_SLOT_MAX_DISTANCE = TRAP_SLOT_SPACING * 1.75;
 
 const STAGE_LAYOUT_GUIDE_ROLES = new Set([
   "entry-step",
@@ -82,18 +83,7 @@ export function createBaseHazards(stage, game) {
   const stageData = getStageById(stage, getLayoutOptions(stage, game));
   const hazards = stageData
     ? cloneTrapNodes(stageData.trapNodes)
-    : [
-      { type: "laser", x: 340, y: 352, w: 15, h: 110 },
-      { type: "shock", x: 680, y: 448, w: 90, h: 14 },
-      { type: "camera", x: 540, y: 252, w: 120, h: 70 },
-    ];
-
-  if (!stageData) {
-    if (stage >= 5) hazards.push({ type: "laser", x: 890, y: 272, w: 15, h: 190 });
-    if (stage >= 7) hazards.push({ type: "shock", x: 185, y: 448, w: 90, h: 14 });
-    if (stage >= 9) hazards.push({ type: "camera", x: 930, y: 232, w: 140, h: 80 });
-    if (stage >= INFINITE_STAGE_START) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
-  }
+    : createFallbackStageHazards(stage);
 
   const normalizedHazards = hazards.map((hazard) => normalizeStageHazard(hazard, game.platforms));
   normalizedHazards.push(...getCarriedHazards(stage, game));
@@ -213,13 +203,97 @@ function createDefenseTrapSlots(stage, game) {
         continue;
       }
       countDefenseTrapSlotCreated(debug, debugRow);
-      slots.push({ x, y, id, occupied: false });
+      slots.push({
+        x,
+        y,
+        id,
+        occupied: false,
+      });
       id += 1;
     }
   }
 
+  markStageHazardBlockedSlots(slots, stage, game);
   logDefenseTrapSlotDebug(stageData, debug, slots.length);
   return slots;
+}
+
+function markStageHazardBlockedSlots(slots, stage, game) {
+  const hazards = getStageHazardsForDefenseSlots(stage, game);
+
+  for (const hazard of hazards) {
+    const anchor = getStageHazardSlotAnchor(hazard);
+    const slot = findClosestStageHazardSlot(slots, anchor);
+    if (!slot || slot.blocked || slot.occupied) continue;
+    slot.blocked = true;
+    slot.blockedReason = "stageHazard";
+    slot.blockedHazardType = hazard.type || "";
+    slot.blockedHazardId = hazard.id || "";
+  }
+}
+
+function getStageHazardsForDefenseSlots(stage, game) {
+  const defenseStageData = getStageById(stage, getLayoutOptions(stage, game));
+  const nextAttackStage = Number(stage) + 1;
+  const stageData = getStageById(nextAttackStage, getLayoutOptions(nextAttackStage, game));
+  const defenseStageHazards = Array.isArray(defenseStageData?.trapNodes) ? defenseStageData.trapNodes : [];
+  const stageHazards = createStageHazardsForSlotBlocking(nextAttackStage, game, stageData);
+  const activeHazards = Array.isArray(game?.baseHazards) ? game.baseHazards : [];
+  return [...activeHazards, ...defenseStageHazards, ...stageHazards];
+}
+
+function getStageHazardSlotAnchor(hazard) {
+  if (!hazard) return { x: 0, y: 0 };
+
+  if (hazard.type === "camera" && Number.isFinite(hazard.x) && Number.isFinite(hazard.y)) {
+    return { x: hazard.x, y: hazard.y };
+  }
+
+  return {
+    x: Number.isFinite(hazard.x) && Number.isFinite(hazard.w) ? hazard.x + hazard.w / 2 : Number(hazard.x) || 0,
+    y: Number.isFinite(hazard.y) && Number.isFinite(hazard.h) ? hazard.y + hazard.h : Number(hazard.y) || 0,
+  };
+}
+
+function findClosestStageHazardSlot(slots, anchor) {
+  let bestSlot = null;
+  let bestScore = Infinity;
+
+  for (const slot of slots) {
+    const dx = slot.x - anchor.x;
+    const dy = slot.y - anchor.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > STAGE_HAZARD_SLOT_MAX_DISTANCE) continue;
+
+    const score = Math.abs(dx) + Math.abs(dy) * 1.35;
+    if (score >= bestScore) continue;
+    bestScore = score;
+    bestSlot = slot;
+  }
+
+  return bestSlot;
+}
+
+function createStageHazardsForSlotBlocking(stage, game, stageData) {
+  const hazards = Array.isArray(stageData?.trapNodes)
+    ? cloneTrapNodes(stageData.trapNodes)
+    : createFallbackStageHazards(stage);
+
+  return hazards.map((hazard) => normalizeStageHazard(hazard, game.platforms));
+}
+
+function createFallbackStageHazards(stage) {
+  const hazards = [
+    { type: "laser", x: 340, y: 352, w: 15, h: 110 },
+    { type: "shock", x: 680, y: 448, w: 90, h: 14 },
+    { type: "camera", x: 540, y: 252, w: 120, h: 70 },
+  ];
+
+  if (stage >= 5) hazards.push({ type: "laser", x: 890, y: 272, w: 15, h: 190 });
+  if (stage >= 7) hazards.push({ type: "shock", x: 185, y: 448, w: 90, h: 14 });
+  if (stage >= 9) hazards.push({ type: "camera", x: 930, y: 232, w: 140, h: 80 });
+  if (stage >= INFINITE_STAGE_START) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
+  return hazards;
 }
 
 function canCreateTrapSlotsOnPlatform(platform) {
