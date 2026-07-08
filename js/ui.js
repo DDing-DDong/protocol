@@ -211,6 +211,8 @@ export function initUI(callbacks) {
   let overlayTyping = null;
   let guideBubble = null;
   let guideBubbleInputLocked = false;
+  let pendingEmpowerPreviewGuide = false;
+  let empowerPreviewGuideShown = false;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
   let attackSkillsPanelOpen = false;
@@ -697,6 +699,7 @@ export function initUI(callbacks) {
       empty.className = "empower-summary";
       empty.textContent = "대상 없음";
       ui.empowerPreview.appendChild(empty);
+      maybeShowPendingEmpowerPreviewGuide();
       return;
     }
 
@@ -713,6 +716,7 @@ export function initUI(callbacks) {
       }
 
       ui.empowerPreview.appendChild(icons);
+      maybeShowPendingEmpowerPreviewGuide();
       return;
     }
 
@@ -722,6 +726,7 @@ export function initUI(callbacks) {
     summary.dataset.tooltip = summarizeTrapTypes(previewTraps);
     summary.tabIndex = 0;
     ui.empowerPreview.appendChild(summary);
+    maybeShowPendingEmpowerPreviewGuide();
   }
 
   function updateDefenseObjectiveHUD(game) {
@@ -862,7 +867,34 @@ export function initUI(callbacks) {
       },
     ];
 
-    showGuideBubbleSequence(steps, onComplete);
+    showGuideBubbleSequence(steps, () => {
+      queueEmpowerPreviewGuideBubbles();
+      if (typeof onComplete === "function") onComplete();
+    });
+  }
+
+  function queueEmpowerPreviewGuideBubbles() {
+    pendingEmpowerPreviewGuide = true;
+    empowerPreviewGuideShown = false;
+    maybeShowPendingEmpowerPreviewGuide();
+  }
+
+  function maybeShowPendingEmpowerPreviewGuide() {
+    if (!pendingEmpowerPreviewGuide || empowerPreviewGuideShown) return;
+    if (!ui.empowerPreview || ui.empowerPreview.classList.contains("hidden")) return;
+
+    pendingEmpowerPreviewGuide = false;
+    empowerPreviewGuideShown = true;
+    showGuideBubbleSequence([
+      {
+        target: () => ui.empowerPreview,
+        text: "카메라는 함정을 설치한 순서대로 강화시킵니다.",
+      },
+      {
+        target: () => ui.empowerPreview,
+        text: "해당 함정은 현재 스테이지에 처음으로 추가된 함정으로,\n\n카메라가 해커를 탐지할 시 강화될 함정입니다.",
+      },
+    ]);
   }
 
   function showGuideBubbleSequence(steps, onComplete, index = 0) {
