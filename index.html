@@ -21,8 +21,21 @@
       <div class="topbar-actions">
         <button id="restartBtn" class="secondary" type="button">처음부터</button>
         <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
-        <button id="helpBtn" class="secondary" type="button">도움말</button>
-        <button id="exitBtn" class="secondary" type="button" aria-label="게임 종료">X</button>
+        <div class="settings-menu">
+          <button id="settingsBtn" class="secondary icon-btn settings-toggle" type="button" aria-label="설정" aria-expanded="false">⚙</button>
+          <div id="settingsPanel" class="settings-panel hidden" aria-label="설정 패널">
+            <label class="settings-row" for="bgmVolume">
+              <span>BGM</span>
+              <input id="bgmVolume" type="range" min="0" max="100" step="1" />
+            </label>
+            <label class="settings-row" for="sfxVolume">
+              <span>SFX</span>
+              <input id="sfxVolume" type="range" min="0" max="100" step="1" />
+            </label>
+            <button id="helpBtn" class="secondary" type="button">도움말</button>
+            <button id="lobbyBtn" class="secondary" type="button">로비로 이동</button>
+          </div>
+        </div>
       </div>
     </header>
 

@@ -21,7 +21,7 @@ import {
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { playSfx, unlockAudio } from "./audio.js?v=20260707-mobile-panels-fit2";
+import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260707-mobile-panels-fit2";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -168,8 +168,12 @@ export function initUI(callbacks) {
     deleteTrapBtn: document.getElementById("deleteTrapBtn"),
     pauseAttackBtn: document.getElementById("pauseAttackBtn"),
     restartBtn: document.getElementById("restartBtn"),
+    settingsBtn: document.getElementById("settingsBtn"),
+    settingsPanel: document.getElementById("settingsPanel"),
+    bgmVolume: document.getElementById("bgmVolume"),
+    sfxVolume: document.getElementById("sfxVolume"),
     helpBtn: document.getElementById("helpBtn"),
-    exitBtn: document.getElementById("exitBtn"),
+    lobbyBtn: document.getElementById("lobbyBtn"),
   };
   prepareStatusBar(ui);
   prepareAttackSkillPanel(ui, canvas);
@@ -179,6 +183,7 @@ export function initUI(callbacks) {
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
   let attackSkillsPanelOpen = false;
+  let settingsPanelOpen = false;
   const keys = new Set();
   const attackResumeKeys = new Set([
     "Space",
@@ -192,6 +197,17 @@ export function initUI(callbacks) {
 
   function setLog(text) {
     ui.logText.textContent = text;
+  }
+
+  function syncVolumeInputs() {
+    if (ui.bgmVolume) ui.bgmVolume.value = String(Math.round(getBgmVolume() * 100));
+    if (ui.sfxVolume) ui.sfxVolume.value = String(Math.round(getSfxVolume() * 100));
+  }
+
+  function setSettingsPanelOpen(open) {
+    settingsPanelOpen = Boolean(open);
+    ui.settingsBtn?.setAttribute("aria-expanded", settingsPanelOpen ? "true" : "false");
+    ui.settingsPanel?.classList.toggle("hidden", !settingsPanelOpen);
   }
 
   function prepareStatusBar(ui) {
@@ -354,6 +370,7 @@ export function initUI(callbacks) {
     ui.pauseAttackBtn.classList.toggle("active", Boolean(game.attackPaused));
     setDeleteMode(Boolean(game.deleteMode && game.turn === TURN.DEFENSE_BUILD));
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
+    if (ui.lobbyBtn) ui.lobbyBtn.disabled = false;
     updateEmpowerPreview(game);
     updateDefenseObjectiveHUD(game);
     updateTrapTooltips(game);
@@ -1915,6 +1932,7 @@ export function initUI(callbacks) {
 
   function bindEvents() {
     initializeTrapButtonIcons();
+    syncVolumeInputs();
     bindMobileControls();
 
     document.addEventListener("pointerdown", unlockAudio);
@@ -2022,6 +2040,31 @@ export function initUI(callbacks) {
       ui.attackSkillsPanel?.classList.toggle("hidden", !attackSkillsPanelOpen);
     });
 
+    ui.settingsBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      console.log("[Settings] toggle");
+      setSettingsPanelOpen(!settingsPanelOpen);
+    });
+
+    ui.settingsPanel?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!settingsPanelOpen) return;
+      if (event.target?.closest?.(".settings-menu")) return;
+      setSettingsPanelOpen(false);
+    });
+
+    ui.bgmVolume?.addEventListener("input", (event) => {
+      setBgmVolume(Number(event.target.value) / 100);
+    });
+
+    ui.sfxVolume?.addEventListener("input", (event) => {
+      setSfxVolume(Number(event.target.value) / 100);
+    });
+
     ui.restartBtn.addEventListener(
       "click",
       callbacks.onRestart
@@ -2032,10 +2075,11 @@ export function initUI(callbacks) {
       callbacks.onHelp
     );
 
-    ui.exitBtn?.addEventListener(
-      "click",
-      callbacks.onExitGame
-    );
+    ui.lobbyBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setLog("로비 기능은 추후 추가 예정입니다.");
+    });
 
     for (const btn of document.querySelectorAll(".trap-btn")) {
       btn.addEventListener("click", () =>

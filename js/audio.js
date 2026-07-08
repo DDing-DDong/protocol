@@ -16,6 +16,8 @@ const SFX_FILES = {
 
 const DEFAULT_SFX_VOLUME = 0.6;
 const DEFAULT_BGM_VOLUME = 0.45;
+const BGM_VOLUME_STORAGE_KEY = "protocol_bgm_volume";
+const SFX_VOLUME_STORAGE_KEY = "protocol_sfx_volume";
 const BGM_CACHE_VERSION = "";
 const DISABLED_BGM_FILES = new Set();
 
@@ -24,14 +26,15 @@ const sfxPlayTokens = new Map();
 const bgmPlayers = new Map();
 const audioBuffers = new Map();
 const activeBufferSources = new Map();
-let sfxVolume = DEFAULT_SFX_VOLUME;
-let bgmVolume = DEFAULT_BGM_VOLUME;
+let sfxVolume = loadStoredVolume(SFX_VOLUME_STORAGE_KEY, DEFAULT_SFX_VOLUME);
+let bgmVolume = loadStoredVolume(BGM_VOLUME_STORAGE_KEY, DEFAULT_BGM_VOLUME);
 let currentBgmSrc = "";
 let pendingBgmSrc = "";
-let audioPrimed = false;
+let audioUnlocked = false;
 let audioContext = null;
 
 export function unlockAudio() {
+  audioUnlocked = true;
   getAudioContext()?.resume?.();
   preloadAudioBuffers();
   preloadBgm();
@@ -41,16 +44,29 @@ export function unlockAudio() {
 
 export function setSfxVolume(value) {
   sfxVolume = clampVolume(value);
+  saveStoredVolume(SFX_VOLUME_STORAGE_KEY, sfxVolume);
   for (const audio of sfxPlayers.values()) {
-    audio.volume = sfxVolume;
+    audio.volume = getEffectiveSfxVolume(audio.dataset.sfxBaseVolume);
+  }
+  for (const active of activeBufferSources.values()) {
+    active.gain.gain.value = getEffectiveSfxVolume(active.baseVolume);
   }
 }
 
 export function setBgmVolume(value) {
   bgmVolume = clampVolume(value);
+  saveStoredVolume(BGM_VOLUME_STORAGE_KEY, bgmVolume);
   for (const audio of bgmPlayers.values()) {
     audio.volume = bgmVolume;
   }
+}
+
+export function getSfxVolume() {
+  return sfxVolume;
+}
+
+export function getBgmVolume() {
+  return bgmVolume;
 }
 
 export function playSfx(name, options = {}) {
@@ -63,7 +79,8 @@ export function playSfx(name, options = {}) {
   if (!audio) return;
 
   if (options.loop && !audio.paused) {
-    audio.volume = clampVolume(options.volume ?? sfxVolume);
+    audio.dataset.sfxBaseVolume = String(getSfxBaseVolume(options));
+    audio.volume = getEffectiveSfxVolume(options.volume);
     return;
   }
 
@@ -72,7 +89,8 @@ export function playSfx(name, options = {}) {
   sfxPlayTokens.set(name, playToken);
   audio.muted = false;
   audio.loop = Boolean(options.loop);
-  audio.volume = clampVolume(options.volume ?? sfxVolume);
+  audio.dataset.sfxBaseVolume = String(getSfxBaseVolume(options));
+  audio.volume = getEffectiveSfxVolume(options.volume);
 
   const maxDuration = Number(options.maxDuration) || 0;
   if (maxDuration > 0) {
@@ -101,7 +119,6 @@ export function playBgm(src, options = {}) {
     return;
   }
   pendingBgmSrc = src;
-  console.info(`[BGM] request: ${src}`);
 
   playElementBgm(src);
 }
@@ -111,6 +128,7 @@ export function stopBgm() {
     stopAudio(audio);
   }
   currentBgmSrc = "";
+  pendingBgmSrc = "";
 }
 
 function getSfxPlayer(name, file) {
@@ -118,7 +136,8 @@ function getSfxPlayer(name, file) {
 
   const audio = new Audio(getAudioUrl(file, SFX_BASE_URL));
   audio.preload = "auto";
-  audio.volume = sfxVolume;
+  audio.dataset.sfxBaseVolume = "1";
+  audio.volume = getEffectiveSfxVolume(1);
   audio.addEventListener("error", () => {
     sfxPlayers.delete(name);
   });
@@ -130,7 +149,6 @@ function getBgmPlayer(src) {
   if (bgmPlayers.has(src)) return bgmPlayers.get(src);
 
   const url = getAudioUrl(src, BGM_BASE_URL);
-  console.info(`[BGM] create: ${src} -> ${url}`);
   const audio = new Audio(url);
   audio.preload = "auto";
   audio.loop = true;
@@ -138,9 +156,6 @@ function getBgmPlayer(src) {
   audio.addEventListener("error", () => {
     console.warn("BGM file failed to load:", src, url, audio.error);
   });
-  audio.addEventListener("canplaythrough", () => {
-    console.info(`[BGM] ready: ${src}`);
-  }, { once: true });
   bgmPlayers.set(src, audio);
   return audio;
 }
@@ -157,6 +172,11 @@ function getAudioUrl(src, baseUrl, cacheVersion = "") {
 
 function playElementBgm(src) {
   const player = getBgmPlayer(src);
+
+  if (currentBgmSrc === src && !player.paused) {
+    player.volume = bgmVolume;
+    return;
+  }
 
   for (const [otherSrc, audio] of bgmPlayers.entries()) {
     if (otherSrc !== src) stopAudio(audio);
@@ -179,9 +199,9 @@ function retryCurrentBgm() {
 
 function playAudioElement(audio, src) {
   audio.play().then(() => {
-    console.info(`[BGM] playing: ${src}`);
+    // Playback started.
   }).catch((error) => {
-    console.warn("BGM play blocked or failed:", src, error);
+    if (audioUnlocked) console.warn("BGM play blocked or failed:", src, error);
   });
 }
 
@@ -213,27 +233,34 @@ function playBufferedSfx(name, file, options) {
   }
 
   if (context.state === "suspended") context.resume();
-  if (options.loop && activeBufferSources.has(name)) return true;
+  if (options.loop && activeBufferSources.has(name)) {
+    const active = activeBufferSources.get(name);
+    active.baseVolume = getSfxBaseVolume(options);
+    active.gain.gain.value = getEffectiveSfxVolume(active.baseVolume);
+    return true;
+  }
   stopBufferedSfx(name);
 
   const source = context.createBufferSource();
   const gain = context.createGain();
+  const baseVolume = getSfxBaseVolume(options);
   source.buffer = buffer;
   source.loop = Boolean(options.loop);
-  gain.gain.value = clampVolume(options.volume ?? sfxVolume);
+  gain.gain.value = getEffectiveSfxVolume(baseVolume);
   source.connect(gain);
   gain.connect(context.destination);
   source.start(0);
-  activeBufferSources.set(name, source);
+  const active = { source, gain, baseVolume };
+  activeBufferSources.set(name, active);
 
   source.onended = () => {
-    if (activeBufferSources.get(name) === source) activeBufferSources.delete(name);
+    if (activeBufferSources.get(name) === active) activeBufferSources.delete(name);
   };
 
   const maxDuration = Number(options.maxDuration) || 0;
   if (maxDuration > 0) {
     window.setTimeout(() => {
-      if (activeBufferSources.get(name) === source) stopBufferedSfx(name);
+      if (activeBufferSources.get(name) === active) stopBufferedSfx(name);
     }, maxDuration * 1000);
   }
 
@@ -241,11 +268,11 @@ function playBufferedSfx(name, file, options) {
 }
 
 function stopBufferedSfx(name) {
-  const source = activeBufferSources.get(name);
-  if (!source) return;
+  const active = activeBufferSources.get(name);
+  if (!active) return;
   activeBufferSources.delete(name);
   try {
-    source.stop(0);
+    active.source.stop(0);
   } catch {
     // Already stopped.
   }
@@ -275,24 +302,6 @@ function getAudioContext() {
   return audioContext;
 }
 
-function primeSfxPlayback() {
-  if (audioPrimed) return;
-  audioPrimed = true;
-
-  for (const audio of sfxPlayers.values()) {
-    const previousMuted = audio.muted;
-    audio.muted = true;
-    audio.play()
-      .then(() => {
-        stopAudio(audio);
-        audio.muted = previousMuted;
-      })
-      .catch(() => {
-        audio.muted = previousMuted;
-      });
-  }
-}
-
 function stopAudio(audio) {
   audio.pause();
   try {
@@ -302,8 +311,36 @@ function stopAudio(audio) {
   }
 }
 
+function getSfxBaseVolume(options = {}) {
+  return clampVolume(options.volume ?? 1);
+}
+
+function getEffectiveSfxVolume(baseVolume = 1) {
+  return clampVolume(sfxVolume * clampVolume(baseVolume));
+}
+
 function clampVolume(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
   return Math.max(0, Math.min(1, numeric));
+}
+
+function loadStoredVolume(key, fallback) {
+  try {
+    if (typeof window === "undefined") return fallback;
+    const stored = window.localStorage?.getItem(key);
+    if (stored === null || stored === undefined) return fallback;
+    return clampVolume(stored);
+  } catch {
+    return fallback;
+  }
+}
+
+function saveStoredVolume(key, value) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage?.setItem(key, String(clampVolume(value)));
+  } catch {
+    // Storage can be unavailable in private or restricted contexts.
+  }
 }

@@ -83,6 +83,8 @@ button.secondary {
 }
 
 .topbar {
+  position: relative;
+  z-index: 100;
   max-width: 1560px;
   margin: 0 auto 14px;
   display: flex;
@@ -106,6 +108,60 @@ button.secondary {
 .topbar-actions {
   display: flex;
   gap: 8px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.icon-btn {
+  min-width: 42px;
+  padding-inline: 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.settings-menu {
+  position: relative;
+  pointer-events: auto;
+}
+
+.settings-toggle[aria-expanded="true"] {
+  border-color: rgba(24, 224, 255, 0.72);
+  box-shadow: 0 0 14px rgba(24, 224, 255, 0.18);
+}
+
+.settings-panel {
+  position: absolute;
+  z-index: 80;
+  pointer-events: auto;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(260px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(11, 26, 39, 0.98), rgba(5, 14, 22, 0.98));
+  border: 1px solid rgba(154, 199, 214, 0.34);
+  border-radius: 8px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  color: #d4f4ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-row input[type="range"] {
+  width: 100%;
+  accent-color: #18e0ff;
+}
+
+.settings-panel button {
+  width: 100%;
 }
 
 .game-layout {
@@ -1165,8 +1221,20 @@ kbd {
     width: 100%;
   }
 
+  .settings-menu {
+    flex: 1;
+  }
+
   .topbar-actions button {
     flex: 1;
+  }
+
+  .settings-toggle {
+    width: 100%;
+  }
+
+  .settings-panel {
+    right: 0;
   }
 
   .side-panel {
@@ -1286,7 +1354,7 @@ kbd {
 
   .topbar {
     position: absolute;
-    z-index: 40;
+    z-index: 100;
     top: max(8px, env(safe-area-inset-top));
     left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
@@ -1307,14 +1375,20 @@ kbd {
     pointer-events: auto;
   }
 
+  .settings-menu {
+    flex: 0 0 auto;
+  }
+
   .topbar-actions button {
     flex: 0 0 auto;
     min-height: 34px;
     padding: 8px 10px;
   }
 
-  #exitBtn {
-    min-width: 42px;
+  .settings-panel {
+    width: min(236px, calc(100dvw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
   }
 
   .objective-hud {
