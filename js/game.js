@@ -105,6 +105,7 @@ const uiModule = initUI({
   onApplyReward: applyReward,
   onToggleAttackPause: toggleAttackPause,
   onResumeAttackPause: resumeAttackPause,
+  onTutorialBubbleInput: handleTutorialBubbleInput,
   canPlayAttackSfx: () => game.turn === TURN.ATTACK && !game.tutorialInputLocked && !game.attackPaused,
 });
 
@@ -147,6 +148,7 @@ const game = {
   objectiveSparkTimer: 0,
   tutorialFlags: createTutorialFlags(),
   tutorialInputLocked: false,
+  tutorialBubble: null,
 };
 
 let lastTime = performance.now();
@@ -155,26 +157,51 @@ let selectedRotation = 90;
 let laserRotation = 90;
 
 const STAGE_ONE_HACKER_DIALOGUE = [
-  "접속 성공. 외곽 서버실이 눈앞이야.",
-  "좋아, 여기까지는 깔끔하네.",
-  "이제부터 삐끗하면 내 기록이 통째로 날아가겠지만.",
-  "데이터 코어로 진입해서 정보를 빼내야 해.\n\n침투기록이 남을테니 최대한 빨리 움직여야지.",
-  "하던대로 움직이면 돼. 방향키로 이동하고\n\nShift로 슬라이딩. Space로 전방의 레이저나 카메라를 해킹하면 되겠지.",
+  { text: "접속 성공. 외곽 서버실이 눈앞이야.", portrait: "idle" },
+  { text: "좋아, 여기까지는 깔끔하네.", portrait: "happy" },
+  { text: "이제부터 삐끗하면 내 기록이 통째로 날아가겠지만.", portrait: "frown" },
+  { text: "데이터 코어로 진입해서 정보를 빼내야 해.\n침투기록이 남을테니 최대한 빨리 움직여야지.", portrait: "idle" },
+  { text: "하던대로 움직이면 돼. 방향키로 이동하고\nShift로 슬라이딩. Space로 전방의 레이저나 카메라를 해킹하면 되겠지.", portrait: "idle" },
+];
+
+const STAGE_ONE_HACKING_TIP =
+  "레이저나 카메라는 space키를 입력해 해킹할 수 있습니다. 해킹된 함정은 짧은 시간 무력화됩니다.";
+const STAGE_ONE_FLOOR_TRAP_TIP =
+  "감전패널이나 EMP패널같은 바닥함정은 슬라이딩으로 회피할 수 있습니다.";
+const STAGE_ONE_WALL_TIPS = [
+  "벽에서 방향키를 이용하면 잠시동안 벽에 달라붙을 수 있습니다.",
+  "점프와 반대방향 방향키를 동시에 누르면 대각선 방향으로 점프해서 올라갈 수 있습니다.",
 ];
 
 const STAGE_ONE_REWARD_DIALOGUE = [
-  "침투가 감지되었습니다. 보안 개선을 시작하겠습니다.",
-  "감전패널을 임시 강화하여 보안 취약점을 개선하겠습니다.",
+  { text: "침투가 감지되었습니다. 보안 개선을 시작하겠습니다.", portrait: "error" },
+  { text: "감전패널을 임시 강화하여 보안 취약점을 개선하겠습니다.", portrait: "eyes_closed" },
 ];
 
 const STAGE_TWO_DEFENSE_DIALOGUE = [
-  "보안 취약점을 개선할때는 침입 궤적이 그대로 재생됩니다.",
-  "해당 경로 위에 보안 취약점을 개선할 함정을 배치해야 합니다.\n\n무작정 모든 길을 막는 것이 아니라, 반드시 통과할 지점을 선별해야 합니다.",
-  "표시된 슬롯을 클릭하면 함정을 설치할 수 있습니다.\n\n사용할 수 있는 함정 토큰은 제한되어 있으므로 경로 전체를 차단하는 방식은 비효율적입니다.",
-  "침투자가 지나간 위치, 점프 후 착지하는 지점.\n\n이런 구간이 가장 취약한 지점입니다.",
-  "설치가 완료되면 리플레이를 시작해, 개선점을 확인합니다.",
-  "목표는 침입마다 변경됩니다.\n\n지정된 조건을 달성해 방어를 성공시켜야 합니다.",
-  "정확한 방해 한 번으로도 전체 침투 시간을 무너뜨릴 수 있습니다.\n\n방어 준비를 개시합니다.",
+  { text: "보안 취약점을 개선할때는 침입 궤적이 그대로 재생됩니다.", portrait: "idle" },
+  { text: "해당 경로 위에 보안 취약점을 개선할 함정을 배치해야 합니다.\n무작정 모든 길을 막는 것이 아니라, 반드시 통과할 지점을 선별해야 합니다.", portrait: "idle" },
+  { text: "표시된 슬롯을 클릭하면 함정을 설치할 수 있습니다.\n함정 토큰은 제한되어 있으므로 경로 전체를 차단하는 방식은 비효율적입니다.", portrait: "idle" },
+  { text: "침투자가 지나간 위치, 점프 후 착지하는 지점.\n이런 구간이 가장 취약한 지점입니다.", portrait: "eyes_closed" },
+  { text: "설치가 완료되면 리플레이를 시작해, 개선점을 확인합니다.", portrait: "idle" },
+  { text: "목표는 침입마다 변경됩니다.\n지정된 조건을 달성해 방어를 성공시켜야 합니다.", portrait: "idle" },
+  { text: "정확한 방해 한 번으로도 전체 침투 시간을 무너뜨릴 수 있습니다.\n방어 준비를 개시합니다.", portrait: "happy" },
+];
+
+const STAGE_TWO_CLEAR_HACKER_DIALOGUE = [
+  { text: "바닥에 함정이 유독 늘어난 것 같은데.\n다음부터는 슬라이딩 거리를 더 신경써야겠어.", portrait: "frown" },
+];
+
+const STAGE_THREE_HACKER_DIALOGUE = [
+  {
+    text: "이번엔 바닥 함정이 많아 보이네.\n\n에너지를 잘 분배해서 사용해야겠어.",
+    portrait: "idle",
+  },
+  { text: "특히 EMP패널은 에너지를 흡수하니까 조심해야해.", portrait: "frown" },
+];
+
+const STAGE_THREE_REWARD_DIALOGUE = [
+  { text: "바닥함정을 회피하기 시작했습니다.\n다른 방식으로 경로를 차단하겠습니다.", portrait: "idle" },
 ];
 
 function flashLog(text) {
@@ -197,6 +224,12 @@ function createTutorialFlags() {
     stage1Intro: false,
     stage1Reward: false,
     stage2Defense: false,
+    stage1HackableTrap: false,
+    stage1FloorTrap: false,
+    stage1WallStep: 0,
+    stage2ReplayTip: false,
+    stage3Intro: false,
+    stage4Defense: false,
   };
 }
 
@@ -265,6 +298,7 @@ function getTrapRefund(trap) {
 
 function setupStage(options = {}) {
   uiModule.hideOverlay();
+  uiModule.hideGuideBubble?.();
   stopSfx("electric");
   if (!options.keepCurrentBgm) playLobbyBgm();
   uiModule.keys.clear();
@@ -291,6 +325,7 @@ function setupStage(options = {}) {
   game.showSuccessDefenseLayout = false;
   game.completedObjectiveEffectIds = new Set();
   game.objectiveSparkTimer = 0;
+  game.tutorialBubble = null;
   game.nextEmpowerTrapIndex = 0;
   game.currentRecording = [];
   game.placedTraps = [];
@@ -411,6 +446,7 @@ function getRemainingDefenseBudget() {
 
 function update(dt) {
   game.messageCooldown = Math.max(0, game.messageCooldown - dt);
+  updateTutorialBubble(dt);
   if (game.tutorialInputLocked) {
     uiModule.keys.clear();
     uiModule.updateUI(game);
@@ -422,6 +458,7 @@ function update(dt) {
       const wasAttackStarted = game.attackTimerStarted;
       updateAttack(game, dt, uiModule.keys, flashLog, endStage);
       if (!wasAttackStarted && game.attackTimerStarted) playGameplayBgmForTurn(game.turn);
+      updateStageOneContextTutorial();
     }
   }
   if (game.turn === TURN.DEFENSE_REPLAY) {
@@ -430,8 +467,167 @@ function update(dt) {
   uiModule.updateUI(game);
 }
 
+function updateTutorialBubble(dt) {
+  if (!game.tutorialBubble) return;
+  if (game.tutorialBubble.waitsForInput) {
+    game.tutorialBubble.inputLockedTime = Math.max(0, (game.tutorialBubble.inputLockedTime || 0) - dt);
+    return;
+  }
+
+  game.tutorialBubble.time -= dt;
+  if (game.tutorialBubble.time > 0) return;
+
+  const nextBubble = game.tutorialBubble.nextBubble;
+  game.tutorialBubble = null;
+  if (nextBubble) {
+    game.tutorialBubble = createTutorialBubble(nextBubble);
+  }
+}
+
+function updateStageOneContextTutorial() {
+  if (game.stage !== 1 || game.turn !== TURN.ATTACK || !game.hacker || game.tutorialBubble) return;
+
+  const h = game.hacker;
+  const firstHackable = findNearbyForwardHazard(["laser", "camera"], 150);
+  if (!game.tutorialFlags.stage1HackableTrap && firstHackable) {
+    game.tutorialFlags.stage1HackableTrap = true;
+    showTutorialBubble(firstHackable, STAGE_ONE_HACKING_TIP);
+    return;
+  }
+
+  const firstFloorTrap = findNearbyForwardHazard(["shock", "emp"], 130);
+  if (!game.tutorialFlags.stage1FloorTrap && firstFloorTrap) {
+    game.tutorialFlags.stage1FloorTrap = true;
+    showTutorialBubble(firstFloorTrap, STAGE_ONE_FLOOR_TRAP_TIP);
+    return;
+  }
+
+  const wall = findNearbyStageOneWall(h);
+  if (wall && game.tutorialFlags.stage1WallStep === 0) {
+    game.tutorialFlags.stage1WallStep = 2;
+    const anchor = getObjectAnchor(wall);
+    showTutorialBubbleAt(anchor, STAGE_ONE_WALL_TIPS[0], {
+      duration: 4.6,
+      nextBubble: {
+        x: anchor.x,
+        y: anchor.y,
+        text: STAGE_ONE_WALL_TIPS[1],
+        duration: 5.2,
+      },
+    });
+  }
+}
+
+function findNearbyForwardHazard(types, distance) {
+  const h = game.hacker;
+  if (!h) return null;
+
+  const hackerCenterX = h.x + h.w / 2;
+  const hackerCenterY = h.y + h.h / 2;
+  const candidates = (game.baseHazards || [])
+    .filter((hazard) => types.includes(hazard.type))
+    .map((hazard) => {
+      const anchor = getObjectAnchor(hazard);
+      return {
+        hazard,
+        anchor,
+        forwardDistance: anchor.x - hackerCenterX,
+        verticalDistance: Math.abs(anchor.y - hackerCenterY),
+      };
+    })
+    .filter(({ forwardDistance, verticalDistance }) => (
+      Math.abs(forwardDistance) <= distance &&
+      verticalDistance <= 210
+    ))
+    .sort((a, b) => Math.abs(a.forwardDistance) - Math.abs(b.forwardDistance));
+
+  return candidates[0]?.hazard || null;
+}
+
+function findNearbyStageOneWall(h) {
+  return (game.platforms || []).find((platform) => {
+    if (platform.role !== "chokepoint-wall") return false;
+    const nearX = h.x + h.w >= platform.x - 105 && h.x <= platform.x + platform.w + 115;
+    const nearY = h.y + h.h >= platform.y - 70 && h.y <= platform.y + platform.h + 130;
+    return nearX && nearY;
+  });
+}
+
+function showTutorialBubble(target, text, options = {}) {
+  showTutorialBubbleAt(getObjectAnchor(target), text, options);
+}
+
+function showTutorialBubbleAt(anchor, text, options = {}) {
+  const waitsForInput = options.waitsForInput ?? true;
+  game.tutorialBubble = createTutorialBubble({
+    x: anchor.x,
+    y: anchor.y,
+    text,
+    duration: options.duration,
+    nextBubble: options.nextBubble,
+    waitsForInput,
+    inputLockedTime: options.inputLockedTime,
+  });
+  if (waitsForInput && game.turn === TURN.ATTACK) {
+    game.attackPaused = true;
+    uiModule.keys.clear();
+    uiModule.updateUI(game);
+  }
+}
+
+function createTutorialBubble({
+  x,
+  y,
+  text,
+  duration = 5,
+  nextBubble = null,
+  waitsForInput = false,
+  inputLockedTime = 0.16,
+}) {
+  return {
+    x,
+    y,
+    text,
+    time: duration,
+    duration,
+    nextBubble,
+    waitsForInput,
+    inputLockedTime,
+  };
+}
+
+function handleTutorialBubbleInput() {
+  if (!game.tutorialBubble?.waitsForInput) return false;
+  if ((game.tutorialBubble.inputLockedTime || 0) > 0) return true;
+
+  const nextBubble = game.tutorialBubble.nextBubble;
+  game.tutorialBubble = null;
+  uiModule.keys.clear();
+
+  if (nextBubble) {
+    game.tutorialBubble = createTutorialBubble({
+      waitsForInput: true,
+      ...nextBubble,
+    });
+    game.attackPaused = true;
+  } else {
+    game.attackPaused = false;
+  }
+
+  uiModule.updateUI(game);
+  return true;
+}
+
+function getObjectAnchor(object) {
+  return {
+    x: object.x + object.w / 2,
+    y: object.y,
+  };
+}
+
 function toggleAttackPause() {
   if (game.tutorialInputLocked) return false;
+  if (game.tutorialBubble?.waitsForInput) return false;
   if (game.turn !== TURN.ATTACK || game.turn === TURN.ENDING) return false;
 
   game.attackPaused = !game.attackPaused;
@@ -448,6 +644,7 @@ function toggleAttackPause() {
 
 function resumeAttackPause() {
   if (game.tutorialInputLocked) return false;
+  if (game.tutorialBubble?.waitsForInput) return false;
   if (game.turn !== TURN.ATTACK || !game.attackPaused) return false;
 
   game.attackPaused = false;
@@ -516,6 +713,22 @@ function endStage(success, text) {
     return;
   }
 
+  if (completedStage === 2 && completedTurn === TURN.DEFENSE_REPLAY) {
+    showDialogueSequence("해커", STAGE_TWO_CLEAR_HACKER_DIALOGUE, {
+      finalButtonText: "보상 확인",
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+    });
+    return;
+  }
+
+  if (completedStage === 3 && completedTurn === TURN.ATTACK) {
+    showDialogueSequence("AI 시스템", STAGE_THREE_REWARD_DIALOGUE, {
+      finalButtonText: "보상 확인",
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+    });
+    return;
+  }
+
   showStageClearRewardOverlay(completedStage, completedTurn, text);
 }
 
@@ -528,6 +741,7 @@ function showStageClearRewardOverlay(completedStage, completedTurn, text) {
     title: "스테이지 클리어",
     text: `${text}\n보상 1개를 선택하면 다음 스테이지로 진행합니다.`,
     rewards,
+    lockRecommendedReward: isFixedRewardStage(completedStage, completedTurn),
     buttonText: selectedReward ? "선택된 보상 받기" : "보상 없이 진행",
     onButton: () => {
       if (selectedReward) {
@@ -544,11 +758,22 @@ function showStageClearRewardOverlay(completedStage, completedTurn, text) {
 
 function getStageRewardChoices(completedStage, completedTurn) {
   const type = completedTurn === TURN.ATTACK ? "attack" : "defense";
-  const shouldGuideShockReward = completedStage === 1 && completedTurn === TURN.ATTACK;
+  const preferredRewardId = getFixedRewardId(completedStage, completedTurn);
 
-  return pickRewards(type, rewardPool, completedStage, shouldGuideShockReward
-    ? { preferredRewardId: "shock_delay_bonus", markPreferred: true }
+  return pickRewards(type, rewardPool, completedStage, preferredRewardId
+    ? { preferredRewardId, markPreferred: true }
     : {});
+}
+
+function getFixedRewardId(completedStage, completedTurn) {
+  if (completedStage === 1 && completedTurn === TURN.ATTACK) return "shock_delay_bonus";
+  if (completedStage === 2 && completedTurn === TURN.DEFENSE_REPLAY) return "dash_duration_bonus";
+  if (completedStage === 3 && completedTurn === TURN.ATTACK) return "firewall_delay_bonus";
+  return "";
+}
+
+function isFixedRewardStage(completedStage, completedTurn) {
+  return Boolean(getFixedRewardId(completedStage, completedTurn));
 }
 
 function applyReward(reward, options = {}) {
@@ -632,9 +857,32 @@ function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
       keepCurrentBgm: true,
       onComplete: () => {
         uiModule.hideOverlay();
+        showStageTwoDefenseGuideBubbles();
+      },
+    });
+    return true;
+  }
+
+  if (game.stage === 3 && game.turn === TURN.ATTACK && !game.tutorialFlags.stage3Intro) {
+    game.tutorialFlags.stage3Intro = true;
+    showDialogueSequence("해커", STAGE_THREE_HACKER_DIALOGUE, {
+      finalButtonText: "침투 시작",
+      onComplete: () => {
+        uiModule.hideOverlay();
         playGameplayBgmForTurn(game.turn);
       },
     });
+    return true;
+  }
+
+  if (
+    game.stage === 4 &&
+    game.turn === TURN.DEFENSE_BUILD &&
+    !keepDefenseTraps &&
+    !game.tutorialFlags.stage4Defense
+  ) {
+    game.tutorialFlags.stage4Defense = true;
+    showStageFourDefenseGuideBubbles();
     return true;
   }
 
@@ -647,12 +895,26 @@ function showDialogueSequence(title, lines, options = {}) {
   game.tutorialInputLocked = true;
   uiModule.keys.clear();
 
+  const completeSequence = () => {
+    game.tutorialInputLocked = false;
+    uiModule.keys.clear();
+    if (typeof options.onComplete === "function") {
+      options.onComplete();
+    } else {
+      uiModule.hideOverlay();
+    }
+  };
+
   const showLine = () => {
+    const line = normalizeDialogueLine(lines[index]);
     const isLast = index >= lines.length - 1;
     uiModule.showOverlay({
       title,
-      text: lines[index],
+      text: line.text,
       speaker: getDialogueSpeaker(title),
+      portrait: line.portrait,
+      advanceOnCardClick: true,
+      onSkip: completeSequence,
       buttonText: isLast ? (options.finalButtonText || "확인") : "다음",
       onButton: () => {
         if (!isLast) {
@@ -661,18 +923,43 @@ function showDialogueSequence(title, lines, options = {}) {
           return;
         }
 
-        game.tutorialInputLocked = false;
-        uiModule.keys.clear();
-        if (typeof options.onComplete === "function") {
-          options.onComplete();
-        } else {
-          uiModule.hideOverlay();
-        }
+        completeSequence();
       },
     });
   };
 
   showLine();
+}
+
+function showStageTwoDefenseGuideBubbles() {
+  game.tutorialInputLocked = true;
+  uiModule.keys.clear();
+  uiModule.showDefenseGuideBubbles?.({
+    onComplete: () => {
+      game.tutorialInputLocked = false;
+      uiModule.keys.clear();
+      playGameplayBgmForTurn(game.turn);
+      uiModule.updateUI(game);
+    },
+  });
+}
+
+function showStageFourDefenseGuideBubbles() {
+  game.tutorialInputLocked = true;
+  uiModule.keys.clear();
+  uiModule.showStageFourGuideBubbles?.({
+    onComplete: () => {
+      game.tutorialInputLocked = false;
+      uiModule.keys.clear();
+      playGameplayBgmForTurn(game.turn);
+      uiModule.updateUI(game);
+    },
+  });
+}
+
+function normalizeDialogueLine(line) {
+  if (line && typeof line === "object") return line;
+  return { text: String(line || ""), portrait: "" };
 }
 
 function getDialogueSpeaker(title) {
@@ -702,7 +989,20 @@ function handleCanvasClick(pos) {
     placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog);
     if (game.placedTraps.length > trapCount) playSfx("deploy", { maxDuration: 2 });
     uiModule.updateUI(game);
+    maybeShowStageTwoReplayGuide();
   }
+}
+
+function maybeShowStageTwoReplayGuide() {
+  if (game.stage !== 2 || game.turn !== TURN.DEFENSE_BUILD) return;
+  if (game.tutorialFlags.stage2ReplayTip) return;
+
+  const shockCount = game.placedTraps.filter((trap) => trap.type === "shock").length;
+  const empCount = game.placedTraps.filter((trap) => trap.type === "emp").length;
+  if (shockCount < 1 || empCount < 1) return;
+
+  game.tutorialFlags.stage2ReplayTip = true;
+  uiModule.showReplayStartGuideBubble?.();
 }
 
 function resetGame() {
@@ -717,6 +1017,7 @@ function resetGame() {
   game.mods = createDefaultMods();
   game.tutorialFlags = createTutorialFlags();
   game.tutorialInputLocked = false;
+  game.tutorialBubble = null;
   setupStage();
 }
 
