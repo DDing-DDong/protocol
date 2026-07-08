@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260708-mobile-layout" />
+  <link rel="stylesheet" href="./style.css?v=20260709-skin-purchase" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -28,6 +28,7 @@
         <p class="lobby-status">Connected to AI Network</p>
         <div class="lobby-actions">
           <button id="lobbyStartBtn" class="lobby-button lobby-button-primary" type="button">START MISSION</button>
+          <button id="lobbySkinBtn" class="lobby-button" type="button" aria-expanded="false">SKIN</button>
           <button id="lobbyHelpBtn" class="lobby-button" type="button">HELP</button>
           <button id="lobbySettingsBtn" class="lobby-button" type="button">SETTINGS</button>
         </div>
@@ -54,6 +55,11 @@
             <label class="settings-row" for="sfxVolume">
               <span>SFX</span>
               <input id="sfxVolume" type="range" min="0" max="100" step="1" />
+            </label>
+            <label class="settings-row settings-toggle-row" for="guideBubbleSkipToggle">
+              <span>튜토리얼 말풍선 스킵</span>
+              <input id="guideBubbleSkipToggle" class="settings-switch-input" type="checkbox" />
+              <span class="settings-switch" aria-hidden="true"></span>
             </label>
             <button id="helpBtn" class="secondary" type="button">도움말</button>
             <button id="lobbyBtn" class="secondary" type="button">로비로 이동</button>
@@ -135,6 +141,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260708-mobile-layout"></script>
+  <script type="module" src="./js/game.js?v=20260709-skin-purchase"></script>
 </body>
 </html>

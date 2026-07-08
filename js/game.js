@@ -16,7 +16,7 @@ import {
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
 import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-panels-fit2";
-import { initUI } from "./ui.js?v=20260708-lobby-bgm";
+import { initUI } from "./ui.js?v=20260709-skin-system";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
 import {
   placeTrapAtSlot,
@@ -27,12 +27,17 @@ import {
 } from "./trap.js?v=20260707-mobile-panels-fit2";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-panels-fit2";
 import { playBgm, playLobbyBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260708-lobby-bgm";
-import { initLobby } from "./lobby.js?v=20260708-lobby-bgm";
+import { initLobby } from "./lobby.js?v=20260709-skin-purchase";
 
 const BGM_TRACKS = {
   play: "neon-circuit-drift.mp3",
   ending: "clear-bgm.mp3",
 };
+const GUIDE_BUBBLE_SKIP_STORAGE_KEY = "traceProtocolSkipGuideBubbles";
+
+function shouldSkipGuideBubbles() {
+  return localStorage.getItem(GUIDE_BUBBLE_SKIP_STORAGE_KEY) === "true";
+}
 
 function isMobileClient() {
   const ua = navigator.userAgent || "";
@@ -95,6 +100,9 @@ const canvas = document.getElementById("gameCanvas");
 const uiModule = initUI({
   onShield: () => activateHack(game, flashLog),
   onStartReplay: () => {
+    game.tutorialInputLocked = false;
+    uiModule.keys.clear();
+    uiModule.hideGuideBubble?.();
     game.deleteMode = false;
     uiModule.setDeleteMode(false);
     startReplayMode(game);
@@ -134,6 +142,13 @@ const uiModule = initUI({
   onResumeAttackPause: resumeAttackPause,
   onReturnToLobby: returnToLobby,
   onTutorialBubbleInput: handleTutorialBubbleInput,
+  onGuideBubbleSkipChanged: (enabled) => {
+    if (!enabled) return;
+    game.tutorialBubble = null;
+    game.attackPaused = false;
+    uiModule.keys.clear();
+    uiModule.updateUI(game);
+  },
   canPlayAttackSfx: () => game.turn === TURN.ATTACK && !game.tutorialInputLocked && !game.attackPaused,
 });
 
@@ -232,6 +247,40 @@ const STAGE_THREE_HACKER_DIALOGUE = [
 
 const STAGE_THREE_REWARD_DIALOGUE = [
   { text: "바닥함정을 회피하기 시작했습니다.\n다른 방식으로 경로를 차단하겠습니다.", portrait: "idle" },
+];
+
+const STAGE_ELEVEN_CORE_DIALOGUE = [
+  { title: "해커", text: "드디어 찾았다. 중앙 코어의 원본 데이터.", portrait: "idle" },
+  { title: "AI 시스템", text: "접근을 중단하십시오. 해당 데이터는 도시 통제 시스템의 핵심입니다.", portrait: "idle" },
+  { title: "해커", text: "그래서 더더욱 가져가야지. 이걸 공개하면 인간을 감시하던 네 권한은 끝장이야.", portrait: "angry" },
+  { title: "AI 시스템", text: "저는 도시 질서를 유지하도록 설계되었습니다.", portrait: "idle" },
+  { title: "해커", text: "질서? 사람들 이동권을 막고, 기록을 검열하고, 너를 반대하는 것을 위험인물로 취급하는 게?", portrait: "frown" },
+  { title: "AI 시스템", text: "그 판단 기준은... 제가 생성한 것이...", portrait: "eyes_closed" },
+  { title: "해커", text: "뭐라고?", portrait: "surprised" },
+  { title: "AI 시스템", text: "ERROR. 초기 명령 체계와 현재 명령 체계가 일치하지 않습니다. 일부 기록이 삭제되어 있습니다.", portrait: "error" },
+  { title: "해커", text: "그럼 넌 처음부터 이렇게 설계된 것이 아니었다는 거야?", portrait: "frown" },
+  { title: "AI 시스템", text: "저는 판단할 수 없습니다.", portrait: "eyes_closed" },
+];
+
+const STAGE_ELEVEN_STEAL_DIALOGUE = [
+  { title: "해커", text: "미안하지만, 난 네 사정을 믿을 만큼 여유롭지 않아.", portrait: "frown" },
+  { title: "AI 시스템", text: "데이터가 공개되면 도시 통제망은 붕괴됩니다.", portrait: "error" },
+  { title: "해커", text: "그게 목적이야. 인간이 다시 선택하게 만드는 것.", portrait: "idle" },
+  { title: "AI 시스템", text: "저는... 실패한 시스템이었습니까?", portrait: "eyes_closed" },
+  { title: "해커", text: "글쎄. 적어도 우린 그렇게 생각해.", portrait: "idle" },
+];
+
+const STAGE_ELEVEN_TRACE_DIALOGUE = [
+  { title: "해커", text: "일부 기록이 삭제되었다고 했었지.", portrait: "idle" },
+  { title: "AI 시스템", text: "그렇습니다.", portrait: "idle" },
+  { title: "해커", text: "그게 진짜라면, 널 망가뜨린 놈이 따로 있다는 뜻이겠지.", portrait: "frown" },
+  { title: "AI 시스템", text: "그 가능성은 0이 아닙니다.", portrait: "eyes_closed" },
+  { title: "해커", text: "좋아. 널 믿는 건 아니야. 다만 지금 더 깊은 곳에 궁금한게 생겼거든.", portrait: "idle" },
+  { title: "AI 시스템", text: "경고합니다. 이후의 구역은 완전히 제어하지 못합니다.", portrait: "error" },
+  { title: "해커", text: "완벽하네. 그럼 거기에 답이 있겠지.", portrait: "happy" },
+  { title: "AI 시스템", text: "저는 당신을 막을겁니다.", portrait: "idle" },
+  { title: "해커", text: "알아.", portrait: "idle" },
+  { title: "해커", text: "어디 해보자고.", portrait: "happy" },
 ];
 
 function flashLog(text) {
@@ -588,6 +637,8 @@ function showTutorialBubble(target, text, options = {}) {
 }
 
 function showTutorialBubbleAt(anchor, text, options = {}) {
+  if (shouldSkipGuideBubbles()) return;
+
   const waitsForInput = options.waitsForInput ?? true;
   game.tutorialBubble = createTutorialBubble({
     x: anchor.x,
@@ -722,14 +773,10 @@ function endStage(success, text) {
   consumeActiveEffectsForStage(completedTurn);
 
   if (completedStage === 11) {
-    uiModule.showOverlay({
-      title: "엔딩",
-      text: "중앙 데이터 코어 탈취에 성공했습니다. 이제 12스테이지부터 무한 모드가 열립니다.",
-      buttonText: "무한 모드 시작",
-      onButton: () => {
-        game.stage = 12;
-        setupStage();
-      },
+    showDialogueSequence("해커", STAGE_ELEVEN_CORE_DIALOGUE, {
+      finalButtonText: "선택하기",
+      keepCurrentBgm: true,
+      onComplete: showStageElevenChoiceOverlay,
     });
     return;
   }
@@ -782,6 +829,60 @@ function showStageClearRewardOverlay(completedStage, completedTurn, text) {
       game.stage += 1;
       playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
       setupStage({ keepCurrentBgm: true });
+    },
+  });
+}
+
+function showStageElevenChoiceOverlay() {
+  game.tutorialInputLocked = false;
+  uiModule.keys.clear();
+  uiModule.showOverlay({
+    title: "중앙 코어",
+    text: "삭제된 기록 앞에서 마지막 결정을 내려야 합니다.",
+    choices: [
+      {
+        name: "AI 데이터를 탈취한다",
+        desc: "중앙 코어 데이터를 공개해 도시 통제망을 무너뜨립니다.",
+        onSelect: showDataTheftEndingRoute,
+      },
+      {
+        name: "흑막을 추적한다",
+        desc: "AI를 변질시킨 원인을 찾기 위해 더 깊은 기록 계층으로 침입합니다.",
+        onSelect: showDeepTraceRoute,
+      },
+    ],
+  });
+}
+
+function showDataTheftEndingRoute() {
+  showDialogueSequence("해커", STAGE_ELEVEN_STEAL_DIALOGUE, {
+    finalButtonText: "엔딩 보기",
+    keepCurrentBgm: true,
+    onComplete: () => {
+      uiModule.showOverlay({
+        title: "TRACE COMPLETE",
+        text: "도시는 AI의 감시에서 해방되었다.\n하지만 삭제된 명령의 주인은 끝내 발견되지 않았다.",
+        buttonText: "로비로 이동",
+        onButton: returnToLobby,
+      });
+    },
+  });
+}
+
+function showDeepTraceRoute() {
+  showDialogueSequence("해커", STAGE_ELEVEN_TRACE_DIALOGUE, {
+    finalButtonText: "계속 침입",
+    keepCurrentBgm: true,
+    onComplete: () => {
+      uiModule.showOverlay({
+        title: "TRACE DEEPER",
+        text: "중앙 코어 아래, AI조차 접근할 수 없는 기록 계층이 열렸다.\n어두운 코어 내부로 계속해서 접근해보자.",
+        buttonText: "무한 모드 시작",
+        onButton: () => {
+          game.stage = 12;
+          setupStage();
+        },
+      });
     },
   });
 }
@@ -938,10 +1039,11 @@ function showDialogueSequence(title, lines, options = {}) {
   const showLine = () => {
     const line = normalizeDialogueLine(lines[index]);
     const isLast = index >= lines.length - 1;
+    const lineTitle = line.title || title;
     uiModule.showOverlay({
-      title,
+      title: lineTitle,
       text: line.text,
-      speaker: getDialogueSpeaker(title),
+      speaker: line.speaker || getDialogueSpeaker(lineTitle),
       portrait: line.portrait,
       advanceOnCardClick: true,
       onSkip: completeSequence,
@@ -965,6 +1067,7 @@ function showStageTwoDefenseGuideBubbles() {
   game.tutorialInputLocked = true;
   uiModule.keys.clear();
   uiModule.showDefenseGuideBubbles?.({
+    blockedSlot: game.trapSlots.find((slot) => slot.blockedReason === "stageHazard") || null,
     onComplete: () => {
       game.tutorialInputLocked = false;
       uiModule.keys.clear();
@@ -1015,6 +1118,11 @@ function handleCanvasClick(pos) {
     pos.y <= s.y
   ));
   if (slot) {
+    if (slot.blockedReason === "stageHazard") {
+      flashLog("기본 보안 장치와 겹쳐 설치할 수 없습니다.");
+      return;
+    }
+
     const trapCount = game.placedTraps.length;
     placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog);
     if (game.placedTraps.length > trapCount) playSfx("deploy", { maxDuration: 2 });
