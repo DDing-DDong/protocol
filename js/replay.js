@@ -30,8 +30,39 @@ export function createReplayHacker(game) {
   return {
     x: first.x,
     y: first.y,
-    w: 30,
+
+    w: first.w || 30,
     h: first.h || 54,
+
+    vx: first.vx || 0,
+    vy: first.vy || 0,
+
+    facing: first.facing || 1,
+
+    onGround: Boolean(first.onGround),
+
+    isSliding: Boolean(first.isSliding),
+
+    isDashing: Boolean(first.isDashing),
+
+    wallGrab: Boolean(first.wallGrab),
+
+    wallSide: first.wallSide || 0,
+
+    dashTime: first.dashTime || 0,
+
+    shield: Boolean(first.shield),
+
+    energy: first.energy || 0,
+
+    hp: 3,
+
+    glitchTime: 0,
+
+    trapCooldowns: new Map(),
+
+    triggeredTraps: new Set(),
+};
     vx: first.vx || 0,
     vy: first.vy || 0,
     facing: first.facing || 1,
@@ -46,43 +77,42 @@ export function createReplayHacker(game) {
 
 export function recordHacker(game, dt) {
   game.recordTimer += dt;
-
-while (game.recordTimer >= game.sampleStep) {
-
-    game.recordTimer -= game.sampleStep;
-
-    const h = game.hacker;
-
-    game.currentRecording.push({
-        t: getStageTime(game.stage) - game.timer,
-        x: h.x,
-        y: h.y,
-        h: h.h,
-        vx: h.vx,
-        vy: h.vy,
-        facing: h.facing,
-        onGround: h.onGround,
-        isSliding: Boolean(h.isSliding),
-        shield: h.shield,
-        energyUsed: game.metrics.energyUsed,
-    });
-
-}
+  if (game.recordTimer < game.sampleStep) return;
+  game.recordTimer = 0;
 
   const h = game.hacker;
-  game.currentRecording.push({
+game.currentRecording.push({
     t: getStageTime(game.stage) - game.timer,
+
     x: h.x,
     y: h.y,
+
+    w: h.w,
     h: h.h,
+
     vx: h.vx,
     vy: h.vy,
+
     facing: h.facing,
+
     onGround: h.onGround,
+
     isSliding: Boolean(h.isSliding),
-    shield: h.shield,
+
+    isDashing: Boolean(h.isDashing),
+
+    wallGrab: Boolean(h.wallGrab),
+
+    wallSide: h.wallSide,
+
+    dashTime: h.dashTime,
+
+    shield: Boolean(h.shield),
+
+    energy: h.energy,
+
     energyUsed: game.metrics.energyUsed,
-  });
+});
 }
 
 export function startReplay(game) {
@@ -125,55 +155,48 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
     return;
   }
 
-const path = game.lastAttackRecording;
-const sampleStep = game.sampleStep || 0.06;
+  const path = game.lastAttackRecording;
+  const sampleStep = game.sampleStep || 0.06;
+  game.replayStepTimer = (game.replayStepTimer || 0) + dt * REPLAY_PLAYBACK_SPEED;
+  if (game.replayStepTimer < sampleStep) return;
+  game.replayStepTimer = normalizeTime(game.replayStepTimer - sampleStep);
 
-game.replayStepTimer =
-    (game.replayStepTimer || 0) + dt * REPLAY_PLAYBACK_SPEED;
+  if (game.replayIndex >= path.length - 1) {
+    game.replayFinished = true;
+    const success = evaluateDefenseSuccess(game);
+    endStage(success, success ? "방어 목표를 달성했습니다." : "방어 목표를 모두 달성하지 못했습니다.");
+    return;
+  }
 
-// 샘플 이동
-while (game.replayStepTimer >= sampleStep) {
-    game.replayStepTimer -= sampleStep;
+  game.replayIndex += 1;
+  const sample = path[game.replayIndex];
+  r.x = sample.x;
+r.y = sample.y;
 
-    if (game.replayIndex < path.length - 2) {
-        game.replayIndex++;
-    } else {
-        game.replayFinished = true;
+r.w = sample.w || 30;
+r.h = sample.h || 54;
 
-        const success = evaluateDefenseSuccess(game);
+r.vx = sample.vx || 0;
+r.vy = sample.vy || 0;
 
-        endStage(
-            success,
-            success
-                ? "방어 목표를 달성했습니다."
-                : "방어 목표를 모두 달성하지 못했습니다."
-        );
+r.facing = sample.facing || r.facing;
 
-        return;
-    }
-}
+r.onGround = Boolean(sample.onGround);
 
-const current = path[game.replayIndex];
-const next = path[Math.min(game.replayIndex + 1, path.length - 1)];
+r.isSliding = Boolean(sample.isSliding);
 
-const t = game.replayStepTimer / sampleStep;
+r.isDashing = Boolean(sample.isDashing);
 
-r.x = lerp(current.x, next.x, t);
-r.y = lerp(current.y, next.y, t);
+r.wallGrab = Boolean(sample.wallGrab);
 
-r.h = lerp(current.h || 54, next.h || 54, t);
+r.wallSide = sample.wallSide || 0;
 
-r.vx = lerp(current.vx || 0, next.vx || 0, t);
-r.vy = lerp(current.vy || 0, next.vy || 0, t);
+r.dashTime = sample.dashTime || 0;
 
-r.facing = t < 0.5 ? current.facing : next.facing;
-r.onGround = t < 0.5 ? current.onGround : next.onGround;
-r.isSliding = t < 0.5 ? current.isSliding : next.isSliding;
+r.shield = Boolean(sample.shield);
 
-game.metrics.energyUsed = Math.max(
-    game.metrics.energyUsed,
-    current.energyUsed || 0
-);
+r.energy = sample.energy || 0;
+  game.metrics.energyUsed = Math.max(game.metrics.energyUsed, sample.energyUsed || 0);
 
   checkDefenseTraps(r, game, flashLog);
 
