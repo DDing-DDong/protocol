@@ -16,7 +16,7 @@ import {
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
 import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-panels-fit2";
-import { initUI } from "./ui.js?v=20260707-mobile-panels-fit2";
+import { initUI } from "./ui.js?v=20260708-lobby-bgm";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
 import {
   placeTrapAtSlot,
@@ -26,10 +26,10 @@ import {
   getTrapCost,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-panels-fit2";
-import { playBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260707-mobile-panels-fit2";
+import { playBgm, playLobbyBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260708-lobby-bgm";
+import { initLobby } from "./lobby.js?v=20260708-lobby-bgm";
 
 const BGM_TRACKS = {
-  lobby: "neon-protocol.mp3",
   play: "neon-circuit-drift.mp3",
   ending: "clear-bgm.mp3",
 };
@@ -50,10 +50,6 @@ function setupLandscapeOrientationLock() {
 }
 
 setupLandscapeOrientationLock();
-
-function playLobbyBgm() {
-  playBgm(BGM_TRACKS.lobby, { force: true });
-}
 
 function playGameplayBgmForTurn(turn) {
   if (turn === TURN.ATTACK || turn === TURN.DEFENSE_BUILD || turn === TURN.DEFENSE_REPLAY) {
@@ -105,6 +101,7 @@ const uiModule = initUI({
   onApplyReward: applyReward,
   onToggleAttackPause: toggleAttackPause,
   onResumeAttackPause: resumeAttackPause,
+  onReturnToLobby: returnToLobby,
   onTutorialBubbleInput: handleTutorialBubbleInput,
   canPlayAttackSfx: () => game.turn === TURN.ATTACK && !game.tutorialInputLocked && !game.attackPaused,
 });
@@ -155,6 +152,8 @@ let lastTime = performance.now();
 let selectedTrap = "laser";
 let selectedRotation = 90;
 let laserRotation = 90;
+let stageStarted = false;
+let lobbyModule = null;
 
 const STAGE_ONE_HACKER_DIALOGUE = [
   { text: "접속 성공. 외곽 서버실이 눈앞이야.", portrait: "idle" },
@@ -791,7 +790,7 @@ function updateBest(stage, success) {
 }
 
 function showHelp() {
-  if (game.tutorialInputLocked) return;
+  if (game.tutorialInputLocked && stageStarted) return;
   if (game.turn === TURN.ENDING) {
     flashLog("결과 화면에서는 보상 카드나 진행 버튼을 선택하세요.");
     return;
@@ -1006,10 +1005,16 @@ function maybeShowStageTwoReplayGuide() {
 }
 
 function resetGame() {
+  stageStarted = true;
   stopBgm();
   localStorage.removeItem("traceProtocolBest");
+  resetRunState({ clearBest: true });
+  setupStage();
+}
+
+function resetRunState({ clearBest = false } = {}) {
   game.stage = 1;
-  game.infiniteBest = 0;
+  if (clearBest) game.infiniteBest = 0;
   game.lastAttackRecording = [];
   game.carriedTrapsByStage.clear();
   game.activeEffects = [];
@@ -1019,18 +1024,43 @@ function resetGame() {
   game.tutorialFlags = createTutorialFlags();
   game.tutorialInputLocked = false;
   game.tutorialBubble = null;
-  setupStage();
 }
 
 function loop(now) {
   const dt = Math.min(0.033, (now - lastTime) / 1000);
   lastTime = now;
-  update(dt);
-  uiModule.draw(game);
+  if (stageStarted) {
+    update(dt);
+    uiModule.draw(game);
+  }
   requestAnimationFrame(loop);
+}
+
+function startMission() {
+  if (stageStarted) return;
+  stageStarted = true;
+  uiModule.setSettingsPanelOpen?.(false);
+  resetRunState();
+  setupStage();
+}
+
+function returnToLobby() {
+  stageStarted = false;
+  stopSfx("electric");
+  uiModule.keys.clear();
+  uiModule.hideOverlay();
+  uiModule.hideGuideBubble?.();
+  uiModule.setSettingsPanelOpen?.(false);
+  lobbyModule?.showLobby();
+  lobbyModule?.playLobbyBgm();
+  return true;
 }
 
 uiModule.bindEvents();
 uiModule.updateLaserDirection(laserRotation);
-setupStage();
+lobbyModule = initLobby({
+  onStart: startMission,
+  onHelp: showHelp,
+  onSettings: () => uiModule.setSettingsPanelOpen?.(true),
+});
 requestAnimationFrame(loop);

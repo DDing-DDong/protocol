@@ -20,6 +20,7 @@ const BGM_VOLUME_STORAGE_KEY = "protocol_bgm_volume";
 const SFX_VOLUME_STORAGE_KEY = "protocol_sfx_volume";
 const BGM_CACHE_VERSION = "";
 const DISABLED_BGM_FILES = new Set();
+const LOBBY_BGM_SRC = "neon-circuit-drift.mp3";
 
 const sfxPlayers = new Map();
 const sfxPlayTokens = new Map();
@@ -134,6 +135,10 @@ export function playBgm(src, options = {}) {
   pendingBgmSrc = src;
 
   playElementBgm(src);
+}
+
+export function playLobbyBgm() {
+  playBgm(LOBBY_BGM_SRC);
 }
 
 export function stopBgm() {
