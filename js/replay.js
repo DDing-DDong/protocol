@@ -46,8 +46,28 @@ export function createReplayHacker(game) {
 
 export function recordHacker(game, dt) {
   game.recordTimer += dt;
-  if (game.recordTimer < game.sampleStep) return;
-  game.recordTimer = 0;
+
+while (game.recordTimer >= game.sampleStep) {
+
+    game.recordTimer -= game.sampleStep;
+
+    const h = game.hacker;
+
+    game.currentRecording.push({
+        t: getStageTime(game.stage) - game.timer,
+        x: h.x,
+        y: h.y,
+        h: h.h,
+        vx: h.vx,
+        vy: h.vy,
+        facing: h.facing,
+        onGround: h.onGround,
+        isSliding: Boolean(h.isSliding),
+        shield: h.shield,
+        energyUsed: game.metrics.energyUsed,
+    });
+
+}
 
   const h = game.hacker;
   game.currentRecording.push({
@@ -105,30 +125,55 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
     return;
   }
 
-  const path = game.lastAttackRecording;
-  const sampleStep = game.sampleStep || 0.06;
-  game.replayStepTimer = (game.replayStepTimer || 0) + dt * REPLAY_PLAYBACK_SPEED;
-  if (game.replayStepTimer < sampleStep) return;
-  game.replayStepTimer = normalizeTime(game.replayStepTimer - sampleStep);
+const path = game.lastAttackRecording;
+const sampleStep = game.sampleStep || 0.06;
 
-  if (game.replayIndex >= path.length - 1) {
-    game.replayFinished = true;
-    const success = evaluateDefenseSuccess(game);
-    endStage(success, success ? "방어 목표를 달성했습니다." : "방어 목표를 모두 달성하지 못했습니다.");
-    return;
-  }
+game.replayStepTimer =
+    (game.replayStepTimer || 0) + dt * REPLAY_PLAYBACK_SPEED;
 
-  game.replayIndex += 1;
-  const sample = path[game.replayIndex];
-  r.x = sample.x;
-  r.y = sample.y;
-  r.h = sample.h || 54;
-  r.vx = sample.vx || 0;
-  r.vy = sample.vy || 0;
-  r.facing = sample.facing || r.facing;
-  r.onGround = Boolean(sample.onGround);
-  r.isSliding = Boolean(sample.isSliding);
-  game.metrics.energyUsed = Math.max(game.metrics.energyUsed, sample.energyUsed || 0);
+// 샘플 이동
+while (game.replayStepTimer >= sampleStep) {
+    game.replayStepTimer -= sampleStep;
+
+    if (game.replayIndex < path.length - 2) {
+        game.replayIndex++;
+    } else {
+        game.replayFinished = true;
+
+        const success = evaluateDefenseSuccess(game);
+
+        endStage(
+            success,
+            success
+                ? "방어 목표를 달성했습니다."
+                : "방어 목표를 모두 달성하지 못했습니다."
+        );
+
+        return;
+    }
+}
+
+const current = path[game.replayIndex];
+const next = path[Math.min(game.replayIndex + 1, path.length - 1)];
+
+const t = game.replayStepTimer / sampleStep;
+
+r.x = lerp(current.x, next.x, t);
+r.y = lerp(current.y, next.y, t);
+
+r.h = lerp(current.h || 54, next.h || 54, t);
+
+r.vx = lerp(current.vx || 0, next.vx || 0, t);
+r.vy = lerp(current.vy || 0, next.vy || 0, t);
+
+r.facing = t < 0.5 ? current.facing : next.facing;
+r.onGround = t < 0.5 ? current.onGround : next.onGround;
+r.isSliding = t < 0.5 ? current.isSliding : next.isSliding;
+
+game.metrics.energyUsed = Math.max(
+    game.metrics.energyUsed,
+    current.energyUsed || 0
+);
 
   checkDefenseTraps(r, game, flashLog);
 

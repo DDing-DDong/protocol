@@ -34,9 +34,39 @@ const BGM_TRACKS = {
   ending: "clear-bgm.mp3",
 };
 
+function isMobileClient() {
+  const ua = navigator.userAgent || "";
+  const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  const coarsePointer = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches;
+  const standalonePwa =
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    window.navigator.standalone === true;
+  const shortSide = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+  const longSide = Math.max(window.innerWidth || 0, window.innerHeight || 0);
+  const mobileSizedTouchScreen = Boolean(coarsePointer && shortSide <= 820 && longSide <= 1280);
+
+  return Boolean(mobileUA || mobileSizedTouchScreen || (coarsePointer && standalonePwa));
+}
+
+function setupMobileClientMode() {
+  const sync = () => {
+    const mobile = isMobileClient();
+    const landscape = window.innerWidth >= window.innerHeight;
+
+    document.body.classList.toggle("mobile-client", mobile);
+    document.body.classList.toggle("mobile-landscape", mobile && landscape);
+    document.body.classList.toggle("mobile-portrait", mobile && !landscape);
+    document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
+  };
+
+  sync();
+  window.addEventListener("resize", sync);
+  window.addEventListener("orientationchange", sync);
+}
+
 function setupLandscapeOrientationLock() {
   const canUseOrientationLock = () =>
-    window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches &&
+    document.body.classList.contains("mobile-client") &&
     screen.orientation?.lock;
 
   const requestLandscape = () => {
@@ -49,6 +79,7 @@ function setupLandscapeOrientationLock() {
   window.addEventListener("pointerdown", requestLandscape, { once: true });
 }
 
+setupMobileClientMode();
 setupLandscapeOrientationLock();
 
 function playGameplayBgmForTurn(turn) {

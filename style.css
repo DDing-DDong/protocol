@@ -2098,3 +2098,305 @@ kbd {
     max-width: min(calc(100dvw - var(--mobile-game-margin) * 2), calc((100dvh - var(--mobile-game-margin) * 2) * 16 / 9));
   }
 }
+
+body.mobile-client {
+  --mobile-game-margin: 0px;
+  width: 100dvw;
+  height: 100dvh;
+  min-height: var(--app-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+body.mobile-client #app {
+  width: 100dvw;
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow: hidden;
+}
+
+body.mobile-client .lobby-root {
+  width: 100dvw;
+  height: var(--app-height, 100dvh);
+}
+
+body.mobile-client .game-layout {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  display: block;
+}
+
+body.mobile-client .canvas-panel {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.mobile-client #gameCanvas {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  touch-action: none;
+}
+
+body.mobile-client .topbar {
+  position: absolute;
+  z-index: 100;
+  top: max(6px, env(safe-area-inset-top));
+  left: max(6px, env(safe-area-inset-left));
+  right: max(6px, env(safe-area-inset-right));
+  margin: 0;
+  flex-direction: row;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+body.mobile-client .topbar h1,
+body.mobile-client .topbar p,
+body.mobile-client #restartBtn {
+  display: none;
+}
+
+body.mobile-client .topbar-actions {
+  width: auto;
+  margin-left: auto;
+  pointer-events: auto;
+}
+
+body.mobile-client .topbar-actions button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 8px 10px;
+}
+
+body.mobile-client .settings-menu {
+  flex: 0 0 auto;
+}
+
+body.mobile-client .settings-panel {
+  width: min(236px, calc(100dvw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+
+body.mobile-client .side-panel {
+  display: none;
+}
+
+body.mobile-client .in-game-status {
+  position: absolute;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(118px, 0.9fr);
+  gap: 4px 6px;
+  margin: 0;
+  padding: 5px 7px;
+  min-height: 0;
+}
+
+body.mobile-client .in-game-status .meter,
+body.mobile-client .in-game-status .stat-row,
+body.mobile-client .status-log {
+  min-height: 0;
+  padding: 4px 6px;
+}
+
+body.mobile-client .in-game-status .meter-label {
+  margin-bottom: 2px;
+  font-size: 10px;
+}
+
+body.mobile-client .in-game-status .meter-bar {
+  height: 9px;
+  padding: 1px;
+}
+
+body.mobile-client .status-log > span {
+  display: none;
+}
+
+body.mobile-client .status-log .log-text {
+  max-height: 28px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+body.mobile-client .play-timer {
+  top: max(42px, calc(env(safe-area-inset-top) + 34px));
+  right: max(12px, env(safe-area-inset-right));
+  min-width: 96px;
+  min-height: 34px;
+  padding: 5px 6px;
+  justify-content: center;
+  gap: 7px;
+}
+
+body.mobile-client .play-timer span {
+  font-size: 11px;
+}
+
+body.mobile-client .play-timer strong {
+  font-size: 22px;
+}
+
+body.mobile-client .objective-hud {
+  top: max(56px, calc(env(safe-area-inset-top) + 46px));
+  left: max(12px, env(safe-area-inset-left));
+}
+
+body.mobile-client .objective-panel {
+  width: min(210px, calc(100dvh - 112px));
+  padding: 8px 9px;
+}
+
+body.mobile-client .defense-tools-hud {
+  top: max(42px, calc(env(safe-area-inset-top) + 36px));
+  right: max(12px, env(safe-area-inset-right));
+}
+
+body.mobile-client .defense-tools-panel {
+  width: min(390px, calc(100dvw - 24px));
+  max-height: calc(100dvh - 88px);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+body.mobile-client .attack-skills-hud {
+  top: max(82px, calc(env(safe-area-inset-top) + 76px));
+  right: max(12px, env(safe-area-inset-right));
+}
+
+body.mobile-client .mobile-controls:not(.hidden) {
+  position: absolute;
+  z-index: 22;
+  inset: auto 0 max(58px, calc(env(safe-area-inset-bottom) + 56px));
+  display: block;
+  pointer-events: none;
+}
+
+body.mobile-client .mobile-control-btn {
+  position: absolute;
+  border: 1px solid rgba(138, 242, 255, 0.62);
+  background: rgba(3, 8, 13, 0.48);
+  color: #e9f8ff;
+  box-shadow: 0 0 16px rgba(24, 224, 255, 0.18), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.mobile-client .mobile-control-btn.pressed {
+  background: rgba(24, 224, 255, 0.30);
+  border-color: #8af2ff;
+  color: #ffffff;
+  transform: scale(0.96);
+}
+
+body.mobile-client .mobile-action-pad {
+  position: absolute;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: 0;
+  display: flex;
+  gap: 9px;
+  height: 58px;
+  pointer-events: none;
+}
+
+body.mobile-client .mobile-action-btn {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+body.mobile-client .mobile-dpad {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: 0;
+  display: flex;
+  gap: 9px;
+  height: 58px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+body.mobile-client .mobile-dpad-center {
+  display: none;
+}
+
+body.mobile-client .mobile-dpad-btn {
+  position: relative;
+  width: 62px;
+  height: 58px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 31px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+body.mobile-client .dialogue-overlay {
+  padding: 8px 10px;
+}
+
+body.mobile-client .dialogue-overlay .overlay-card {
+  width: min(900px, calc(100% - 16px));
+  height: 92px;
+  min-height: 92px;
+  padding: 9px 11px 13px;
+}
+
+body.mobile-client .dialogue-overlay .overlay-card h2 {
+  font-size: 13px;
+}
+
+body.mobile-client .dialogue-portrait {
+  left: -3px;
+  bottom: calc(100% - 5px);
+  width: 112px;
+  height: 108px;
+}
+
+body.mobile-client .speaker-ai .overlay-card p,
+body.mobile-client .speaker-hacker .overlay-card p {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+body.mobile-client.mobile-portrait {
+  width: 100dvw;
+  height: 100dvh;
+}
+
+body.mobile-client.mobile-portrait #app {
+  width: 100dvh;
+  height: 100dvw;
+  min-height: 100dvw;
+  transform: rotate(-90deg) translateX(-100%);
+  transform-origin: top left;
+}
+
+body.mobile-client.mobile-portrait .lobby-root {
+  width: 100dvh;
+  height: 100dvw;
+  transform: rotate(-90deg) translateX(-100%);
+  transform-origin: top left;
+}
