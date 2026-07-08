@@ -9,9 +9,32 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260707-landscape" />
-  <link rel="stylesheet" href="./style.css?v=20260707-mobile-panels-fit2" />
+  <link rel="stylesheet" href="./style.css?v=20260708-lobby-bgm" />
 </head>
 <body>
+  <div id="lobbyRoot" class="lobby-root" aria-live="polite">
+    <section id="splashScreen" class="splash-screen" aria-label="Protocol initializing">
+      <div class="splash-content">
+        <p class="splash-kicker">CONNECTING...</p>
+        <h1>PROTOCOL</h1>
+        <p class="splash-status">INITIALIZING AI NETWORK</p>
+      </div>
+    </section>
+
+    <section id="lobbyScreen" class="lobby-screen hidden" aria-label="Protocol lobby">
+      <div class="lobby-panel">
+        <p class="lobby-kicker">ACCESS NODE</p>
+        <h1>PROTOCOL</h1>
+        <p class="lobby-status">Connected to AI Network</p>
+        <div class="lobby-actions">
+          <button id="lobbyStartBtn" class="lobby-button lobby-button-primary" type="button">START MISSION</button>
+          <button id="lobbyHelpBtn" class="lobby-button" type="button">HELP</button>
+          <button id="lobbySettingsBtn" class="lobby-button" type="button">SETTINGS</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div id="app">
     <header class="topbar">
       <div>
@@ -112,6 +135,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260707-mobile-panels-fit2"></script>
+  <script type="module" src="./js/game.js?v=20260708-lobby-bgm"></script>
 </body>
 </html>

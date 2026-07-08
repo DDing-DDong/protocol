@@ -77,6 +77,154 @@ button.secondary {
   border: 1px solid #2d516d;
 }
 
+.lobby-root {
+  position: fixed;
+  z-index: 160;
+  inset: 0;
+  overflow: hidden;
+  background: #03080d;
+}
+
+.splash-screen,
+.lobby-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: clamp(22px, 6vw, 84px);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.splash-screen {
+  justify-content: center;
+  text-align: center;
+  background-image:
+    linear-gradient(180deg, rgba(3, 8, 13, 0.22), rgba(3, 8, 13, 0.74)),
+    url("./assets/images/Background_image/citiview.png");
+}
+
+.lobby-screen {
+  justify-content: flex-start;
+  background-image:
+    linear-gradient(90deg, rgba(3, 8, 13, 0.9), rgba(3, 8, 13, 0.44) 48%, rgba(3, 8, 13, 0.1)),
+    url("./assets/images/Background_image/lobby.png");
+}
+
+.splash-content,
+.lobby-panel {
+  position: relative;
+  max-width: min(520px, 100%);
+}
+
+.splash-content::before,
+.lobby-panel::before {
+  content: "";
+  position: absolute;
+  inset: -18px;
+  z-index: -1;
+  border: 1px solid rgba(24, 224, 255, 0.28);
+  background: linear-gradient(180deg, rgba(3, 16, 24, 0.68), rgba(3, 8, 13, 0.32));
+  box-shadow: 0 0 34px rgba(24, 224, 255, 0.14), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+}
+
+.splash-kicker,
+.splash-status,
+.lobby-kicker,
+.lobby-status {
+  margin: 0;
+  color: #9fefff;
+  font-size: clamp(13px, 2vw, 18px);
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-shadow: 0 0 14px rgba(24, 224, 255, 0.46);
+}
+
+.splash-content h1,
+.lobby-panel h1 {
+  margin: 10px 0;
+  color: #e9f8ff;
+  font-size: clamp(48px, 10vw, 116px);
+  line-height: 0.9;
+  letter-spacing: 5px;
+  text-shadow: 0 0 18px rgba(24, 224, 255, 0.68), 4px 0 0 rgba(255, 68, 106, 0.34);
+}
+
+.lobby-panel h1 {
+  font-size: clamp(52px, 8vw, 104px);
+}
+
+.lobby-actions {
+  display: grid;
+  gap: 12px;
+  width: min(330px, 100%);
+  margin-top: 32px;
+}
+
+.lobby-button {
+  min-height: 52px;
+  border: 1px solid rgba(24, 224, 255, 0.42);
+  border-radius: 4px;
+  background: rgba(7, 22, 34, 0.86);
+  color: #e9f8ff;
+  box-shadow: inset 0 0 0 1px rgba(233, 248, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.28);
+  letter-spacing: 1px;
+}
+
+.lobby-button-primary {
+  background: linear-gradient(90deg, #18e0ff, #27ffc8);
+  color: #031018;
+  box-shadow: 0 0 24px rgba(24, 224, 255, 0.28);
+}
+
+body.lobby-active .topbar,
+body.lobby-modal-open .topbar {
+  display: none;
+}
+
+body.lobby-active.lobby-settings-open .topbar {
+  display: flex;
+  z-index: 220;
+}
+
+body.lobby-active.lobby-settings-open .topbar > div:first-child,
+body.lobby-active.lobby-settings-open #restartBtn,
+body.lobby-active.lobby-settings-open #pauseAttackBtn {
+  display: none;
+}
+
+body.lobby-active.lobby-settings-open .topbar-actions {
+  margin-left: auto;
+}
+
+body.lobby-active .side-panel,
+body.lobby-active #gameCanvas,
+body.lobby-active .in-game-status,
+body.lobby-active .play-timer,
+body.lobby-active #empowerPreview,
+body.lobby-active #objectiveHud,
+body.lobby-active #defenseTools,
+body.lobby-active #attackSkills,
+body.lobby-active #mobileControls {
+  visibility: hidden;
+}
+
+body.lobby-active .canvas-panel {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.lobby-active .game-layout {
+  pointer-events: none;
+}
+
+body.lobby-modal-open .game-layout,
+body.lobby-active.lobby-settings-open .topbar {
+  pointer-events: auto;
+}
+
 #app {
   min-height: 100vh;
   padding: 18px;
@@ -1439,6 +1587,19 @@ kbd {
 
   .settings-panel {
     right: 0;
+  }
+
+  .lobby-screen {
+    align-items: flex-end;
+    padding-bottom: 28px;
+  }
+
+  .lobby-actions {
+    width: 100%;
+  }
+
+  .lobby-button {
+    min-height: 58px;
   }
 
   .side-panel {

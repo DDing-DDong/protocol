@@ -19,7 +19,7 @@ import {
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260707-mobile-panels-fit2";
+import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260708-lobby-bgm";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -239,6 +239,9 @@ export function initUI(callbacks) {
     settingsPanelOpen = Boolean(open);
     ui.settingsBtn?.setAttribute("aria-expanded", settingsPanelOpen ? "true" : "false");
     ui.settingsPanel?.classList.toggle("hidden", !settingsPanelOpen);
+    document.dispatchEvent(new CustomEvent("protocol:settings-panel-toggle", {
+      detail: { open: settingsPanelOpen },
+    }));
   }
 
   function prepareStatusBar(ui) {
@@ -2546,6 +2549,7 @@ export function initUI(callbacks) {
     ui.lobbyBtn?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (callbacks.onReturnToLobby?.()) return;
       setLog("로비 기능은 추후 추가 예정입니다.");
     });
 
@@ -2634,6 +2638,7 @@ export function initUI(callbacks) {
     setLog,
     updateLaserDirection,
     setDeleteMode,
+    setSettingsPanelOpen,
   };
 }
 
