@@ -1006,6 +1006,7 @@ function maybeShowStageTwoReplayGuide() {
 }
 
 function resetGame() {
+  stopBgm();
   localStorage.removeItem("traceProtocolBest");
   game.stage = 1;
   game.infiniteBest = 0;

@@ -24,16 +24,19 @@ const DISABLED_BGM_FILES = new Set();
 const sfxPlayers = new Map();
 const sfxPlayTokens = new Map();
 const bgmPlayers = new Map();
+const bgmPlayPromises = new Map();
 const audioBuffers = new Map();
 const activeBufferSources = new Map();
 let sfxVolume = loadStoredVolume(SFX_VOLUME_STORAGE_KEY, DEFAULT_SFX_VOLUME);
 let bgmVolume = loadStoredVolume(BGM_VOLUME_STORAGE_KEY, DEFAULT_BGM_VOLUME);
 let currentBgmSrc = "";
 let pendingBgmSrc = "";
+let bgmPreloaded = false;
 let audioUnlocked = false;
 let audioContext = null;
 
 export function unlockAudio() {
+  if (audioUnlocked) return;
   audioUnlocked = true;
   getAudioContext()?.resume?.();
   preloadAudioBuffers();
@@ -118,6 +121,16 @@ export function playBgm(src, options = {}) {
     pendingBgmSrc = "";
     return;
   }
+
+  if (isSameBgmActive(src)) {
+    const player = bgmPlayers.get(src);
+    if (player) {
+      player.loop = true;
+      player.volume = bgmVolume;
+    }
+    return;
+  }
+
   pendingBgmSrc = src;
 
   playElementBgm(src);
@@ -173,8 +186,9 @@ function getAudioUrl(src, baseUrl, cacheVersion = "") {
 function playElementBgm(src) {
   const player = getBgmPlayer(src);
 
-  if (currentBgmSrc === src && !player.paused) {
+  if (currentBgmSrc === src && (!player.paused || isBgmPlayPending(src))) {
     player.volume = bgmVolume;
+    player.loop = true;
     return;
   }
 
@@ -191,23 +205,38 @@ function playElementBgm(src) {
 function retryCurrentBgm() {
   const src = currentBgmSrc || pendingBgmSrc;
   if (!src) return;
+  if (isBgmPlayPending(src)) return;
   const player = getBgmPlayer(src);
   if (!player.paused) return;
+  player.loop = true;
   player.volume = bgmVolume;
   playAudioElement(player, src);
 }
 
 function playAudioElement(audio, src) {
-  audio.play().then(() => {
-    // Playback started.
-  }).catch((error) => {
-    if (audioUnlocked) console.warn("BGM play blocked or failed:", src, error);
-  });
+  if (isBgmPlayPending(src)) return;
+
+  const playPromise = audio.play()
+    .then(() => {
+      if (bgmPlayPromises.get(src) === playPromise) {
+        bgmPlayPromises.delete(src);
+      }
+    })
+    .catch((error) => {
+      if (bgmPlayPromises.get(src) === playPromise) {
+        bgmPlayPromises.delete(src);
+      }
+      if (shouldWarnBgmPlayError(error, src)) console.warn("BGM play blocked or failed:", src, error);
+    });
+
+  bgmPlayPromises.set(src, playPromise);
 }
 
 function preloadBgm() {
-  if (pendingBgmSrc) getBgmPlayer(pendingBgmSrc).load();
+  if (bgmPreloaded) return;
+  bgmPreloaded = true;
   for (const src of ["neon-protocol.mp3", "neon-circuit-drift.mp3", "clear-bgm.mp3"]) {
+    if (src === currentBgmSrc || src === pendingBgmSrc) continue;
     getBgmPlayer(src).load();
   }
 }
@@ -303,11 +332,35 @@ function getAudioContext() {
 }
 
 function stopAudio(audio) {
+  forgetBgmPlayPromise(audio);
   audio.pause();
   try {
     audio.currentTime = 0;
   } catch {
     // Some missing or not-yet-ready files can reject seeking.
+  }
+}
+
+function isSameBgmActive(src) {
+  if (currentBgmSrc !== src && pendingBgmSrc !== src) return false;
+  const player = bgmPlayers.get(src);
+  if (!player) return false;
+  return !player.paused || isBgmPlayPending(src) || !audioUnlocked;
+}
+
+function isBgmPlayPending(src) {
+  return bgmPlayPromises.has(src);
+}
+
+function shouldWarnBgmPlayError(error, src) {
+  if (!audioUnlocked) return false;
+  if (error?.name === "AbortError") return false;
+  return currentBgmSrc === src;
+}
+
+function forgetBgmPlayPromise(audio) {
+  for (const [src, player] of bgmPlayers.entries()) {
+    if (player === audio) bgmPlayPromises.delete(src);
   }
 }
 
