@@ -313,6 +313,10 @@ export function initUI(callbacks) {
   let empowerPreviewGuideShown = false;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
+  let reopenTrapToolsAfterMapAction = false;
+  let reopenTrapToolsTimer = null;
+  let selectedTrapPreview = null;
+  let pointerTrapPreviewPos = null;
   let attackSkillsPanelOpen = false;
   let settingsPanelOpen = false;
   const keys = new Set();
@@ -645,7 +649,13 @@ export function initUI(callbacks) {
       ? String(game.defenseBudget)
       : game.turn === TURN.DEFENSE_REPLAY ? "리플레이 중" : "-";
     const showDefenseTools = game.turn === TURN.DEFENSE_BUILD;
-    if (!showDefenseTools) trapToolsPanelOpen = false;
+    if (!showDefenseTools) {
+      trapToolsPanelOpen = false;
+      reopenTrapToolsAfterMapAction = false;
+      clearTrapToolsReopenTimer();
+      selectedTrapPreview = null;
+      pointerTrapPreviewPos = null;
+    }
     ui.defenseTools?.classList.toggle("hidden", !showDefenseTools);
     ui.trapToolsToggle?.setAttribute("aria-expanded", showDefenseTools && trapToolsPanelOpen ? "true" : "false");
     ui.trapToolsPanel?.classList.toggle("hidden", !showDefenseTools || !trapToolsPanelOpen);
@@ -1041,9 +1051,37 @@ export function initUI(callbacks) {
   }
 
   function openTrapToolsPanel() {
-    trapToolsPanelOpen = true;
-    ui.trapToolsToggle?.setAttribute("aria-expanded", "true");
-    ui.trapToolsPanel?.classList.remove("hidden");
+    setTrapToolsPanelOpen(true);
+  }
+
+  function setTrapToolsPanelOpen(open) {
+    if (open) clearTrapToolsReopenTimer();
+    trapToolsPanelOpen = Boolean(open);
+    ui.trapToolsToggle?.setAttribute("aria-expanded", trapToolsPanelOpen ? "true" : "false");
+    ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
+  }
+
+  function closeTrapToolsForMapAction() {
+    if (!trapToolsPanelOpen) return;
+    clearTrapToolsReopenTimer();
+    reopenTrapToolsAfterMapAction = true;
+    setTrapToolsPanelOpen(false);
+  }
+
+  function restoreTrapToolsAfterMapAction() {
+    if (!reopenTrapToolsAfterMapAction) return;
+    reopenTrapToolsAfterMapAction = false;
+    clearTrapToolsReopenTimer();
+    reopenTrapToolsTimer = window.setTimeout(() => {
+      reopenTrapToolsTimer = null;
+      setTrapToolsPanelOpen(true);
+    }, 650);
+  }
+
+  function clearTrapToolsReopenTimer() {
+    if (!reopenTrapToolsTimer) return;
+    window.clearTimeout(reopenTrapToolsTimer);
+    reopenTrapToolsTimer = null;
   }
 
   function openObjectivePanel() {
@@ -1054,11 +1092,11 @@ export function initUI(callbacks) {
 
   function closeDefenseGuidePanels() {
     objectivePanelOpen = false;
-    trapToolsPanelOpen = false;
+    reopenTrapToolsAfterMapAction = false;
+    clearTrapToolsReopenTimer();
+    setTrapToolsPanelOpen(false);
     ui.objectiveToggle?.setAttribute("aria-expanded", "false");
     ui.objectivePanel?.classList.add("hidden");
-    ui.trapToolsToggle?.setAttribute("aria-expanded", "false");
-    ui.trapToolsPanel?.classList.add("hidden");
   }
 
   function createCanvasPointGuideTarget(x, y) {
@@ -1181,16 +1219,25 @@ export function initUI(callbacks) {
     const targetCenter = targetRect.left + targetRect.width / 2;
 
     if (mobileClient) {
-      const left = targetCenter;
-      const top = targetRect.bottom + 10;
+      const minLeft = halfWidth + margin;
+      const maxLeft = Math.max(minLeft, hostWidth - halfWidth - margin);
+      const left = clampNumber(targetCenter, minLeft, maxLeft);
+      const belowTop = targetRect.bottom + 10;
+      const aboveTop = targetRect.top - bubbleRect.height - 10;
+      const canFitBelow = belowTop + bubbleRect.height <= hostHeight - margin;
+      const canFitAbove = aboveTop >= margin;
+      const placeAbove = !canFitBelow && canFitAbove;
+      const preferredTop = placeAbove ? aboveTop : belowTop;
+      const maxTop = Math.max(margin, hostHeight - bubbleRect.height - margin);
+      const top = clampNumber(preferredTop, margin, maxTop);
       const arrowMin = Math.min(16, bubbleRect.width / 2);
       const arrowMax = Math.max(arrowMin, bubbleRect.width - arrowMin);
-      const arrowX = clampNumber(bubbleRect.width / 2, arrowMin, arrowMax);
+      const arrowX = clampNumber(targetCenter - (left - bubbleRect.width / 2), arrowMin, arrowMax);
 
       bubble.style.left = `${left}px`;
       bubble.style.top = `${top}px`;
       bubble.style.setProperty("--bubble-arrow-x", `${arrowX}px`);
-      bubble.classList.remove("above-target");
+      bubble.classList.toggle("above-target", placeAbove);
       return;
     }
 
@@ -1322,6 +1369,7 @@ export function initUI(callbacks) {
       drawSafely(ctx, () => drawReplayPath(ctx, game?.lastAttackRecording));
       drawSafely(ctx, () => drawTrapSlots(ctx, game?.trapSlots));
       drawSafely(ctx, () => drawPlacedTraps(ctx, game?.placedTraps, game));
+      drawSafely(ctx, () => drawSelectedTrapPreview(ctx, game));
     }
 
     if (game?.turn === TURN.ATTACK && game.hacker) {
@@ -1983,6 +2031,43 @@ export function initUI(callbacks) {
       if (trap.type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h, trap);
       if (trap.empowered) drawEmpoweredMark(ctx, box);
     }
+  }
+
+  function drawSelectedTrapPreview(ctx, game) {
+    if (!pointerTrapPreviewPos || trapToolsPanelOpen) return;
+    if (game?.turn !== TURN.DEFENSE_BUILD || game?.deleteMode) return;
+
+    const type = selectedTrapPreview?.type;
+    if (!TRAPS[type]) return;
+
+    const trap = {
+      type,
+      rotation: selectedTrapPreview.rotation,
+      x: pointerTrapPreviewPos.x,
+      y: pointerTrapPreviewPos.y,
+      empowered: false,
+      closed: false,
+    };
+    const box = getOrientedTrapBox(trap, game);
+
+    ctx.save();
+    ctx.globalAlpha = 0.72;
+    ctx.shadowColor = TRAPS[type].color || "#27ffc8";
+    ctx.shadowBlur = 14;
+    if (type === "laser") drawLaser(ctx, box.x, box.y, box.w, box.h, trap);
+    if (type === "shock") drawShock(ctx, box.x, box.y, box.w, box.h, trap);
+    if (type === "camera") drawCamera(ctx, box.x, box.y, box.w, box.h, trap);
+    if (type === "firewall") drawFirewall(ctx, box.x, box.y, box.w, box.h, false);
+    if (type === "emp") drawEmp(ctx, box.x, box.y, box.w, box.h, trap);
+
+    ctx.globalAlpha = 0.95;
+    ctx.shadowBlur = 0;
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = TRAPS[type].color || "#27ffc8";
+    roundRect(ctx, box.x - 5, box.y - 5, box.w + 10, box.h + 10, 6);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawTrapEffects(ctx, placedTraps, game) {
@@ -2782,6 +2867,7 @@ export function initUI(callbacks) {
       btn.classList.toggle("selected", btn.dataset.trap === type);
     }
     const rotation = callbacks.onTrapSelected(type, wasSelected);
+    selectedTrapPreview = { type, rotation: Number(rotation) || 0 };
     if (type === "laser") updateLaserDirection(rotation);
   }
 
@@ -2834,6 +2920,18 @@ export function initUI(callbacks) {
 
     window.addEventListener("keyup", (event) => keys.delete(event.code));
 
+    canvas.addEventListener("pointermove", (event) => {
+      pointerTrapPreviewPos = getCanvasPos(event);
+    });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      pointerTrapPreviewPos = getCanvasPos(event);
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      pointerTrapPreviewPos = null;
+    });
+
     canvas.addEventListener("click", (event) =>
       callbacks.onCanvasClick(getCanvasPos(event))
     );
@@ -2860,10 +2958,11 @@ export function initUI(callbacks) {
       callbacks.onStartReplay
     );
 
-    ui.deleteTrapBtn.addEventListener(
-      "click",
-      () => setDeleteMode(callbacks.onDeleteTrapMode())
-    );
+    ui.deleteTrapBtn.addEventListener("click", () => {
+      const active = callbacks.onDeleteTrapMode();
+      setDeleteMode(active);
+      if (active) closeTrapToolsForMapAction();
+    });
 
     ui.pauseAttackBtn.addEventListener("click", (event) => {
       event.preventDefault();
@@ -2882,9 +2981,9 @@ export function initUI(callbacks) {
     ui.trapToolsToggle?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      trapToolsPanelOpen = !trapToolsPanelOpen;
-      ui.trapToolsToggle.setAttribute("aria-expanded", trapToolsPanelOpen ? "true" : "false");
-      ui.trapToolsPanel?.classList.toggle("hidden", !trapToolsPanelOpen);
+      reopenTrapToolsAfterMapAction = false;
+      clearTrapToolsReopenTimer();
+      setTrapToolsPanelOpen(!trapToolsPanelOpen);
     });
 
     ui.trapToolsPanel?.addEventListener("click", (event) => {
@@ -2949,9 +3048,10 @@ export function initUI(callbacks) {
     });
 
     for (const btn of document.querySelectorAll(".trap-btn")) {
-      btn.addEventListener("click", () =>
-        selectTrap(btn.dataset.trap)
-      );
+      btn.addEventListener("click", () => {
+        selectTrap(btn.dataset.trap);
+        if (!guideBubble) closeTrapToolsForMapAction();
+      });
     }
   }
 
@@ -3034,6 +3134,7 @@ export function initUI(callbacks) {
     updateLaserDirection,
     setDeleteMode,
     setSettingsPanelOpen,
+    restoreTrapToolsAfterMapAction,
   };
 }
 
