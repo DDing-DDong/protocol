@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260709-skin-purchase" />
+  <link rel="stylesheet" href="./style.css?v=20260709-playframe-status" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -37,39 +37,34 @@
   </div>
 
   <div id="app">
-    <header class="topbar">
-      <div>
-        <h1>TRACE PROTOCOL</h1>
-        <p id="subtitle">해커 공격과 AI 방어를 번갈아 진행하는 샘플 MVP</p>
-      </div>
-      <div class="topbar-actions">
-        <button id="restartBtn" class="secondary" type="button">처음부터</button>
-        <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
-        <div class="settings-menu">
-          <button id="settingsBtn" class="secondary icon-btn settings-toggle" type="button" aria-label="설정" aria-expanded="false">⚙</button>
-          <div id="settingsPanel" class="settings-panel hidden" aria-label="설정 패널">
-            <label class="settings-row" for="bgmVolume">
-              <span>BGM</span>
-              <input id="bgmVolume" type="range" min="0" max="100" step="1" />
-            </label>
-            <label class="settings-row" for="sfxVolume">
-              <span>SFX</span>
-              <input id="sfxVolume" type="range" min="0" max="100" step="1" />
-            </label>
-            <label class="settings-row settings-toggle-row" for="guideBubbleSkipToggle">
-              <span>튜토리얼 말풍선 스킵</span>
-              <input id="guideBubbleSkipToggle" class="settings-switch-input" type="checkbox" />
-              <span class="settings-switch" aria-hidden="true"></span>
-            </label>
-            <button id="helpBtn" class="secondary" type="button">도움말</button>
-            <button id="lobbyBtn" class="secondary" type="button">로비로 이동</button>
-          </div>
-        </div>
-      </div>
-    </header>
-
     <main class="game-layout">
       <section class="canvas-panel">
+        <header class="topbar">
+          <div class="topbar-actions">
+            <button id="restartBtn" class="secondary" type="button">처음부터</button>
+            <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
+            <div class="settings-menu">
+              <button id="settingsBtn" class="secondary icon-btn settings-toggle" type="button" aria-label="설정" aria-expanded="false">⚙</button>
+              <div id="settingsPanel" class="settings-panel hidden" aria-label="설정 패널">
+                <label class="settings-row" for="bgmVolume">
+                  <span>BGM</span>
+                  <input id="bgmVolume" type="range" min="0" max="100" step="1" />
+                </label>
+                <label class="settings-row" for="sfxVolume">
+                  <span>SFX</span>
+                  <input id="sfxVolume" type="range" min="0" max="100" step="1" />
+                </label>
+                <label class="settings-row settings-toggle-row" for="guideBubbleSkipToggle">
+                  <span>튜토리얼 말풍선 스킵</span>
+                  <input id="guideBubbleSkipToggle" class="settings-switch-input" type="checkbox" />
+                  <span class="settings-switch" aria-hidden="true"></span>
+                </label>
+                <button id="helpBtn" class="secondary" type="button">도움말</button>
+                <button id="lobbyBtn" class="secondary" type="button">로비로 이동</button>
+              </div>
+            </div>
+          </div>
+        </header>
         <canvas id="gameCanvas" width="1200" height="540"></canvas>
         <div id="empowerPreview" class="empower-preview hidden" aria-live="polite"></div>
         <div id="objectiveHud" class="objective-hud hidden">
