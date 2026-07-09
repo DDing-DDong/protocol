@@ -29,6 +29,7 @@ const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
 const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
+const BACKGROUND_IMAGE_BASE_URL = new URL("../assets/images/Background_image/", import.meta.url);
 const ASSET_VERSION = "20260707-mobile-panels-fit2";
 const TRAP_IMAGE_FILES = {
   laser: "laser.png",
@@ -48,6 +49,14 @@ const STAGE_IMAGE_FILES = {
   checkpoint1: "checkpoint-.png",
   checkpoint2: "checkpoint2-.png",
 };
+const STAGE_BACKGROUNDS = {
+  default: "stage",
+  final: "stage11",
+};
+const BACKGROUND_IMAGE_FILES = {
+  stage: "stage.png",
+  stage11: "11stage.png",
+};
 const GROUND_TILE_PATTERN = [
   "tile1", "tile1", "tile2", "tile1", "tile1",
   "tile2", "tile1", "tile1", "tile1", "tile2",
@@ -55,6 +64,7 @@ const GROUND_TILE_PATTERN = [
 const CHECKPOINT_FRAME_SECONDS = 0.65;
 const trapImages = createTrapImages();
 const stageImages = createStageImages();
+const backgroundImages = createBackgroundImages();
 const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
 const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
 const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
@@ -165,6 +175,18 @@ function createStageImages() {
   for (const [key, file] of Object.entries(STAGE_IMAGE_FILES)) {
     const image = new Image();
     const url = new URL(file, STAGE_IMAGE_BASE_URL);
+    url.searchParams.set("v", ASSET_VERSION);
+    image.src = url.href;
+    images[key] = image;
+  }
+  return images;
+}
+
+function createBackgroundImages() {
+  const images = {};
+  for (const [key, file] of Object.entries(BACKGROUND_IMAGE_FILES)) {
+    const image = new Image();
+    const url = new URL(file, BACKGROUND_IMAGE_BASE_URL);
     url.searchParams.set("v", ASSET_VERSION);
     image.src = url.href;
     images[key] = image;
@@ -1343,11 +1365,42 @@ export function initUI(callbacks) {
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+    if (drawMappedStageBackground(ctx, stage)) {
+      ctx.restore();
+      return;
+    }
+
     drawFarLayer(ctx, visualTheme, colors);
     drawMidLayer(ctx, visualTheme, colors);
     drawFrontLayer(ctx, visualTheme, colors);
     drawFxLayer(ctx, visualTheme, colors);
     ctx.restore();
+  }
+
+  function drawMappedStageBackground(ctx, stage) {
+    const backgroundKey = getStageBackgroundKey(stage);
+    const image = backgroundImages[backgroundKey];
+    if (!isImageReady(image)) return false;
+
+    const scale = Math.min(
+      CANVAS_WIDTH / image.naturalWidth,
+      CANVAS_HEIGHT / image.naturalHeight
+    );
+    const drawW = image.naturalWidth * scale;
+    const drawH = image.naturalHeight * scale;
+    const x = (CANVAS_WIDTH - drawW) / 2;
+    const y = (CANVAS_HEIGHT - drawH) / 2;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, x, y, drawW, drawH);
+    ctx.restore();
+    return true;
+  }
+
+  function getStageBackgroundKey(stage) {
+    return Number(stage) === 11 ? STAGE_BACKGROUNDS.final : STAGE_BACKGROUNDS.default;
   }
 
   function getStageVisualTheme(stage, stageData) {
