@@ -344,22 +344,20 @@ export function initUI(callbacks) {
 
   function prepareStatusBar(ui) {
     const statusBar = document.querySelector(".in-game-status");
+    const canvasPanel = document.querySelector(".canvas-panel");
     if (!statusBar) return;
 
     statusBar.querySelectorAll(".stat-stage, .stat-turn, .stat-objective")
       .forEach((node) => node.remove());
 
-    if (!ui.logText || ui.logText.closest(".in-game-status")) return;
+    if (!ui.logText || ui.logText.closest(".status-log")) return;
 
     const oldLogPanel = ui.logText.closest(".panel-block");
     const logBox = document.createElement("div");
     logBox.className = "status-log";
+    logBox.append(ui.logText);
 
-    const label = document.createElement("span");
-    label.textContent = "로그";
-    logBox.append(label, ui.logText);
-
-    statusBar.append(logBox);
+    (canvasPanel || statusBar).append(logBox);
     oldLogPanel?.remove();
   }
 
@@ -794,56 +792,8 @@ export function initUI(callbacks) {
   function updateEmpowerPreview(game) {
     if (!ui.empowerPreview) return;
 
-    const isAttack = game.turn === TURN.ATTACK;
-    const isDefense = game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY;
-    const targets = isAttack ? (game.baseHazards || []) : isDefense ? (game.placedTraps || []) : [];
-    const previewTraps = isAttack
-      ? previewNextHazardsByPlacementOrder(game)
-      : isDefense ? previewNextTrapsByPlacementOrder(game) : [];
-    const visible = (isAttack || isDefense) && targets.length > 0;
-
-    ui.empowerPreview.classList.toggle("hidden", !visible);
+    ui.empowerPreview.classList.add("hidden");
     ui.empowerPreview.replaceChildren();
-    if (!visible) return;
-
-    const label = document.createElement("span");
-    label.className = "empower-preview-label";
-    label.textContent = "다음 강화";
-    ui.empowerPreview.appendChild(label);
-
-    if (previewTraps.length === 0) {
-      const empty = document.createElement("span");
-      empty.className = "empower-summary";
-      empty.textContent = "대상 없음";
-      ui.empowerPreview.appendChild(empty);
-      maybeShowPendingEmpowerPreviewGuide();
-      return;
-    }
-
-    if (previewTraps.length <= 2) {
-      const icons = document.createElement("span");
-      icons.className = "empower-icons";
-
-      for (const trap of previewTraps) {
-        const icon = createTrapIcon(trap.type);
-        icon.dataset.tooltip = TRAPS[trap.type].name;
-        icon.tabIndex = 0;
-        icon.setAttribute("aria-label", TRAPS[trap.type].name);
-        icons.appendChild(icon);
-      }
-
-      ui.empowerPreview.appendChild(icons);
-      maybeShowPendingEmpowerPreviewGuide();
-      return;
-    }
-
-    const summary = document.createElement("span");
-    summary.className = "empower-summary";
-    summary.textContent = summarizeTrapTypes(previewTraps);
-    summary.dataset.tooltip = summarizeTrapTypes(previewTraps);
-    summary.tabIndex = 0;
-    ui.empowerPreview.appendChild(summary);
-    maybeShowPendingEmpowerPreviewGuide();
   }
 
   function updateDefenseObjectiveHUD(game) {

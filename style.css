@@ -332,6 +332,7 @@ body.lobby-active.lobby-settings-open .topbar-actions {
 body.lobby-active .side-panel,
 body.lobby-active #gameCanvas,
 body.lobby-active .in-game-status,
+body.lobby-active .status-log,
 body.lobby-active .play-timer,
 body.lobby-active #empowerPreview,
 body.lobby-active #objectiveHud,
@@ -1051,16 +1052,17 @@ body.lobby-active.lobby-settings-open .topbar {
 
 .in-game-status {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 36px));
   z-index: 18;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   align-items: center;
-  gap: 8px 12px;
+  gap: 4px;
   margin: 0;
-  padding: 10px 12px;
+  padding: 6px 10px;
   background: linear-gradient(180deg, rgba(11, 26, 39, 0.96), rgba(5, 14, 22, 0.96));
   border-color: rgba(154, 199, 214, 0.34);
   box-shadow: inset 0 1px 0 rgba(233, 248, 255, 0.08), 0 10px 28px rgba(0, 0, 0, 0.28);
@@ -1077,30 +1079,36 @@ body.lobby-active.lobby-settings-open .topbar {
 }
 
 .status-log {
-  min-width: 0;
-  min-height: 48px;
-  padding: 6px 9px;
-  background: rgba(3, 8, 13, 0.42);
-  border: 1px solid rgba(154, 199, 214, 0.16);
-  border-radius: 6px;
-}
-
-.status-log > span {
-  display: block;
-  margin-bottom: 4px;
-  color: #18e0ff;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
+  position: absolute;
+  z-index: 17;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 36px));
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  background: rgba(3, 8, 13, 0.76);
+  border: 1px solid rgba(154, 199, 214, 0.24);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
 }
 
 .status-log .log-text {
+  margin: 0;
   min-height: 0;
-  max-height: 30px;
+  max-height: none;
   overflow: hidden;
   color: #d4f4ff;
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .side-panel .panel-block:nth-child(2) {
@@ -1226,7 +1234,7 @@ body.lobby-active.lobby-settings-open .topbar {
 .in-game-status .meter {
   min-width: 0;
   margin: 0;
-  padding: 5px 8px 7px;
+  padding: 4px 7px 5px;
   background: rgba(3, 8, 13, 0.42);
   border: 1px solid rgba(154, 199, 214, 0.16);
   border-radius: 6px;
@@ -1242,9 +1250,9 @@ body.lobby-active.lobby-settings-open .topbar {
 
 .in-game-status .meter-label {
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   color: #d4f4ff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
 }
@@ -1257,8 +1265,8 @@ body.lobby-active.lobby-settings-open .topbar {
 }
 
 .in-game-status .meter-bar {
-  height: 14px;
-  padding: 2px;
+  height: 10px;
+  padding: 1px;
   background: linear-gradient(180deg, #031018, #132234);
   border: 1px solid rgba(233, 248, 255, 0.36);
   border-radius: 3px;
@@ -1752,7 +1760,7 @@ kbd {
   }
 
   .in-game-status {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .in-game-status .meter {
@@ -1854,9 +1862,9 @@ kbd {
   }
 
   .in-game-status {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 6px;
-    margin: -46px 7px 7px;
+    margin: 0;
     padding: 7px;
   }
 
@@ -1881,7 +1889,6 @@ kbd {
   }
 
   .in-game-status .meter {
-    grid-column: span 1;
     padding: 5px 6px 6px;
   }
 
@@ -2092,7 +2099,7 @@ kbd {
   .mobile-controls:not(.hidden) {
     position: absolute;
     z-index: 22;
-    inset: auto 0 62px;
+    inset: auto 0 2px;
     display: block;
     pointer-events: none;
   }
@@ -2118,18 +2125,18 @@ kbd {
 
   .mobile-action-pad {
     position: absolute;
-    left: 22px;
+    left: 10px;
     bottom: 0;
     display: flex;
-    gap: 8px;
-    height: 54px;
+    gap: 10px;
+    height: 52px;
     pointer-events: none;
   }
 
   .mobile-action-btn {
     position: relative;
-    width: 54px;
-    height: 54px;
+    width: 52px;
+    height: 52px;
     margin: 0;
     padding: 0;
     border-radius: 50%;
@@ -2149,11 +2156,11 @@ kbd {
 
   .mobile-dpad {
     position: absolute;
-    right: 22px;
+    right: 10px;
     bottom: 0;
     display: flex;
-    gap: 8px;
-    height: 54px;
+    gap: 10px;
+    height: 52px;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -2167,15 +2174,15 @@ kbd {
 
   .mobile-dpad-btn {
     position: relative;
-    width: 58px;
-    height: 54px;
+    width: 68px;
+    height: 52px;
     padding: 0;
     border: 1px solid rgba(138, 242, 255, 0.58);
     border-radius: 8px;
     background: rgba(3, 8, 13, 0.42);
     color: rgba(233, 248, 255, 0.96);
     box-shadow: 0 0 16px rgba(24, 224, 255, 0.16), inset 0 1px 0 rgba(233, 248, 255, 0.08);
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 900;
     line-height: 1;
   }
@@ -2219,41 +2226,44 @@ kbd {
 
   .in-game-status {
     position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 5px;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(120px, 0.9fr);
-    gap: 4px 6px;
+    left: 50%;
+    right: auto;
+    bottom: 4px;
+    transform: translateX(-50%);
+    width: min(340px, calc(100% - 300px));
+    grid-template-columns: 1fr;
+    gap: 2px;
     margin: 0;
-    padding: 5px 7px;
+    padding: 3px 6px;
     min-height: 0;
   }
 
   .in-game-status .meter,
-  .in-game-status .stat-row,
-  .status-log {
+  .in-game-status .stat-row {
     min-height: 0;
-    padding: 4px 6px;
+    padding: 2px 5px;
   }
 
   .in-game-status .meter-label {
-    margin-bottom: 2px;
-    font-size: 10px;
+    margin-bottom: 1px;
+    font-size: 9px;
   }
 
   .in-game-status .meter-bar {
-    height: 9px;
+    height: 6px;
     padding: 1px;
   }
 
-  .status-log > span {
-    display: none;
+  .status-log {
+    top: 8px;
+    width: min(320px, calc(100% - 196px));
+    min-height: 30px;
+    padding: 5px 9px;
   }
 
   .status-log .log-text {
-    max-height: 28px;
-    font-size: 10px;
-    line-height: 1.35;
+    font-size: 11px;
+    line-height: 1.2;
   }
 
   .game-layout {
@@ -2429,41 +2439,44 @@ body.mobile-client .side-panel {
 
 body.mobile-client .in-game-status {
   position: absolute;
-  left: max(8px, env(safe-area-inset-left));
-  right: max(8px, env(safe-area-inset-right));
-  bottom: max(6px, env(safe-area-inset-bottom));
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(118px, 0.9fr);
-  gap: 4px 6px;
+  left: 50%;
+  right: auto;
+  bottom: max(4px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(340px, calc(100% - 300px));
+  grid-template-columns: 1fr;
+  gap: 2px;
   margin: 0;
-  padding: 5px 7px;
+  padding: 3px 6px;
   min-height: 0;
 }
 
 body.mobile-client .in-game-status .meter,
-body.mobile-client .in-game-status .stat-row,
-body.mobile-client .status-log {
+body.mobile-client .in-game-status .stat-row {
   min-height: 0;
-  padding: 4px 6px;
+  padding: 2px 5px;
 }
 
 body.mobile-client .in-game-status .meter-label {
-  margin-bottom: 2px;
-  font-size: 10px;
+  margin-bottom: 1px;
+  font-size: 9px;
 }
 
 body.mobile-client .in-game-status .meter-bar {
-  height: 9px;
+  height: 6px;
   padding: 1px;
 }
 
-body.mobile-client .status-log > span {
-  display: none;
+body.mobile-client .status-log {
+  top: max(6px, env(safe-area-inset-top));
+  width: min(320px, calc(100% - 196px));
+  min-height: 30px;
+  padding: 5px 9px;
 }
 
 body.mobile-client .status-log .log-text {
-  max-height: 28px;
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 body.mobile-client .play-timer {
@@ -2522,7 +2535,7 @@ body.mobile-client .attack-skills-toggle {
 body.mobile-client .mobile-controls:not(.hidden) {
   position: absolute;
   z-index: 22;
-  inset: auto 0 max(58px, calc(env(safe-area-inset-bottom) + 56px));
+  inset: auto 0 max(2px, env(safe-area-inset-bottom));
   display: block;
   pointer-events: none;
 }
@@ -2548,18 +2561,18 @@ body.mobile-client .mobile-control-btn.pressed {
 
 body.mobile-client .mobile-action-pad {
   position: absolute;
-  left: max(18px, env(safe-area-inset-left));
+  left: max(10px, env(safe-area-inset-left));
   bottom: 0;
   display: flex;
-  gap: 9px;
-  height: 58px;
+  gap: 10px;
+  height: 52px;
   pointer-events: none;
 }
 
 body.mobile-client .mobile-action-btn {
   position: relative;
-  width: 58px;
-  height: 58px;
+  width: 52px;
+  height: 52px;
   margin: 0;
   padding: 0;
   border-radius: 50%;
@@ -2569,11 +2582,11 @@ body.mobile-client .mobile-action-btn {
 
 body.mobile-client .mobile-dpad {
   position: absolute;
-  right: max(18px, env(safe-area-inset-right));
+  right: max(10px, env(safe-area-inset-right));
   bottom: 0;
   display: flex;
-  gap: 9px;
-  height: 58px;
+  gap: 10px;
+  height: 52px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2587,11 +2600,11 @@ body.mobile-client .mobile-dpad-center {
 
 body.mobile-client .mobile-dpad-btn {
   position: relative;
-  width: 62px;
-  height: 58px;
+  width: 68px;
+  height: 52px;
   padding: 0;
   border-radius: 8px;
-  font-size: 31px;
+  font-size: 28px;
   font-weight: 900;
   line-height: 1;
 }
