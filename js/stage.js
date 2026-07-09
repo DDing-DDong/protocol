@@ -19,6 +19,7 @@ const REPLAY_SLOT_X_RADIUS = 104;
 const REPLAY_SLOT_Y_RADIUS = 136;
 const HACKER_REPLAY_WIDTH = 30;
 const STAGE_HAZARD_SLOT_MAX_DISTANCE = TRAP_SLOT_SPACING * 1.75;
+const FALLBACK_PLATFORM_TILE_HEIGHT = 48;
 
 const STAGE_LAYOUT_GUIDE_ROLES = new Set([
   "entry-step",
@@ -65,16 +66,99 @@ export function createPlatforms(stage, game) {
   const stageData = getStageById(stage, getLayoutOptions(stage, game));
   if (stageData) return cloneRects(stageData.platforms);
 
-  const platforms = [
-    { x: 0, y: GROUND_Y, w: WIDTH, h: 78 },
-    { x: 250, y: 360, w: 150, h: 18 },
-    { x: 520, y: 300, w: 150, h: 18 },
-    { x: 810, y: 365, w: 150, h: 18 },
-  ];
+  const platforms = createFallbackPlatforms();
 
-  if (stage >= 5) platforms.push({ x: 650, y: 405, w: 96, h: 18 });
-  if (stage >= 9) platforms.push({ x: 970, y: 280, w: 96, h: 18 });
+  if (stage >= 5) {
+    platforms.push({
+      id: "fallback-advanced-route-step",
+      x: 864,
+      y: 366,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "fast-exit",
+      mapObject: "data-bridge",
+    });
+  }
+  if (stage >= 9) {
+    platforms.push({
+      id: "fallback-high-security-ledge",
+      x: 960,
+      y: 318,
+      w: 96,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "goal-approach",
+      mapObject: "security-ledge",
+    });
+  }
   return platforms;
+}
+
+function createFallbackPlatforms() {
+  return [
+    {
+      id: "fallback-ground",
+      x: 0,
+      y: GROUND_Y,
+      w: WIDTH,
+      h: 78,
+      role: "main-route",
+      mapObject: "research-lab-floor",
+    },
+    {
+      id: "fallback-entry-step",
+      x: 240,
+      y: 366,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "entry-step",
+      mapObject: "server-rack-step",
+    },
+    {
+      id: "fallback-low-bypass",
+      x: 384,
+      y: 414,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "low-bypass",
+      mapObject: "cooling-unit",
+    },
+    {
+      id: "fallback-chokepoint-wall",
+      x: 576,
+      y: 174,
+      w: 48,
+      h: 192,
+      role: "chokepoint-wall",
+      mapObject: "security-pillar",
+    },
+    {
+      id: "fallback-wall-jump-route",
+      x: 624,
+      y: 222,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "wall-jump-fast-route",
+      mapObject: "data-overpass",
+    },
+    {
+      id: "fallback-exit-step",
+      x: 720,
+      y: 414,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "exit-step",
+      mapObject: "server-rack-step",
+    },
+    {
+      id: "fallback-goal-approach",
+      x: 912,
+      y: 318,
+      w: 144,
+      h: FALLBACK_PLATFORM_TILE_HEIGHT,
+      role: "goal-approach",
+      mapObject: "data-bridge",
+    },
+  ];
 }
 
 export function createBaseHazards(stage, game) {
@@ -284,15 +368,79 @@ function createStageHazardsForSlotBlocking(stage, game, stageData) {
 
 function createFallbackStageHazards(stage) {
   const hazards = [
-    { type: "laser", x: 340, y: 352, w: 15, h: 110 },
-    { type: "shock", x: 680, y: 448, w: 90, h: 14 },
-    { type: "camera", x: 540, y: 252, w: 120, h: 70 },
+    {
+      id: "fallback-laser-pillar-route",
+      type: "laser",
+      x: 672,
+      y: 344,
+      w: 15,
+      h: 118,
+      intent: "중앙 초크 포인트 이후 상단 루트와 하단 우회 루트 사이를 압박한다.",
+    },
+    {
+      id: "fallback-shock-exit-step",
+      type: "shock",
+      x: 768,
+      y: 400,
+      w: 96,
+      h: 14,
+      intent: "출구 발판 위 착지 지점에 바닥 위협을 배치한다.",
+    },
+    {
+      id: "fallback-camera-overpass",
+      type: "camera",
+      x: 600,
+      y: 150,
+      w: 144,
+      h: 72,
+      intent: "상단 발판과 중앙 기둥 접촉면을 감시한다.",
+    },
   ];
 
-  if (stage >= 5) hazards.push({ type: "laser", x: 890, y: 272, w: 15, h: 190 });
-  if (stage >= 7) hazards.push({ type: "shock", x: 185, y: 448, w: 90, h: 14 });
-  if (stage >= 9) hazards.push({ type: "camera", x: 930, y: 232, w: 140, h: 80 });
-  if (stage >= INFINITE_STAGE_START) hazards.push({ type: "laser", x: 1040, y: 310, w: 15, h: 152 });
+  if (stage >= 5) {
+    hazards.push({
+      id: "fallback-laser-advanced-step",
+      type: "laser",
+      x: 928,
+      y: 248,
+      w: 15,
+      h: 118,
+      intent: "후반 보조 발판 위에 수직 압박을 더한다.",
+    });
+  }
+  if (stage >= 7) {
+    hazards.push({
+      id: "fallback-shock-ground-entry",
+      type: "shock",
+      x: 168,
+      y: 448,
+      w: 96,
+      h: 14,
+      intent: "초반 지상 이동 구간의 바닥 위협을 추가한다.",
+    });
+  }
+  if (stage >= 9) {
+    hazards.push({
+      id: "fallback-camera-goal-ledge",
+      type: "camera",
+      x: 912,
+      y: 246,
+      w: 144,
+      h: 72,
+      intent: "Goal 접근 발판 위 감시 장치를 배치한다.",
+    });
+  }
+  if (stage >= INFINITE_STAGE_START) {
+    hazards.push({
+      id: "fallback-laser-infinite-goal",
+      type: "laser",
+      x: 1040,
+      y: 200,
+      w: 15,
+      h: 118,
+      intent: "무한 모드 Goal 접근 발판 근처 압박을 유지한다.",
+    });
+  }
   return hazards;
 }
 
