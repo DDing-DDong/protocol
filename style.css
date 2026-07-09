@@ -1306,6 +1306,7 @@ body.lobby-active.lobby-settings-open .topbar {
 
 #defenseTools.hidden,
 #attackSkills.hidden,
+#trapToolsPanel.hidden,
 .hidden,
 .overlay.hidden {
   display: none;

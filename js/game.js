@@ -16,7 +16,7 @@ import {
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
 import { createHacker, updateAttack, activateHack } from "./player.js?v=20260709-stage-clear-sfx";
-import { initUI } from "./ui.js?v=20260709-defense-guide-order";
+import { initUI } from "./ui.js?v=20260709-trap-preview-after-select";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
 import {
   placeTrapAtSlot,
@@ -1121,6 +1121,7 @@ function handleCanvasClick(pos) {
   if (game.deleteMode) {
     const removed = removeTrapAtPosition(game, pos, (text) => uiModule.setLog(text));
     if (!removed) uiModule.setLog("삭제할 함정을 클릭/터치하세요.");
+    else uiModule.restoreTrapToolsAfterMapAction?.();
     uiModule.updateUI(game);
     return;
   }
@@ -1139,7 +1140,10 @@ function handleCanvasClick(pos) {
 
     const trapCount = game.placedTraps.length;
     placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog);
-    if (game.placedTraps.length > trapCount) playSfx("deploy", { maxDuration: 2 });
+    if (game.placedTraps.length > trapCount) {
+      playSfx("deploy", { maxDuration: 2 });
+      uiModule.restoreTrapToolsAfterMapAction?.();
+    }
     uiModule.updateUI(game);
     maybeShowStageTwoReplayGuide();
   }
