@@ -1400,7 +1400,7 @@ export function initUI(callbacks) {
   }
 
   function getStageBackgroundKey(stage) {
-    return Number(stage) === 11 ? STAGE_BACKGROUNDS.final : STAGE_BACKGROUNDS.default;
+    return Number(stage) >= 11 ? STAGE_BACKGROUNDS.final : STAGE_BACKGROUNDS.default;
   }
 
   function getStageVisualTheme(stage, stageData) {
@@ -1913,43 +1913,39 @@ export function initUI(callbacks) {
       if (slot.blocked) {
         ctx.strokeStyle = "rgba(255, 43, 139, 0.92)";
         ctx.fillStyle = "rgba(255, 43, 139, 0.24)";
-      } else if (slot.costDiscount) {
-        ctx.strokeStyle = "rgba(55, 255, 150, 0.92)";
-        ctx.fillStyle = "rgba(55, 255, 150, 0.20)";
       } else {
         ctx.strokeStyle = "rgba(24,224,255,0.42)";
         ctx.fillStyle = "rgba(24,224,255,0.055)";
       }
-      if (slot.blocked || slot.costDiscount) {
-        drawSlotGlitch(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H, slot.blocked ? "blocked" : "discount");
+      if (slot.blocked) {
+        drawSlotGlitch(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H);
       }
 
-      ctx.lineWidth = slot.blocked || slot.costDiscount ? 2 : 1;
+      ctx.lineWidth = slot.blocked ? 2 : 1;
       roundRect(ctx, x, y, VISUAL_SLOT_W, VISUAL_SLOT_H, 2);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = slot.blocked
         ? "rgba(233, 248, 255, 0.42)"
-        : slot.costDiscount ? "rgba(233, 248, 255, 0.44)" : "rgba(24,224,255,0.16)";
+        : "rgba(24,224,255,0.16)";
       ctx.fillRect(x + 7, y + 3, VISUAL_SLOT_W - 14, 1);
       ctx.fillStyle = slot.blocked
         ? "rgba(24, 224, 255, 0.58)"
-        : slot.costDiscount ? "rgba(255, 245, 105, 0.62)" : "rgba(39,255,200,0.085)";
+        : "rgba(39,255,200,0.085)";
       ctx.fillRect(x + 12, y + VISUAL_SLOT_H - 3, VISUAL_SLOT_W - 24, 1);
       ctx.restore();
     }
   }
 
-  function drawSlotGlitch(ctx, x, y, w, h, variant) {
+  function drawSlotGlitch(ctx, x, y, w, h) {
     const t = performance.now() / 1000;
     const pulse = 0.45 + Math.sin(t * 18 + x * 0.05) * 0.14;
     const jitter = Math.round(Math.sin(t * 31 + x * 0.11) * 2);
-    const isBlocked = variant === "blocked";
-    const primary = isBlocked ? "rgba(255, 43, 139," : "rgba(55, 255, 150,";
-    const secondary = isBlocked ? "rgba(24, 224, 255," : "rgba(255, 245, 105,";
+    const primary = "rgba(255, 43, 139,";
+    const secondary = "rgba(24, 224, 255,";
 
     ctx.save();
-    ctx.shadowColor = isBlocked ? "#ff2b8b" : "#37ff96";
+    ctx.shadowColor = "#ff2b8b";
     ctx.shadowBlur = 13;
     ctx.strokeStyle = `${primary} ${Math.min(0.95, pulse + 0.28)})`;
     ctx.lineWidth = 2;
@@ -1968,17 +1964,10 @@ export function initUI(callbacks) {
     ctx.strokeStyle = `${secondary} 0.70)`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    if (isBlocked) {
-      ctx.moveTo(x + 9 + jitter, y - 3);
-      ctx.lineTo(x + w - 9 - jitter, y + h + 4);
-      ctx.moveTo(x + w - 10 - jitter, y - 3);
-      ctx.lineTo(x + 10 + jitter, y + h + 4);
-    } else {
-      ctx.moveTo(x + 10 + jitter, y + h + 4);
-      ctx.lineTo(x + 18 + jitter, y - 3);
-      ctx.moveTo(x + 22 - jitter, y + h + 4);
-      ctx.lineTo(x + 30 - jitter, y - 3);
-    }
+    ctx.moveTo(x + 9 + jitter, y - 3);
+    ctx.lineTo(x + w - 9 - jitter, y + h + 4);
+    ctx.moveTo(x + w - 10 - jitter, y - 3);
+    ctx.lineTo(x + 10 + jitter, y + h + 4);
     ctx.stroke();
     ctx.restore();
   }
