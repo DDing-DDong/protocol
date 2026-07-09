@@ -20,6 +20,7 @@ const REPLAY_SLOT_Y_RADIUS = 136;
 const HACKER_REPLAY_WIDTH = 30;
 const STAGE_HAZARD_SLOT_MAX_DISTANCE = TRAP_SLOT_SPACING * 1.75;
 const FALLBACK_PLATFORM_TILE_HEIGHT = 48;
+const STAGE_HAZARD_SURFACE_SNAP_DISTANCE = 72;
 
 const STAGE_LAYOUT_GUIDE_ROLES = new Set([
   "entry-step",
@@ -169,7 +170,9 @@ export function createBaseHazards(stage, game) {
     ? cloneTrapNodes(stageData.trapNodes)
     : createFallbackStageHazards(stage);
 
-  const normalizedHazards = hazards.map((hazard) => normalizeStageHazard(hazard, game.platforms));
+  const normalizedHazards = hazards.map((hazard) =>
+    normalizeStageHazard(normalizeStageHazardSurface(hazard, stage, game), game.platforms)
+  );
   normalizedHazards.push(...getCarriedHazards(stage, game));
   return normalizedHazards;
 }
@@ -363,7 +366,9 @@ function createStageHazardsForSlotBlocking(stage, game, stageData) {
     ? cloneTrapNodes(stageData.trapNodes)
     : createFallbackStageHazards(stage);
 
-  return hazards.map((hazard) => normalizeStageHazard(hazard, game.platforms));
+  return hazards.map((hazard) =>
+    normalizeStageHazard(normalizeStageHazardSurface(hazard, stage, game), game.platforms)
+  );
 }
 
 function createFallbackStageHazards(stage) {
@@ -844,6 +849,100 @@ function normalizeStageHazard(hazard, platforms) {
   if (hazard.type === "laser") return normalizeStageLaserHazard(hazard);
   if (hazard.type === "camera") return normalizeStageCameraHazard(hazard, platforms);
   return hazard;
+}
+
+function normalizeStageHazardSurface(hazard, stage, game) {
+  if (!hazard || hazard.type === "camera") return hazard;
+  if (!["laser", "shock", "emp", "firewall"].includes(hazard.type)) return hazard;
+
+  const width = Number(hazard.w);
+  const height = Number(hazard.h);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return hazard;
+
+  const anchor = getStageHazardSurfaceAnchor(hazard, width, height);
+  const surface = findClosestHazardTopSurface(hazard, anchor, width, height, stage, game);
+  if (!surface) return hazard;
+
+  return {
+    ...hazard,
+    y: surface.y - height,
+  };
+}
+
+function getStageHazardSurfaceAnchor(hazard, width, height) {
+  return {
+    x: Number(hazard.x) + width / 2,
+    y: Number(hazard.y) + height,
+  };
+}
+
+function findClosestHazardTopSurface(hazard, anchor, width, height, stage, game) {
+  let bestSurface = null;
+  let bestDistance = Infinity;
+
+  for (const platform of game?.platforms || []) {
+    if (!isValidPlatformRect(platform)) continue;
+    if (!doesHazardOverlapSurfaceX(hazard, width, platform)) continue;
+
+    const insidePlatformBody = isHazardInsidePlatformBody(hazard, anchor, height, platform);
+    const distance = insidePlatformBody ? 0 : Math.abs(platform.y - anchor.y);
+    if (!insidePlatformBody && distance > STAGE_HAZARD_SURFACE_SNAP_DISTANCE) continue;
+    if (distance >= bestDistance) continue;
+    if (wouldHazardOverlapProtectedArea(hazard, platform.y - height, width, height, stage, game)) continue;
+
+    bestDistance = distance;
+    bestSurface = platform;
+  }
+
+  return bestSurface;
+}
+
+function isHazardInsidePlatformBody(hazard, anchor, height, platform) {
+  const top = Number(hazard.y);
+  const bottom = top + height;
+  const verticalOverlap = bottom > platform.y && top < platform.y + platform.h;
+  return verticalOverlap && anchor.y > platform.y && anchor.y <= platform.y + platform.h;
+}
+
+function doesHazardOverlapSurfaceX(hazard, width, platform) {
+  const left = Number(hazard.x);
+  const right = left + width;
+  const center = left + width / 2;
+  return right > platform.x && left < platform.x + platform.w &&
+    center >= platform.x - TRAP_SLOT_SPACING / 2 &&
+    center <= platform.x + platform.w + TRAP_SLOT_SPACING / 2;
+}
+
+function wouldHazardOverlapProtectedArea(hazard, y, width, height, stage, game) {
+  const rect = {
+    x: Number(hazard.x),
+    y,
+    w: width,
+    h: height,
+  };
+
+  if (game?.core && rectsOverlapLocal(rect, game.core)) return true;
+
+  const spawn = getStagePlayerStartRect(stage, game);
+  return Boolean(spawn && rectsOverlapLocal(rect, spawn));
+}
+
+function getStagePlayerStartRect(stage, game) {
+  const stageData = getStageById(stage, getLayoutOptions(stage, game));
+  const playerStart = stageData?.playerStart || { x: 64, y: 388 };
+  return {
+    x: playerStart.x,
+    y: playerStart.y,
+    w: HACKER_START_WIDTH,
+    h: HACKER_START_HEIGHT,
+  };
+}
+
+function rectsOverlapLocal(a, b) {
+  return a.x < b.x + b.w &&
+    a.x + a.w > b.x &&
+    a.y < b.y + b.h &&
+    a.y + a.h > b.y;
 }
 
 function normalizeStageLaserHazard(laser) {
