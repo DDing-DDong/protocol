@@ -116,6 +116,12 @@ export function stopSfx(name) {
   stopAudio(audio);
 }
 
+export function stopAllSfx() {
+  for (const name of new Set([...sfxPlayers.keys(), ...activeBufferSources.keys()])) {
+    stopSfx(name);
+  }
+}
+
 export function playBgm(src, options = {}) {
   if (!src) return;
   if (DISABLED_BGM_FILES.has(src)) {

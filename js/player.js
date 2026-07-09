@@ -19,8 +19,8 @@ import {
   isEntityInCameraView,
   tickBaseHazardTimers,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { recordHacker } from "./replay.js?v=20260707-mobile-panels-fit2";
-import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-panels-fit2";
+import { recordHacker } from "./replay.js?v=20260709-stage-clear-sfx";
+import { playSfx, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
 
 const ATTACK_INPUT_CODES = new Set([
   "ArrowLeft",

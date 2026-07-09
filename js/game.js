@@ -15,8 +15,8 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260707-mobile-panels-fit2";
-import { initUI } from "./ui.js?v=20260709-skin-system";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260709-stage-clear-sfx";
+import { initUI } from "./ui.js?v=20260709-defense-guide-order";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
 import {
   placeTrapAtSlot,
@@ -25,9 +25,9 @@ import {
   getAllowedRotation,
   getTrapCost,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260707-mobile-panels-fit2";
-import { playBgm, playLobbyBgm, playSfx, stopBgm, stopSfx } from "./audio.js?v=20260708-lobby-bgm";
-import { initLobby } from "./lobby.js?v=20260709-skin-purchase";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260709-stage-clear-sfx";
+import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
+import { initLobby } from "./lobby.js?v=20260709-stage-clear-sfx";
 
 const BGM_TRACKS = {
   play: "neon-circuit-drift.mp3",
@@ -546,6 +546,20 @@ function update(dt) {
   uiModule.updateUI(game);
 }
 
+function clearStageAudioState() {
+  stopAllSfx();
+  if (game.hacker) {
+    game.hacker.slowTime = 0;
+    game.hacker.slowMultiplier = 1;
+    game.hacker.damageFlashTime = 0;
+  }
+  if (game.replayHacker) {
+    game.replayHacker.glitchTime = 0;
+  }
+  game.replayPause = 0;
+  game.replayDelaySourceTrapId = "";
+}
+
 function updateTutorialBubble(dt) {
   if (!game.tutorialBubble) return;
   if (game.tutorialBubble.waitsForInput) {
@@ -736,7 +750,7 @@ function resumeAttackPause() {
 
 function endStage(success, text) {
   if (game.turn === TURN.ENDING) return;
-  stopSfx("electric");
+  clearStageAudioState();
   const completedStage = game.stage;
   const completedTurn = game.turn;
   game.turn = TURN.ENDING;

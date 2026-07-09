@@ -19,7 +19,7 @@ import {
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260708-lobby-bgm";
+import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260709-stage-clear-sfx";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -245,6 +245,7 @@ export function initUI(callbacks) {
     stageLabel: document.getElementById("stageLabel"),
     turnLabel: document.getElementById("turnLabel"),
     objectiveLabel: document.getElementById("objectiveLabel"),
+    statusBar: document.querySelector(".in-game-status"),
     timerLabel: document.getElementById("timerLabel"),
     hpLabel: document.getElementById("hpLabel"),
     energyLabel: document.getElementById("energyLabel"),
@@ -344,22 +345,20 @@ export function initUI(callbacks) {
 
   function prepareStatusBar(ui) {
     const statusBar = document.querySelector(".in-game-status");
+    const canvasPanel = document.querySelector(".canvas-panel");
     if (!statusBar) return;
 
     statusBar.querySelectorAll(".stat-stage, .stat-turn, .stat-objective")
       .forEach((node) => node.remove());
 
-    if (!ui.logText || ui.logText.closest(".in-game-status")) return;
+    if (!ui.logText || ui.logText.closest(".status-log")) return;
 
     const oldLogPanel = ui.logText.closest(".panel-block");
     const logBox = document.createElement("div");
     logBox.className = "status-log";
+    logBox.append(ui.logText);
 
-    const label = document.createElement("span");
-    label.textContent = "로그";
-    logBox.append(label, ui.logText);
-
-    statusBar.append(logBox);
+    (canvasPanel || statusBar).append(logBox);
     oldLogPanel?.remove();
   }
 
@@ -605,6 +604,8 @@ export function initUI(callbacks) {
     ui.objectiveLabel.textContent = getObjectiveDisplayText(game);
     ui.timerLabel.textContent = game.turn === TURN.ATTACK ? game.timer.toFixed(1) : "-";
     ui.timerLabel.closest(".play-timer")?.classList.toggle("hidden", game.turn !== TURN.ATTACK);
+    const isDefenseTurn = game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY;
+    ui.statusBar?.classList.toggle("hidden", isDefenseTurn);
 
     if (game.hacker) {
       ui.hpLabel.textContent = `${game.hacker.hp} / ${game.hacker.maxHp}`;
@@ -794,56 +795,8 @@ export function initUI(callbacks) {
   function updateEmpowerPreview(game) {
     if (!ui.empowerPreview) return;
 
-    const isAttack = game.turn === TURN.ATTACK;
-    const isDefense = game.turn === TURN.DEFENSE_BUILD || game.turn === TURN.DEFENSE_REPLAY;
-    const targets = isAttack ? (game.baseHazards || []) : isDefense ? (game.placedTraps || []) : [];
-    const previewTraps = isAttack
-      ? previewNextHazardsByPlacementOrder(game)
-      : isDefense ? previewNextTrapsByPlacementOrder(game) : [];
-    const visible = (isAttack || isDefense) && targets.length > 0;
-
-    ui.empowerPreview.classList.toggle("hidden", !visible);
+    ui.empowerPreview.classList.add("hidden");
     ui.empowerPreview.replaceChildren();
-    if (!visible) return;
-
-    const label = document.createElement("span");
-    label.className = "empower-preview-label";
-    label.textContent = "다음 강화";
-    ui.empowerPreview.appendChild(label);
-
-    if (previewTraps.length === 0) {
-      const empty = document.createElement("span");
-      empty.className = "empower-summary";
-      empty.textContent = "대상 없음";
-      ui.empowerPreview.appendChild(empty);
-      maybeShowPendingEmpowerPreviewGuide();
-      return;
-    }
-
-    if (previewTraps.length <= 2) {
-      const icons = document.createElement("span");
-      icons.className = "empower-icons";
-
-      for (const trap of previewTraps) {
-        const icon = createTrapIcon(trap.type);
-        icon.dataset.tooltip = TRAPS[trap.type].name;
-        icon.tabIndex = 0;
-        icon.setAttribute("aria-label", TRAPS[trap.type].name);
-        icons.appendChild(icon);
-      }
-
-      ui.empowerPreview.appendChild(icons);
-      maybeShowPendingEmpowerPreviewGuide();
-      return;
-    }
-
-    const summary = document.createElement("span");
-    summary.className = "empower-summary";
-    summary.textContent = summarizeTrapTypes(previewTraps);
-    summary.dataset.tooltip = summarizeTrapTypes(previewTraps);
-    summary.tabIndex = 0;
-    ui.empowerPreview.appendChild(summary);
-    maybeShowPendingEmpowerPreviewGuide();
   }
 
   function updateDefenseObjectiveHUD(game) {
@@ -903,6 +856,7 @@ export function initUI(callbacks) {
   }
 
   function showDefenseGuideBubbles({ blockedSlot = null, onComplete } = {}) {
+    closeDefenseGuidePanels();
     const steps = [
       {
         target: () => blockedSlot ? createCanvasPointGuideTarget(blockedSlot.x, blockedSlot.y - 8) : null,
@@ -949,6 +903,7 @@ export function initUI(callbacks) {
   }
 
   function showStageFourGuideBubbles({ onComplete } = {}) {
+    closeDefenseGuidePanels();
     const steps = [
       {
         target: () => ui.objectiveToggle,
@@ -1075,8 +1030,33 @@ export function initUI(callbacks) {
     ui.objectivePanel?.classList.remove("hidden");
   }
 
+  function closeDefenseGuidePanels() {
+    objectivePanelOpen = false;
+    trapToolsPanelOpen = false;
+    ui.objectiveToggle?.setAttribute("aria-expanded", "false");
+    ui.objectivePanel?.classList.add("hidden");
+    ui.trapToolsToggle?.setAttribute("aria-expanded", "false");
+    ui.trapToolsPanel?.classList.add("hidden");
+  }
+
   function createCanvasPointGuideTarget(x, y) {
     return {
+      getGuideAnchorRect: () => {
+        const width = canvas.clientWidth || canvas.width;
+        const height = canvas.clientHeight || canvas.height;
+        const left = (x / canvas.width) * width - 9;
+        const top = (y / canvas.height) * height - 9;
+        return {
+          x: left,
+          y: top,
+          left,
+          top,
+          right: left + 18,
+          bottom: top + 18,
+          width: 18,
+          height: 18,
+        };
+      },
       getBoundingClientRect: () => {
         const rect = canvas.getBoundingClientRect();
         const left = rect.left + (x / canvas.width) * rect.width;
@@ -1142,6 +1122,7 @@ export function initUI(callbacks) {
     const clickTarget = target.closest?.("button") || target;
     window.addEventListener("keydown", advance, true);
     window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     bubble.addEventListener("pointerdown", advance);
     if (options.blockTargetActivation) {
       clickTarget.addEventListener("click", advance, true);
@@ -1151,6 +1132,7 @@ export function initUI(callbacks) {
     guideBubble.cleanup = () => {
       window.removeEventListener("keydown", advance, true);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
       clickTarget.removeEventListener("click", advance, true);
       clickTarget.removeEventListener("click", advanceAfterTargetClick);
     };
@@ -1159,28 +1141,117 @@ export function initUI(callbacks) {
   function positionGuideBubble() {
     if (!guideBubble?.element || !guideBubble.target) return;
 
-    const hostRect = canvas.parentElement?.getBoundingClientRect();
-    const targetRect = guideBubble.target.getBoundingClientRect();
-    if (!hostRect || !targetRect) return;
+    const host = canvas.parentElement;
+    const hostRect = host?.getBoundingClientRect();
+    if (!hostRect) return;
 
     const bubble = guideBubble.element;
     const bubbleRect = bubble.getBoundingClientRect();
-    const margin = 12;
-    const halfWidth = Math.max(60, bubbleRect.width / 2);
-    const targetCenter = targetRect.left + targetRect.width / 2 - hostRect.left;
+    const compact = isCompactGuideLayout();
+    const mobileClient = document.body.classList.contains("mobile-client");
+    const targetRect = getGuideTargetRect(guideBubble.target, host, hostRect, mobileClient);
+    if (!targetRect) return;
+
+    const margin = compact ? 8 : 12;
+    const halfWidth = Math.max(compact ? 48 : 60, bubbleRect.width / 2);
+    const hostWidth = mobileClient ? host?.clientWidth || hostRect.width : hostRect.width;
+    const hostHeight = mobileClient ? host?.clientHeight || hostRect.height : hostRect.height;
+    const targetCenter = targetRect.left + targetRect.width / 2;
+
+    if (mobileClient) {
+      const left = targetCenter;
+      const top = targetRect.bottom + 10;
+      const arrowMin = Math.min(16, bubbleRect.width / 2);
+      const arrowMax = Math.max(arrowMin, bubbleRect.width - arrowMin);
+      const arrowX = clampNumber(bubbleRect.width / 2, arrowMin, arrowMax);
+
+      bubble.style.left = `${left}px`;
+      bubble.style.top = `${top}px`;
+      bubble.style.setProperty("--bubble-arrow-x", `${arrowX}px`);
+      bubble.classList.remove("above-target");
+      return;
+    }
+
     const minLeft = halfWidth + margin;
-    const maxLeft = hostRect.width - halfWidth - margin;
-    const left = Math.max(minLeft, Math.min(maxLeft, targetCenter));
-    const belowTop = targetRect.bottom - hostRect.top + 10;
-    const aboveTop = targetRect.top - hostRect.top - bubbleRect.height - 10;
-    const placeAbove = belowTop + bubbleRect.height > hostRect.height - margin;
-    const top = placeAbove ? Math.max(margin, aboveTop) : belowTop;
-    const arrowX = Math.max(16, Math.min(bubbleRect.width - 16, targetCenter - (left - halfWidth)));
+    const maxLeft = Math.max(minLeft, hostWidth - halfWidth - margin);
+    const left = clampNumber(targetCenter, minLeft, maxLeft);
+    const belowTop = targetRect.bottom + 10;
+    const aboveTop = targetRect.top - bubbleRect.height - 10;
+    const canFitBelow = belowTop + bubbleRect.height <= hostHeight - margin;
+    const canFitAbove = aboveTop >= margin;
+    const placeAbove = !canFitBelow && (canFitAbove || aboveTop > belowTop);
+    const preferredTop = placeAbove ? aboveTop : belowTop;
+    const maxTop = Math.max(margin, hostHeight - bubbleRect.height - margin);
+    const top = clampNumber(preferredTop, margin, maxTop);
+    const arrowMin = Math.min(16, bubbleRect.width / 2);
+    const arrowMax = Math.max(arrowMin, bubbleRect.width - arrowMin);
+    const arrowX = clampNumber(targetCenter - (left - halfWidth), arrowMin, arrowMax);
 
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
     bubble.style.setProperty("--bubble-arrow-x", `${arrowX}px`);
     bubble.classList.toggle("above-target", placeAbove);
+  }
+
+  function getGuideTargetRect(target, host, hostRect, useLocalCoordinates) {
+    if (useLocalCoordinates) {
+      const anchorRect = target.getGuideAnchorRect?.();
+      if (anchorRect) return anchorRect;
+
+      const localRect = getLocalElementRect(target, host);
+      if (localRect) return localRect;
+    }
+
+    const targetRect = target.getBoundingClientRect?.();
+    if (!targetRect) return null;
+
+    return {
+      x: targetRect.left - hostRect.left,
+      y: targetRect.top - hostRect.top,
+      left: targetRect.left - hostRect.left,
+      top: targetRect.top - hostRect.top,
+      right: targetRect.right - hostRect.left,
+      bottom: targetRect.bottom - hostRect.top,
+      width: targetRect.width,
+      height: targetRect.height,
+    };
+  }
+
+  function getLocalElementRect(target, host) {
+    if (!(target instanceof Element) || !(host instanceof Element) || !host.contains(target)) return null;
+
+    let left = target.offsetLeft;
+    let top = target.offsetTop;
+    let node = target.offsetParent;
+    while (node && node !== host) {
+      left += node.offsetLeft;
+      top += node.offsetTop;
+      node = node.offsetParent;
+    }
+    if (node !== host) return null;
+
+    for (let parent = target.parentElement; parent && parent !== host; parent = parent.parentElement) {
+      left -= parent.scrollLeft || 0;
+      top -= parent.scrollTop || 0;
+    }
+
+    return {
+      x: left,
+      y: top,
+      left,
+      top,
+      right: left + target.offsetWidth,
+      bottom: top + target.offsetHeight,
+      width: target.offsetWidth,
+      height: target.offsetHeight,
+    };
+  }
+
+  function isCompactGuideLayout() {
+    return (
+      document.body.classList.contains("mobile-client") ||
+      window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches
+    );
   }
 
   function hideGuideBubble() {
@@ -1694,14 +1765,18 @@ export function initUI(callbacks) {
     if (!bubble?.text) return;
 
     const alpha = Math.min(1, Math.max(0, (bubble.time || 0) / 0.25));
-    const paddingX = 12;
-    const paddingY = 10;
-    const maxWidth = 330;
-    const lineHeight = 18;
+    const compact = isCompactGuideLayout();
+    const paddingX = compact ? 10 : 12;
+    const paddingY = compact ? 8 : 10;
+    const maxWidth = compact ? 250 : 330;
+    const lineHeight = compact ? 16 : 18;
+    const marginX = compact ? 12 : 16;
+    const minY = compact ? 54 : 72;
+    const bottomReserve = compact ? 72 : 86;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = "bold 14px PfStardust30, system-ui, sans-serif";
+    ctx.font = `bold ${compact ? 12 : 14}px PfStardust30, system-ui, sans-serif`;
     const lines = wrapCanvasText(ctx, bubble.text, maxWidth - paddingX * 2);
     const prompt = bubble.waitsForInput ? "아무 키나 입력하세요." : "";
     const promptHeight = prompt ? lineHeight + 7 : 0;
@@ -1710,8 +1785,8 @@ export function initUI(callbacks) {
     const textWidth = Math.min(maxWidth - paddingX * 2, Math.max(...measuredLineWidths));
     const width = Math.ceil(textWidth + paddingX * 2);
     const height = Math.ceil(lines.length * lineHeight + promptHeight + paddingY * 2);
-    const x = clampNumber(bubble.x - width / 2, 16, CANVAS_WIDTH - width - 16);
-    const y = clampNumber(bubble.y - height - 18, 72, CANVAS_HEIGHT - height - 86);
+    const x = clampNumber(bubble.x - width / 2, marginX, CANVAS_WIDTH - width - marginX);
+    const y = clampNumber(bubble.y - height - 18, minY, CANVAS_HEIGHT - height - bottomReserve);
     const tailX = clampNumber(bubble.x, x + 18, x + width - 18);
     const tailY = y + height;
 
@@ -1742,7 +1817,7 @@ export function initUI(callbacks) {
     });
     if (prompt) {
       ctx.fillStyle = "#8af2ff";
-      ctx.font = "bold 13px PfStardust30, system-ui, sans-serif";
+      ctx.font = `bold ${compact ? 11 : 13}px PfStardust30, system-ui, sans-serif`;
       ctx.fillText(prompt, x + paddingX, y + paddingY + lines.length * lineHeight + 7);
     }
     ctx.restore();
@@ -1767,6 +1842,7 @@ export function initUI(callbacks) {
   }
 
   function clampNumber(value, min, max) {
+    if (max < min) return min;
     return Math.min(max, Math.max(min, value));
   }
 
