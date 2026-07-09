@@ -28,6 +28,7 @@ const VISUAL_TILE_DRAW_W = 56;
 const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
+const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
 const ASSET_VERSION = "20260707-mobile-panels-fit2";
 const TRAP_IMAGE_FILES = {
   laser: "laser.png",
@@ -40,7 +41,20 @@ const TRAP_IMAGE_FILES = {
   emp: "emp.png",
   empEmpowered: "emp-empowered.png",
 };
+const STAGE_IMAGE_FILES = {
+  tile1: "tile1.png",
+  tile2: "tile2.png",
+  tile3: "tile3.png",
+  checkpoint1: "checkpoint-.png",
+  checkpoint2: "checkpoint2-.png",
+};
+const GROUND_TILE_PATTERN = [
+  "tile1", "tile1", "tile2", "tile1", "tile1",
+  "tile2", "tile1", "tile1", "tile1", "tile2",
+];
+const CHECKPOINT_FRAME_SECONDS = 0.65;
 const trapImages = createTrapImages();
+const stageImages = createStageImages();
 const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
 const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
 const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
@@ -139,6 +153,18 @@ function createTrapImages() {
   for (const [key, file] of Object.entries(TRAP_IMAGE_FILES)) {
     const image = new Image();
     const url = new URL(file, TRAP_IMAGE_BASE_URL);
+    url.searchParams.set("v", ASSET_VERSION);
+    image.src = url.href;
+    images[key] = image;
+  }
+  return images;
+}
+
+function createStageImages() {
+  const images = {};
+  for (const [key, file] of Object.entries(STAGE_IMAGE_FILES)) {
+    const image = new Image();
+    const url = new URL(file, STAGE_IMAGE_BASE_URL);
     url.searchParams.set("v", ASSET_VERSION);
     image.src = url.href;
     images[key] = image;
@@ -1487,7 +1513,7 @@ export function initUI(callbacks) {
       for (let col = 0; col < cols; col += 1) {
         const x = visualX + col * VISUAL_TILE_SIZE;
         const y = rect.y + row * VISUAL_TILE_SIZE;
-        drawSquareMetalTile(ctx, x, y, row === 0);
+        drawStageTile(ctx, x, y, platform, row === 0);
       }
     }
 
@@ -1524,6 +1550,41 @@ export function initUI(callbacks) {
     const h = Math.round(Number(rect.h));
     if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return null;
     return { x, y, w, h };
+  }
+
+  function drawStageTile(ctx, x, y, platform, isTopRow) {
+    const tileKey = getStageTileKey(x, y, platform, isTopRow);
+    const image = stageImages[tileKey];
+    if (drawStageTileImage(ctx, image, x, y)) return;
+    drawSquareMetalTile(ctx, x, y, tileKey === "tile3");
+  }
+
+  function getStageTileKey(x, y, platform, isTopRow) {
+    if (isTopRow && !isGroundPlatform(platform)) return "tile3";
+
+    const tileX = Math.floor(x / VISUAL_TILE_SIZE);
+    const tileY = Math.floor(y / VISUAL_TILE_SIZE);
+    return GROUND_TILE_PATTERN[(tileX + tileY * 3) % GROUND_TILE_PATTERN.length];
+  }
+
+  function isGroundPlatform(platform) {
+    const role = String(platform?.role || "");
+    return role.includes("main") || Number(platform?.y) >= 462;
+  }
+
+  function drawStageTileImage(ctx, image, x, y) {
+    if (!isImageReady(image)) return false;
+
+    const size = VISUAL_TILE_SIZE;
+    const tileW = VISUAL_TILE_DRAW_W;
+    const tileX = x + (size - tileW) / 2;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, tileX, y, tileW, size);
+    ctx.restore();
+    return true;
   }
 
   function drawSquareMetalTile(ctx, x, y, isTopRow) {
@@ -1569,6 +1630,8 @@ export function initUI(callbacks) {
     const rect = getRenderableRect(core);
     if (!rect) return;
 
+    if (drawCheckpointCore(ctx, rect)) return;
+
     ctx.save();
     ctx.fillStyle = "#27ffc8";
     ctx.shadowColor = "#27ffc8";
@@ -1581,6 +1644,32 @@ export function initUI(callbacks) {
     ctx.font = "12px monospace";
     ctx.fillText("CORE", rect.x + 5, rect.y - 8);
     ctx.restore();
+  }
+
+  function drawCheckpointCore(ctx, rect) {
+    const image = getCheckpointFrame();
+    if (!isImageReady(image)) return false;
+
+    const aspect = image.naturalWidth / image.naturalHeight || 1;
+    const visualH = Math.max(rect.h, 78);
+    const visualW = Math.max(rect.w, visualH * aspect);
+    const x = rect.x + rect.w / 2 - visualW / 2;
+    const y = rect.y + rect.h - visualH;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.shadowColor = "rgba(39, 255, 200, 0.72)";
+    ctx.shadowBlur = 18;
+    ctx.drawImage(image, x, y, visualW, visualH);
+    ctx.restore();
+    return true;
+  }
+
+  function getCheckpointFrame() {
+    const frames = [stageImages.checkpoint1, stageImages.checkpoint2];
+    const index = Math.floor(performance.now() / 1000 / CHECKPOINT_FRAME_SECONDS) % frames.length;
+    return frames[index];
   }
 
   function drawBaseHazards(ctx, game) {
