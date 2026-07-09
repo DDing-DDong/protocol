@@ -695,6 +695,8 @@ body.lobby-active.lobby-settings-open .topbar {
   position: absolute;
   z-index: 65;
   width: min(330px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow: auto;
   transform: translateX(-50%);
   padding: 11px 13px 10px;
   background: rgba(6, 18, 28, 0.96);
@@ -733,6 +735,7 @@ body.lobby-active.lobby-settings-open .topbar {
   font-weight: 800;
   line-height: 1.42;
   overflow-wrap: anywhere;
+  word-break: keep-all;
   white-space: pre-line;
 }
 
@@ -2008,6 +2011,18 @@ kbd {
     padding-inline: 8px;
   }
 
+  .hud-tutorial-bubble {
+    width: min(250px, calc(100% - 16px));
+    max-height: calc(100% - 16px);
+    padding: 8px 10px;
+    border-radius: 7px;
+  }
+
+  .hud-tutorial-bubble p {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
   .settings-panel {
     width: min(236px, calc(100dvw - 24px));
     max-height: calc(100dvh - 24px);
@@ -2275,6 +2290,49 @@ kbd {
     padding: 8px 10px;
   }
 
+  .overlay:not(.dialogue-overlay) {
+    padding: 8px;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card {
+    width: min(640px, calc(100% - 16px));
+    max-height: calc(100% - 16px);
+    gap: 8px;
+    padding: 10px 12px;
+    overflow: auto;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card h2 {
+    font-size: 20px;
+    line-height: 1.1;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card p {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-list {
+    gap: 6px;
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-card {
+    min-height: 52px;
+    padding: 7px 9px;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .overlay:not(.dialogue-overlay) .choice-card {
+    min-height: 56px;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card > button {
+    min-width: 110px;
+    min-height: 34px;
+    padding: 7px 12px;
+  }
+
   .dialogue-overlay .overlay-card {
     height: 92px;
     min-height: 92px;
@@ -2431,6 +2489,18 @@ body.mobile-client .settings-panel {
   width: min(236px, calc(100dvw - 24px));
   max-height: calc(100dvh - 24px);
   overflow: auto;
+}
+
+body.mobile-client .hud-tutorial-bubble {
+  width: min(300px, calc(100% - 24px));
+  max-height: min(128px, calc(100% - 24px));
+  padding: 10px 12px;
+  border-radius: 7px;
+}
+
+body.mobile-client .hud-tutorial-bubble p {
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 body.mobile-client .side-panel {
@@ -2611,6 +2681,49 @@ body.mobile-client .mobile-dpad-btn {
 
 body.mobile-client .dialogue-overlay {
   padding: 8px 10px;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) {
+  padding: 8px;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card {
+  width: min(640px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  gap: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card h2 {
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card p {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .reward-list {
+  gap: 6px;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .reward-card {
+  min-height: 52px;
+  padding: 7px 9px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .choice-card {
+  min-height: 56px;
+}
+
+body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card > button {
+  min-width: 110px;
+  min-height: 34px;
+  padding: 7px 12px;
 }
 
 body.mobile-client .dialogue-overlay .overlay-card {

@@ -19,7 +19,7 @@ import {
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
 } from "./trap.js?v=20260707-mobile-panels-fit2";
-import { playSfx, stopSfx } from "./audio.js?v=20260707-mobile-panels-fit2";
+import { playSfx, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;
