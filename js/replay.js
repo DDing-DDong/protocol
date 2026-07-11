@@ -18,12 +18,13 @@ import {
   isEntityInCameraView,
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260707-mobile-panels-fit2";
-import { playSfx, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
+} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;
 const OBJECTIVE_SPARK_DURATION = 1.1;
+const LANDING_POSE_DURATION = 0.22;
 
 export function createReplayHacker(game) {
   const first = game.lastAttackRecording[0] || { x: 64, y: 388, h: 54, facing: 1 };
@@ -37,6 +38,9 @@ export function createReplayHacker(game) {
     facing: first.facing || 1,
     onGround: Boolean(first.onGround),
     isSliding: Boolean(first.isSliding),
+    landingPoseTime: first.landingPoseTime || 0,
+    wallGrab: Boolean(first.wallGrab),
+    wallSide: first.wallSide || 0,
     hp: 3,
     glitchTime: 0,
     trapCooldowns: new Map(),
@@ -60,6 +64,9 @@ export function recordHacker(game, dt) {
     facing: h.facing,
     onGround: h.onGround,
     isSliding: Boolean(h.isSliding),
+    landingPoseTime: h.landingPoseTime || 0,
+    wallGrab: Boolean(h.wallGrab),
+    wallSide: h.wallSide || 0,
     shield: h.shield,
     energyUsed: game.metrics.energyUsed,
   });
@@ -92,6 +99,7 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
   tickPlacedTrapTimers(game, dt);
   tickObjectiveSpark(game, dt);
   r.glitchTime = Math.max(0, (r.glitchTime || 0) - dt);
+  r.landingPoseTime = Math.max(0, (r.landingPoseTime || 0) - dt);
 
   if (game.replayPause > 0) {
     const pauseDt = Math.min(game.replayPause, dt);
@@ -120,6 +128,7 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
 
   game.replayIndex += 1;
   const sample = path[game.replayIndex];
+  const wasOnGround = r.onGround;
   r.x = sample.x;
   r.y = sample.y;
   r.h = sample.h || 54;
@@ -128,6 +137,13 @@ export function updateDefenseReplay(game, dt, flashLog, endStage) {
   r.facing = sample.facing || r.facing;
   r.onGround = Boolean(sample.onGround);
   r.isSliding = Boolean(sample.isSliding);
+  if (!wasOnGround && r.onGround && !r.isSliding) {
+    r.landingPoseTime = sample.landingPoseTime || LANDING_POSE_DURATION;
+  } else {
+    r.landingPoseTime = sample.landingPoseTime || r.landingPoseTime || 0;
+  }
+  r.wallGrab = Boolean(sample.wallGrab);
+  r.wallSide = sample.wallSide || 0;
   game.metrics.energyUsed = Math.max(game.metrics.energyUsed, sample.energyUsed || 0);
 
   checkDefenseTraps(r, game, flashLog);

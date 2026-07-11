@@ -1758,6 +1758,113 @@ kbd {
   vertical-align: 2px;
 }
 
+.overlay.reward-select-overlay {
+  background: rgba(3, 8, 13, 0.66);
+}
+
+.overlay.reward-select-overlay .overlay-card {
+  width: min(820px, 94%);
+  min-height: 418px;
+  gap: 14px;
+  padding: 44px 64px 42px;
+  overflow: visible;
+  background: transparent url("./assets/images/ui/select_clear_panel.png") center / 100% 100% no-repeat;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.overlay.reward-select-overlay .overlay-card h2 {
+  color: #e9f8ff;
+  text-shadow: 0 0 12px rgba(24, 224, 255, 0.85), 0 0 22px rgba(187, 92, 255, 0.34);
+}
+
+.overlay.reward-select-overlay .overlay-card p {
+  color: #c8f7ff;
+  text-shadow: 0 0 10px rgba(24, 224, 255, 0.28);
+}
+
+.overlay.reward-select-overlay .reward-list {
+  gap: 10px;
+}
+
+.overlay.reward-select-overlay .reward-card {
+  min-height: 72px;
+  padding: 12px 50px;
+  background: transparent url("./assets/images/ui/select_choice_button.png") center / 100% 100% no-repeat;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #e9f8ff;
+  box-shadow: none;
+}
+
+.overlay.reward-select-overlay .reward-card:hover,
+.overlay.reward-select-overlay .reward-card.selected {
+  filter: brightness(1.14) saturate(1.12);
+  transform: translateY(-1px);
+}
+
+.overlay.reward-select-overlay .reward-card.disabled {
+  opacity: 0.46;
+  filter: grayscale(0.45);
+}
+
+.overlay.reward-select-overlay .reward-card strong {
+  color: #8af2ff;
+  text-shadow: 0 0 10px rgba(24, 224, 255, 0.45);
+}
+
+.overlay.reward-select-overlay .reward-card.recommended strong {
+  color: #ffec9f;
+  text-shadow: 0 0 10px rgba(255, 204, 51, 0.56);
+}
+
+.overlay.reward-select-overlay .reward-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.overlay.reward-select-overlay .reward-actions > button {
+  min-width: 270px;
+  min-height: 78px;
+  padding: 14px 42px;
+  background: transparent url("./assets/images/ui/select_skip_button.png") center / 100% 100% no-repeat;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #dff9ff;
+  text-shadow: 0 0 10px rgba(24, 224, 255, 0.64);
+  box-shadow: none;
+}
+
+.overlay.reward-select-overlay .reward-actions > .reward-skip-button {
+  color: #b9c4ca;
+  text-shadow: 0 0 8px rgba(185, 196, 202, 0.36);
+  opacity: 0.86;
+  filter: grayscale(0.88) saturate(0.34) brightness(0.72) contrast(0.96);
+}
+
+.overlay.reward-select-overlay .reward-actions > button:hover:not(:disabled) {
+  filter: brightness(1.15) saturate(1.12);
+}
+
+.overlay.reward-select-overlay .reward-actions > .reward-skip-button:hover:not(:disabled) {
+  opacity: 0.92;
+  filter: grayscale(0.72) saturate(0.42) brightness(0.9) contrast(0.98);
+}
+
+.overlay.reward-select-overlay .reward-actions > button:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.55);
+  cursor: not-allowed;
+}
+
 @media (max-width: 1040px) {
   .side-panel {
     grid-template-columns: 1fr 1fr;
@@ -2725,6 +2832,60 @@ body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card > button {
   min-width: 110px;
   min-height: 34px;
   padding: 7px 12px;
+}
+
+body.mobile-client .overlay.reward-select-overlay {
+  padding: 4px;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card {
+  width: min(820px, calc(100% - 8px));
+  max-height: calc(100% - 8px);
+  min-height: 0;
+  gap: clamp(4px, 1.4dvh, 10px);
+  padding: clamp(18px, 4dvh, 34px) clamp(22px, 5dvw, 52px) clamp(20px, 4dvh, 34px);
+  overflow: hidden;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card h2 {
+  font-size: clamp(18px, 4.2dvh, 24px);
+  line-height: 1.05;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card p {
+  font-size: clamp(11px, 2.6dvh, 13px);
+  line-height: 1.25;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-list {
+  gap: clamp(5px, 1.2dvh, 8px);
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-card {
+  min-height: clamp(46px, 12dvh, 64px);
+  padding: 7px clamp(20px, 6dvw, 42px);
+  font-size: clamp(11px, 2.6dvh, 13px);
+  line-height: 1.18;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-card strong {
+  margin-bottom: 2px;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-actions {
+  flex-wrap: nowrap;
+  gap: clamp(8px, 2dvw, 14px);
+  margin-top: 0;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-actions > button {
+  flex: 1 1 0;
+  max-width: 250px;
+  min-width: 0;
+  min-height: clamp(44px, 11dvh, 62px);
+  padding: 8px clamp(14px, 4dvw, 28px);
+  font-size: clamp(12px, 2.7dvh, 14px);
+  white-space: nowrap;
 }
 
 body.mobile-client .dialogue-overlay .overlay-card {
