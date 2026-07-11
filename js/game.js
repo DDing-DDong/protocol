@@ -15,18 +15,19 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260709-stage-clear-sfx";
-import { initUI } from "./ui.js?v=20260709-trap-preview-after-select";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260707-mobile-panels-fit2";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260711-action-sfx-gated";
+import { initUI } from "./ui.js?v=20260711-action-sfx-gated";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260711-stage4-laser-rotate-tip";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
+  rotateLaserTrapAtSlot,
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260707-mobile-panels-fit2";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260709-stage-clear-sfx";
-import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
+} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260711-stage4-laser-rotate-tip";
+import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
 import { initLobby } from "./lobby.js?v=20260709-stage-clear-sfx";
 
 const BGM_TRACKS = {
@@ -122,12 +123,6 @@ const uiModule = initUI({
   onTrapSelected: (type, wasSelected) => {
     game.deleteMode = false;
     uiModule.setDeleteMode(false);
-    if (type === "laser" && wasSelected) {
-      selectedRotation = getAllowedRotation(type, selectedRotation + 90);
-      laserRotation = selectedRotation;
-      flashLog(`레이저 회전 ${selectedRotation}도`);
-      return selectedRotation;
-    }
     selectedTrap = type;
     if (selectedTrap === "laser") {
       selectedRotation = laserRotation;
@@ -149,7 +144,6 @@ const uiModule = initUI({
     uiModule.keys.clear();
     uiModule.updateUI(game);
   },
-  canPlayAttackSfx: () => game.turn === TURN.ATTACK && !game.tutorialInputLocked && !game.attackPaused,
 });
 
 const game = {
@@ -309,6 +303,7 @@ function createTutorialFlags() {
     stage2ReplayTip: false,
     stage3Intro: false,
     stage4Defense: false,
+    stage4LaserRotateTip: false,
   };
 }
 
@@ -826,23 +821,33 @@ function endStage(success, text) {
 function showStageClearRewardOverlay(completedStage, completedTurn, text) {
   playLobbyBgm();
   const rewards = getStageRewardChoices(completedStage, completedTurn);
-  const selectedReward = rewards.find((reward) => reward.recommended);
+  let selectedReward = rewards.find((reward) => reward.recommended) || rewards[0] || null;
+  const fixedRewardStage = isFixedRewardStage(completedStage, completedTurn);
+  const skipRewardAndContinue = () => {
+    game.stage += 1;
+    playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
+    setupStage({ keepCurrentBgm: true });
+  };
 
   uiModule.showOverlay({
     title: "스테이지 클리어",
     text: `${text}\n보상 1개를 선택하면 다음 스테이지로 진행합니다.`,
     rewards,
-    lockRecommendedReward: isFixedRewardStage(completedStage, completedTurn),
-    buttonText: selectedReward ? "선택된 보상 받기" : "보상 없이 진행",
+    selectedReward,
+    onRewardSelected: (reward) => {
+      selectedReward = reward;
+    },
+    lockRecommendedReward: fixedRewardStage,
+    rewardSkipButtonText: rewards.length > 0 ? "넘어가기" : "",
+    onRewardSkip: rewards.length > 0 ? skipRewardAndContinue : null,
+    buttonText: rewards.length > 0 ? "선택된 보상 받기" : "넘어가기",
     onButton: () => {
       if (selectedReward) {
         applyReward(selectedReward, { keepCurrentBgm: true });
         return;
       }
 
-      game.stage += 1;
-      playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
-      setupStage({ keepCurrentBgm: true });
+      skipRewardAndContinue();
     },
   });
 }
@@ -1138,15 +1143,29 @@ function handleCanvasClick(pos) {
       return;
     }
 
+    if (rotateLaserTrapAtSlot(game, slot, flashLog)) {
+      playSfx("deploy", { maxDuration: 0.5, volume: 0.38 });
+      uiModule.updateUI(game);
+      return;
+    }
+
     const trapCount = game.placedTraps.length;
     placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog);
     if (game.placedTraps.length > trapCount) {
       playSfx("deploy", { maxDuration: 2 });
       uiModule.restoreTrapToolsAfterMapAction?.();
+      maybeQueueStageFourLaserRotateGuide(slot);
     }
     uiModule.updateUI(game);
     maybeShowStageTwoReplayGuide();
   }
+}
+
+function maybeQueueStageFourLaserRotateGuide(slot) {
+  if (game.stage !== 4 || game.turn !== TURN.DEFENSE_BUILD) return;
+  if (selectedTrap !== "laser" || game.tutorialFlags.stage4LaserRotateTip) return;
+  game.tutorialFlags.stage4LaserRotateTip = true;
+  uiModule.queueStageFourLaserRotateGuide?.(slot);
 }
 
 function maybeShowStageTwoReplayGuide() {

@@ -18,9 +18,9 @@ import {
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260707-mobile-panels-fit2";
-import { recordHacker } from "./replay.js?v=20260709-stage-clear-sfx";
-import { playSfx, stopSfx } from "./audio.js?v=20260709-stage-clear-sfx";
+} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+import { recordHacker } from "./replay.js?v=20260711-stage4-laser-rotate-tip";
+import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const ATTACK_INPUT_CODES = new Set([
   "ArrowLeft",
@@ -56,6 +56,7 @@ const HACK_DELAY = 1;
 const HACK_DURATION = 1;
 const HACK_RANGE = 220;
 const HACK_SCAN_VERTICAL_PADDING = 120;
+const LANDING_POSE_DURATION = 0.22;
 
 export function createHacker(game) {
   return {
@@ -105,6 +106,7 @@ export function createHacker(game) {
     isSliding: false,
     dashTime: 0,
     slidePoseTime: 0,
+    landingPoseTime: 0,
     dashDirection: 1,
 
     // 대시/슬라이딩 중 바닥 함정 끝부분에 걸리는 문제 방지
@@ -152,6 +154,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
   h.dashTime = Math.max(0, h.dashTime - dt);
   h.isDashing = h.dashTime > 0;
   h.slidePoseTime = Math.max(0, (h.slidePoseTime || 0) - dt);
+  h.landingPoseTime = Math.max(0, (h.landingPoseTime || 0) - dt);
   updateSlidePose(h);
 
   h.shieldTime = Math.max(0, h.shieldTime - dt);
@@ -215,6 +218,8 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     } else if (jump && h.onGround) {
       h.vy = -h.jumpPower;
       h.onGround = false;
+      h.landingPoseTime = 0;
+      playSfx("jump");
     }
 
     if (!jump) {
@@ -226,7 +231,11 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     h.vy += 1600 * dt;
   }
 
+  const wasOnGround = h.onGround;
   moveAndCollide(h, dt, game, hackMovementLocked ? NO_INPUT_KEYS : keys);
+  if (!wasOnGround && h.onGround && !h.isSliding) {
+    h.landingPoseTime = LANDING_POSE_DURATION;
+  }
   applyAttackHazards(h, game, flashLog);
   if (game.attackTimerStarted) {
     recordHacker(game, dt);
@@ -272,6 +281,8 @@ function performWallJump(h, wallSide, useSlideBoost = false) {
   h.wallContactTimer = 0;
   h.wallJumpDashTimer = WALL_JUMP_DASH_WINDOW;
   h.wallJumpInputLock = true;
+  h.landingPoseTime = 0;
+  playSfx("jump");
 
   if (useSlideBoost) {
     h.dashDirection = jumpDirection;
@@ -279,6 +290,7 @@ function performWallJump(h, wallSide, useSlideBoost = false) {
     h.dashTime = WALL_DASH_DURATION;
     h.slidePoseTime = SLIDE_POSE_DURATION;
     startSlide(h);
+    playSfx("dash");
   }
 }
 
@@ -343,6 +355,7 @@ function tryDash(game, keys, flashLog) {
   h.dashTime = !h.onGround && h.wallJumpDashTimer > 0 ? WALL_DASH_DURATION : h.dashDuration;
   h.slidePoseTime = SLIDE_POSE_DURATION;
   startSlide(h);
+  playSfx("dash");
 
   // 대시 중 + 대시 직후까지 바닥류 함정 판정을 짧게 무시
   h.dashHazardGrace = h.dashDuration + DASH_FLOOR_HAZARD_GRACE;
@@ -709,6 +722,8 @@ function applyAttackHazards(h, game, flashLog) {
     if (hazard.type === "camera" && !isEntityInCameraView(h, hazard, game)) continue;
     if (!rectsOverlap(h, getHazardHitbox(hazard, game))) continue;
 
+    if (isHackInvincible(h) && hazard.type !== "firewall") continue;
+
     if (canSlidePastFloorHazard(h, hazard)) {
       if (hazard.type === "shock") playSfx("electric", { maxDuration: 0.45, volume: 0.24 });
       continue;
@@ -818,6 +833,10 @@ function canSlidePastFloorHazard(h, hazard) {
 
 function isFloorHazard(hazard) {
   return hazard?.type === "shock" || hazard?.type === "emp";
+}
+
+function isHackInvincible(h) {
+  return (h?.hackChargeTime || 0) > 0;
 }
 
 function showDamageFlash(h, hazardType) {

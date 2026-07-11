@@ -1,7 +1,7 @@
 // js/lobby.js
 // Handles only Splash/Lobby screen transitions and lobby button wiring.
 
-import { playLobbyBgm, unlockAudio } from "./audio.js?v=20260709-stage-clear-sfx";
+import { playLobbyBgm, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 
 const SPLASH_DELAY_MS = 1400;
 const AI_SKIN_STORAGE_KEY = "traceProtocolAiPortraitSkin";

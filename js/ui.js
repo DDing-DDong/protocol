@@ -18,8 +18,8 @@ import {
   getOrientedTrapBox,
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
-} from "./trap.js?v=20260707-mobile-panels-fit2";
-import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260709-stage-clear-sfx";
+} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -30,7 +30,7 @@ const VISUAL_SLOT_H = 11;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
 const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
 const BACKGROUND_IMAGE_BASE_URL = new URL("../assets/images/Background_image/", import.meta.url);
-const ASSET_VERSION = "20260707-mobile-panels-fit2";
+const ASSET_VERSION = "20260711-action-sfx-gated";
 const TRAP_IMAGE_FILES = {
   laser: "laser.png",
   laserEmpowered: "laser-empowered.png",
@@ -65,7 +65,7 @@ const CHECKPOINT_FRAME_SECONDS = 0.65;
 const trapImages = createTrapImages();
 const stageImages = createStageImages();
 const backgroundImages = createBackgroundImages();
-const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker/", import.meta.url);
+const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker_new_frames/", import.meta.url);
 const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
 const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
 const AI_ANDROID_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_skin1/", import.meta.url);
@@ -93,11 +93,40 @@ const AI_SCRIPT_SKINS = {
     },
   },
 };
-const HACKER_IMAGE_FILES = {
-  idle: ["idle-1.png", "idle-2.png", "idle-3.png", "idle-4.png"],
-  run: ["run-1.png", "run-2.png", "run-3.png", "run-4.png", "run-5.png"],
-  jump: ["jump-1.png", "jump-2.png", "jump-3.png", "jump-4.png"],
-  slide: ["slide-1.png", "slide-2.png", "slide-3.png"],
+const HACKER_ANIMATIONS = {
+  idle: {
+    files: createNumberedFrameFiles("idle", 8),
+    frameSeconds: [0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14],
+  },
+  run: {
+    files: createNumberedFrameFiles("run", 8),
+    frameSeconds: [0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09],
+  },
+  jumpStart: {
+    files: createNumberedFrameFiles("jumpStart", 3),
+    frameSeconds: [0.14, 0.11, 0.09],
+  },
+  jumpAir: {
+    files: createNumberedFrameFiles("jumpAir", 3),
+    frameSeconds: [0.11, 0.11, 0.11],
+  },
+  jumpLanding: {
+    files: createNumberedFrameFiles("jumpLanding", 2),
+    frameSeconds: [0.16, 0.22],
+  },
+  slide: {
+    files: createNumberedFrameFiles("slide", 6),
+    frameSeconds: [0.11, 0.12, 0.18, 0.18, 0.14, 0.22],
+  },
+  climb: {
+    files: createNumberedFrameFiles("climb", 6),
+    frameSeconds: [0.14, 0.14, 0.14, 0.14, 0.14, 0.14],
+  },
+};
+const HACKING_EFFECT_DURATION = 0.84;
+const HACKING_EFFECT_ANIMATION = {
+  files: createNumberedFrameFiles("hacking_effect", 12),
+  frameSeconds: Array.from({ length: 12 }, () => HACKING_EFFECT_DURATION / 12),
 };
 const HACKER_SCRIPT_IMAGE_FILES = {
   idle: "idle.png",
@@ -113,10 +142,10 @@ const AI_SCRIPT_IMAGE_FILES = {
   happy: "happy.gif",
 };
 const hackerImages = createHackerImages();
+const hackingEffectImages = createFrameAnimation(HACKING_EFFECT_ANIMATION);
 const hackerScriptImages = createScriptImages(HACKER_SCRIPT_IMAGE_FILES, HACKER_SCRIPT_IMAGE_BASE_URL);
 const aiScriptImages = createScriptImages(AI_SCRIPT_IMAGE_FILES, AI_SCRIPT_IMAGE_BASE_URL);
 const aiScriptImagesBySkin = createAiScriptImagesBySkin();
-const transparentHackerFrames = new WeakMap();
 const DEFAULT_BACKGROUND_LAYERS = {
   far: ["future-city"],
   mid: ["server-rack", "cable", "security-panel"],
@@ -194,18 +223,31 @@ function createBackgroundImages() {
   return images;
 }
 
+function createNumberedFrameFiles(state, count) {
+  return Array.from({ length: count }, (_, index) => `${state}/frame-${String(index).padStart(2, "0")}.png`);
+}
+
 function createHackerImages() {
-  const groups = {};
-  for (const [state, files] of Object.entries(HACKER_IMAGE_FILES)) {
-    groups[state] = files.map((file) => {
-      const image = new Image();
-      const url = new URL(file, HACKER_IMAGE_BASE_URL);
-      url.searchParams.set("v", ASSET_VERSION);
-      image.src = url.href;
-      return image;
-    });
+  const animations = {};
+  for (const [state, animation] of Object.entries(HACKER_ANIMATIONS)) {
+    animations[state] = createFrameAnimation(animation);
   }
-  return groups;
+  return animations;
+}
+
+function createFrameAnimation(animation) {
+  const frames = animation.files.map((file) => {
+    const image = new Image();
+    const url = new URL(file, HACKER_IMAGE_BASE_URL);
+    url.searchParams.set("v", ASSET_VERSION);
+    image.src = url.href;
+    return image;
+  });
+  return {
+    frames,
+    frameSeconds: animation.frameSeconds,
+    totalSeconds: animation.frameSeconds.reduce((sum, seconds) => sum + seconds, 0),
+  };
 }
 
 function createScriptImages(filesByKey, baseUrl) {
@@ -243,12 +285,6 @@ function setGuideBubbleSkipEnabled(enabled) {
 
 function isImageReady(image) {
   return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
-}
-
-function isDrawableReady(source) {
-  if (!source) return false;
-  if (source instanceof HTMLCanvasElement) return source.width > 0 && source.height > 0;
-  return isImageReady(source);
 }
 
 function isImageLoading(image) {
@@ -311,6 +347,7 @@ export function initUI(callbacks) {
   let guideBubbleSequenceSkip = null;
   let pendingEmpowerPreviewGuide = false;
   let empowerPreviewGuideShown = false;
+  let pendingLaserRotateGuideTarget = null;
   let objectivePanelOpen = false;
   let trapToolsPanelOpen = false;
   let reopenTrapToolsAfterMapAction = false;
@@ -464,14 +501,20 @@ export function initUI(callbacks) {
     advanceOnCardClick = false,
     lockRecommendedReward = false,
     onSkip,
+    rewardSkipButtonText = "",
+    onRewardSkip,
+    selectedReward = null,
+    onRewardSelected,
   }) {
     stopOverlayTyping();
     overlayAction = typeof onButton === "function" ? onButton : hideOverlay;
     ui.overlay.classList.remove("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay");
     ui.overlayCard?.classList.remove("has-portrait", "click-advances", "typing");
+    resetRewardActions();
     setOverlaySkip(null);
     if (speaker) ui.overlay.classList.add(`speaker-${speaker}`);
+    if (!speaker && rewards.length > 0) ui.overlay.classList.add("reward-select-overlay");
     if (advanceOnCardClick) {
       ui.overlay.classList.add("dialogue-overlay");
       ui.overlayCard?.classList.add("click-advances");
@@ -484,25 +527,58 @@ export function initUI(callbacks) {
     ui.rewardList.innerHTML = "";
     setOverlayPortrait(portrait, speaker);
 
-    for (const reward of rewards) {
+    let selectedRewardIndex = getInitialSelectedRewardIndex(rewards, selectedReward);
+    const rewardButtons = [];
+
+    if (rewards.length > 0) {
+      const actions = document.createElement("div");
+
+      actions.className = "reward-actions";
+      ui.overlayButton.classList.add("reward-primary-button");
+      ui.overlayCard?.insertBefore(actions, ui.overlayButton);
+
+      if (rewardSkipButtonText && typeof onRewardSkip === "function") {
+        const skipButton = document.createElement("button");
+        const skipDisabled = Boolean(lockRecommendedReward);
+
+        skipButton.type = "button";
+        skipButton.className = "reward-skip-button";
+        skipButton.textContent = rewardSkipButtonText;
+        skipButton.disabled = skipDisabled;
+        skipButton.setAttribute("aria-disabled", skipDisabled ? "true" : "false");
+        if (!skipDisabled) {
+          skipButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onRewardSkip();
+          });
+        }
+
+        actions.appendChild(skipButton);
+      }
+
+      actions.appendChild(ui.overlayButton);
+    }
+
+    for (const [index, reward] of rewards.entries()) {
       const locked = Boolean(lockRecommendedReward && !reward.recommended);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `reward-card${reward.recommended ? " recommended selected" : ""}${locked ? " disabled" : ""}`;
       btn.disabled = locked;
       btn.setAttribute("aria-disabled", locked ? "true" : "false");
-      btn.innerHTML = reward.recommended
-        ? `<strong>${escapeHTML(reward.name)} <em class="reward-badge">선택됨</em></strong><span>${escapeHTML(reward.desc)}</span>`
-        : `<strong>${escapeHTML(reward.name)}</strong><span>${escapeHTML(reward.desc)}</span>`;
       if (!locked) {
         btn.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          callbacks.onApplyReward(reward);
+          selectedRewardIndex = index;
+          updateRewardSelection();
+          if (typeof onRewardSelected === "function") onRewardSelected(reward);
         });
       }
+      rewardButtons.push({ btn, reward, locked });
       ui.rewardList.appendChild(btn);
     }
+    updateRewardSelection();
 
     for (const choice of choices) {
       const btn = document.createElement("button");
@@ -516,18 +592,55 @@ export function initUI(callbacks) {
       });
       ui.rewardList.appendChild(btn);
     }
+
+    function updateRewardSelection() {
+      for (const [index, entry] of rewardButtons.entries()) {
+        const selected = index === selectedRewardIndex;
+        entry.btn.className = `reward-card${entry.reward.recommended ? " recommended" : ""}${selected ? " selected" : ""}${entry.locked ? " disabled" : ""}`;
+        entry.btn.setAttribute("aria-pressed", selected ? "true" : "false");
+        entry.btn.innerHTML = selected
+          ? `<strong>${escapeHTML(entry.reward.name)} <em class="reward-badge">선택됨</em></strong><span>${escapeHTML(entry.reward.desc)}</span>`
+          : `<strong>${escapeHTML(entry.reward.name)}</strong><span>${escapeHTML(entry.reward.desc)}</span>`;
+      }
+    }
+  }
+
+  function getInitialSelectedRewardIndex(rewards, selectedReward) {
+    if (!rewards.length) return -1;
+    const selectedIndex = selectedReward
+      ? rewards.findIndex((reward) => reward === selectedReward || (reward.id && reward.id === selectedReward.id))
+      : -1;
+    if (selectedIndex >= 0) return selectedIndex;
+
+    const recommendedIndex = rewards.findIndex((reward) => reward.recommended);
+    return recommendedIndex >= 0 ? recommendedIndex : 0;
   }
 
   function hideOverlay() {
     stopOverlayTyping();
     ui.overlay.classList.add("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay");
     ui.overlayCard?.classList.remove("has-portrait", "click-advances");
+    resetRewardActions();
     setOverlaySkip(null);
     setOverlayPortrait("");
     ui.rewardList.innerHTML = "";
     ui.overlayButton.classList.remove("hidden");
     overlayAction = null;
+  }
+
+  function resetRewardActions() {
+    const actions = ui.overlayCard?.querySelector(".reward-actions");
+    if (!actions) {
+      ui.overlayButton.classList.remove("reward-primary-button");
+      return;
+    }
+
+    if (actions.contains(ui.overlayButton)) {
+      ui.overlayCard?.insertBefore(ui.overlayButton, actions);
+    }
+    actions.remove();
+    ui.overlayButton.classList.remove("reward-primary-button");
   }
 
   function runOverlayAction() {
@@ -716,7 +829,7 @@ export function initUI(callbacks) {
         "",
         "수비턴: 탐지 +1합니다.",
         "",
-        "선택된 상태에서 다시 클릭하면 회전합니다.",
+        "설치한 칸을 다시 누르면 회전합니다.",
       ].join("\n");
     }
 
@@ -969,7 +1082,7 @@ export function initUI(callbacks) {
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="laser"]'),
-        text: "레이저를 다시 클릭하면 회전이 가능합니다.",
+        text: "레이저를 설치한 칸을 다시 누르면 레이저를 회전할 수 있습니다.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
@@ -1026,6 +1139,7 @@ export function initUI(callbacks) {
       hideGuideBubble();
       guideBubbleSequenceSkip = null;
       if (typeof onComplete === "function") onComplete();
+      maybeShowPendingLaserRotateGuide();
       return;
     }
 
@@ -1033,6 +1147,7 @@ export function initUI(callbacks) {
       hideGuideBubble();
       guideBubbleSequenceSkip = null;
       if (typeof onComplete === "function") onComplete();
+      maybeShowPendingLaserRotateGuide();
     };
 
     const step = steps[index];
@@ -1372,8 +1487,10 @@ export function initUI(callbacks) {
       drawSafely(ctx, () => drawSelectedTrapPreview(ctx, game));
     }
 
+    const freezeHackerAnimation = Boolean(game?.tutorialInputLocked || game?.tutorialBubble?.waitsForInput);
     if (game?.turn === TURN.ATTACK && game.hacker) {
-      drawSafely(ctx, () => drawHacker(ctx, game.hacker, false));
+      drawSafely(ctx, () => drawHacker(ctx, game.hacker, false, freezeHackerAnimation));
+      drawSafely(ctx, () => drawHackingScreenEffect(ctx, game.hacker));
     }
     if (showDefenseLayout && game?.replayHacker) {
       drawSafely(ctx, () => drawHacker(ctx, game.replayHacker, true));
@@ -2100,7 +2217,11 @@ export function initUI(callbacks) {
     ctx.fillStyle = hacked ? "#27ffc8" : "#ff3b67";
     ctx.shadowColor = pending ? "#e9fff8" : hacked ? "#27ffc8" : "#ff3b67";
     ctx.shadowBlur = pending || hacked ? 18 : 12;
-    ctx.fillRect(x + w / 2 - 2, y, 4, h);
+    if (w > h) {
+      ctx.fillRect(x, y + h / 2 - 2, w, 4);
+    } else {
+      ctx.fillRect(x + w / 2 - 2, y, 4, h);
+    }
     if (pending || hacked) drawHackGlitchLines(ctx, x, y, w, h, flicker.jitter);
     ctx.restore();
   }
@@ -2258,21 +2379,25 @@ export function initUI(callbacks) {
 
     const box = getTrapVisualBox(options.type, x, y, w, h);
     const rotation = normalizeVisualRotation(options.rotation || 0);
-    const rotate = options.type === "laser" && rotation !== 90;
+    const laserRotation = options.type === "laser" ? getLaserDrawRotation(rotation, box) : null;
 
     ctx.save();
     ctx.globalAlpha = Number.isFinite(options.alpha) ? options.alpha : 1;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    if (rotate) {
+    if (laserRotation) {
       const centerX = box.x + box.w / 2;
       const centerY = box.y + box.h / 2;
-      const drawW = box.h;
-      const drawH = box.w;
       ctx.translate(centerX, centerY);
-      ctx.rotate((rotation - 90) * Math.PI / 180);
-      ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.rotate(laserRotation.angle);
+      ctx.drawImage(
+        image,
+        -laserRotation.drawW / 2,
+        -laserRotation.drawH / 2,
+        laserRotation.drawW,
+        laserRotation.drawH
+      );
     } else {
       ctx.drawImage(image, box.x, box.y, box.w, box.h);
     }
@@ -2283,12 +2408,14 @@ export function initUI(callbacks) {
 
   function getTrapVisualBox(type, x, y, w, h) {
     if (type === "laser") {
+      const axisPadding = 44;
+      const crossPadding = 28;
       const isHorizontal = w > h;
       if (isHorizontal) {
-        return centerBox(x + w / 2, y + h / 2, Math.max(w + 4, 88), Math.max(h + 8, 26));
+        return centerBox(x + w / 2, y + h / 2, Math.max(w + axisPadding, 108), Math.max(h + crossPadding, 44));
       }
-      const visualW = Math.max(w + 34, 44);
-      const visualH = Math.max(h + 44, 108);
+      const visualW = Math.max(w + crossPadding, 44);
+      const visualH = Math.max(h + axisPadding, 108);
       return bottomAlignedBox(x + w / 2, y + h + 12, visualW, visualH);
     }
 
@@ -2330,6 +2457,50 @@ export function initUI(callbacks) {
       w,
       h,
     };
+  }
+
+  function queueStageFourLaserRotateGuide(slot) {
+    if (shouldSkipGuideBubbles() || !slot) return;
+    pendingLaserRotateGuideTarget = createCanvasPointGuideTarget(slot.x, slot.y + 28);
+    maybeShowPendingLaserRotateGuide();
+  }
+
+  function maybeShowPendingLaserRotateGuide() {
+    if (shouldSkipGuideBubbles()) {
+      pendingLaserRotateGuideTarget = null;
+      return;
+    }
+    if (!pendingLaserRotateGuideTarget || guideBubble || guideBubbleSequenceSkip) return;
+
+    const target = pendingLaserRotateGuideTarget;
+    pendingLaserRotateGuideTarget = null;
+    showGuideBubble(
+      target,
+      "레이저를 설치한 칸을 누르면 바로 회전할 수 있습니다.",
+      null,
+      { blockTargetActivation: true }
+    );
+  }
+
+  function getLaserDrawRotation(rotation, box) {
+    const horizontal = rotation === 0 || rotation === 180;
+    if (horizontal) {
+      return {
+        angle: (rotation - 90) * Math.PI / 180,
+        drawW: box.h,
+        drawH: box.w,
+      };
+    }
+
+    if (rotation === 270) {
+      return {
+        angle: Math.PI,
+        drawW: box.w,
+        drawH: box.h,
+      };
+    }
+
+    return null;
   }
 
   function normalizeVisualRotation(rotation) {
@@ -2495,14 +2666,14 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawHacker(ctx, h, isGhost) {
+  function drawHacker(ctx, h, isGhost, freezeAnimation = false) {
     ctx.save();
     const isHitFlashing = !isGhost && (h.damageFlashTime || 0) > 0;
     const isInvincibleBlink = !isGhost && (h.invincible || 0) > 0;
     ctx.globalAlpha = isGhost ? 0.72 : getHackerAlpha(h, isInvincibleBlink);
     if (isGhost && h.glitchTime > 0) drawGlitchAura(ctx, h);
     if (isHitFlashing) drawDamageFlash(ctx, h);
-    if (drawHackerSprite(ctx, h, isGhost, isHitFlashing)) {
+    if (drawHackerSprite(ctx, h, isGhost, isHitFlashing, freezeAnimation)) {
       if (!isGhost && ((h.hackChargeTime || 0) > 0 || (h.hackEffectTime || 0) > 0)) {
         ctx.save();
         ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
@@ -2543,16 +2714,14 @@ export function initUI(callbacks) {
     ctx.restore();
   }
 
-  function drawHackerSprite(ctx, h, isGhost, isHitFlashing) {
+  function drawHackerSprite(ctx, h, isGhost, isHitFlashing, freezeAnimation = false) {
     const state = getHackerSpriteState(h);
-    const frames = hackerImages[state] || hackerImages.idle;
-    const frame = getAnimationFrame(frames, getHackerFrameRate(state));
-    if (!isImageReady(frame)) return false;
-    const drawableFrame = getTransparentHackerFrame(frame);
-    if (!isDrawableReady(drawableFrame)) return false;
+    const animation = hackerImages[state] || hackerImages.idle;
+    const image = getHackerAnimationFrame(animation, freezeAnimation);
+    if (!isImageReady(image)) return false;
 
-    const box = getHackerSpriteBox(h, state, drawableFrame);
-    const facing = state === "idle" ? -1 : (h.facing || 1);
+    const box = getHackerSpriteBox(h, state, image);
+    const facing = h.facing || 1;
 
     ctx.save();
     ctx.translate(h.x + h.w / 2, box.y + box.h / 2);
@@ -2566,7 +2735,7 @@ export function initUI(callbacks) {
     }
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(drawableFrame, -box.w / 2, -box.h / 2, box.w, box.h);
+    ctx.drawImage(image, -box.w / 2, -box.h / 2, box.w, box.h);
     ctx.restore();
 
     if (!isGhost && h.isSliding) {
@@ -2590,61 +2759,44 @@ export function initUI(callbacks) {
 
   function isHackerSpriteLoading(h) {
     const state = getHackerSpriteState(h);
-    const frames = hackerImages[state] || hackerImages.idle;
-    return frames.some(isImageLoading);
+    const animation = hackerImages[state] || hackerImages.idle;
+    return Boolean(animation?.frames?.some(isImageLoading));
+  }
+
+  function getHackerAnimationFrame(animation, freezeAnimation = false) {
+    const frames = animation?.frames || [];
+    if (frames.length === 0) return null;
+    if (freezeAnimation) return frames[0];
+
+    const totalSeconds = animation.totalSeconds || frames.length * 0.1;
+    const elapsed = (performance.now() / 1000) % totalSeconds;
+    let cursor = 0;
+    for (let index = 0; index < frames.length; index += 1) {
+      cursor += animation.frameSeconds?.[index] || 0.1;
+      if (elapsed <= cursor) return frames[index];
+    }
+
+    return frames[frames.length - 1];
   }
 
   function getHackerSpriteState(h) {
+    if (h.wallGrab || (h.wallAttachEffectTime || 0) > 0) return "climb";
     if (h.isSliding) return "slide";
-    if (Math.abs(h.vy || 0) > 20 || !h.onGround) return "jump";
+    if ((h.landingPoseTime || 0) > 0) return "jumpLanding";
+    if (!h.onGround || Math.abs(h.vy || 0) > 20) return getHackerJumpSpriteState(h);
     if (Math.abs(h.vx || 0) > 12) return "run";
     return "idle";
   }
 
-  function getHackerFrameRate(state) {
-    if (state === "run") return 12;
-    if (state === "slide") return 10;
-    if (state === "jump") return 9;
-    return 6;
-  }
-
-  function getAnimationFrame(frames, fps) {
-    const safeFrames = frames || [];
-    if (safeFrames.length === 0) return null;
-    const index = Math.floor(performance.now() / 1000 * fps) % safeFrames.length;
-    return safeFrames[index];
-  }
-
-  function getTransparentHackerFrame(image) {
-    if (transparentHackerFrames.has(image)) return transparentHackerFrames.get(image);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const frameCtx = canvas.getContext("2d", { willReadFrequently: true });
-    frameCtx.drawImage(image, 0, 0);
-
-    const imageData = frameCtx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const isBrightNeutral = max > 204 && max - min < 34;
-      if (isBrightNeutral) data[i + 3] = 0;
-    }
-
-    frameCtx.putImageData(imageData, 0, 0);
-    transparentHackerFrames.set(image, canvas);
-    return canvas;
+  function getHackerJumpSpriteState(h) {
+    const vy = h.vy || 0;
+    if (vy < -180) return "jumpStart";
+    return "jumpAir";
   }
 
   function getHackerSpriteBox(h, state, frame) {
     const aspect = frame.width / frame.height || 1;
-    const height = state === "slide" ? h.h * 1.52 : h.h * 1.74;
+    const height = getHackerSpriteHeight(h, state);
     const width = height * aspect;
     const groundY = h.y + h.h;
     return {
@@ -2653,6 +2805,58 @@ export function initUI(callbacks) {
       w: width,
       h: height,
     };
+  }
+
+  function getHackerSpriteHeight(h, state) {
+    if (state === "slide") return h.h * 1.92;
+    if (state === "climb") return h.h * 1.72;
+    return h.h * 1.74;
+  }
+
+  function drawHackingScreenEffect(ctx, h) {
+    if (!h || (h.hackChargeTime || 0) <= 0) return;
+
+    const chargeDuration = h.hackChargeDuration || 1;
+    const elapsed = chargeDuration - (h.hackChargeTime || 0);
+    if (elapsed < 0 || elapsed > HACKING_EFFECT_DURATION) return;
+
+    const frame = getHackingEffectFrame(elapsed);
+    if (!isImageReady(frame)) return;
+
+    const progress = clamp01(elapsed / HACKING_EFFECT_DURATION);
+    const appear = clamp01(progress / 0.14);
+    const disappear = clamp01((1 - progress) / 0.12);
+    const alpha = Math.min(appear, disappear);
+    const panelW = CANVAS_WIDTH * 0.72;
+    const panelH = CANVAS_HEIGHT * 0.86;
+    const imageSize = Math.min(CANVAS_WIDTH * 0.72, CANVAS_HEIGHT * 1.34);
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2 + CANVAS_HEIGHT * 0.1;
+
+    ctx.save();
+    ctx.globalAlpha = 0.2 * alpha;
+    ctx.strokeStyle = "#18e0ff";
+    ctx.lineWidth = 2;
+    ctx.shadowColor = "#18e0ff";
+    ctx.shadowBlur = 24;
+    ctx.strokeRect(cx - panelW / 2 + 10, cy - panelH / 2 + 10, panelW - 20, panelH - 20);
+
+    ctx.globalAlpha = 0.95 * alpha;
+    ctx.shadowColor = "#bb5cff";
+    ctx.shadowBlur = 0;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(frame, cx - imageSize / 2, cy - imageSize / 2, imageSize, imageSize);
+    ctx.restore();
+  }
+
+  function getHackingEffectFrame(elapsed) {
+    const frames = hackingEffectImages.frames || [];
+    if (frames.length === 0) return null;
+    const frameIndex = Math.min(
+      frames.length - 1,
+      Math.floor((elapsed / HACKING_EFFECT_DURATION) * frames.length)
+    );
+    return frames[Math.max(0, frameIndex)];
   }
 
   function getHackerAlpha(h, isInvincibleBlink) {
@@ -2905,11 +3109,6 @@ export function initUI(callbacks) {
         return;
       }
 
-      if (!event.repeat && callbacks.canPlayAttackSfx?.()) {
-        if (event.code === "ArrowUp") playSfx("jump");
-        if (event.code === "ShiftLeft" || event.code === "ShiftRight") playSfx("dash");
-      }
-
       keys.add(event.code);
 
       if (attackResumeKeys.has(event.code)) {
@@ -3079,10 +3278,6 @@ export function initUI(callbacks) {
       keys.add(code);
       button.classList.add("pressed");
       callbacks.onResumeAttackPause?.();
-      if (callbacks.canPlayAttackSfx?.()) {
-        if (code === "ArrowUp") playSfx("jump");
-        if (code === "ShiftLeft") playSfx("dash");
-      }
       button.setPointerCapture?.(event.pointerId);
     };
 
@@ -3128,6 +3323,7 @@ export function initUI(callbacks) {
     hideOverlay,
     showDefenseGuideBubbles,
     showStageFourGuideBubbles,
+    queueStageFourLaserRotateGuide,
     showReplayStartGuideBubble,
     hideGuideBubble,
     setLog,
@@ -3145,4 +3341,4 @@ export function initUI(callbacks) {
 // - 카메라 회전을 제거하고 상단 본체와 하향 시야 형태로 고정하기 위함
 // - 설치형/스테이지 카메라 표시 크기를 20% 줄인 공통 크기로 통일하기 위함
 // - 감전패널 이동속도 감소와 감시 네트워크 보상 수치를 툴팁에 반영하기 위함
-// - 별도 회전 버튼 없이 레이저 선택 버튼 재클릭으로 회전하도록 선택 UI를 단순화하기 위함
+// - 별도 회전 버튼 없이 설치한 레이저 칸 재클릭으로 회전하도록 선택 UI를 단순화하기 위함

@@ -5,6 +5,7 @@ import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, ge
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
+const LASER_DOWNWARD_OFFSET = 14;
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return false;
@@ -81,6 +82,20 @@ export function removeTrapAtPosition(game, pos, flashLog) {
   return true;
 }
 
+export function rotateLaserTrapAtSlot(game, slot, flashLog) {
+  if (game.turn !== TURN.DEFENSE_BUILD || !slot) return false;
+
+  const trap = game.placedTraps.find((placedTrap) => (
+    placedTrap.type === "laser" &&
+    placedTrap.slotId === slot.id
+  ));
+  if (!trap) return false;
+
+  trap.rotation = getAllowedRotation("laser", (trap.rotation || 0) + 90);
+  flashLog(`레이저 회전 ${trap.rotation}도`);
+  return true;
+}
+
 export function getTrapCost(type, game, slot) {
   if (canUseFreeTrapPlacement(game)) return 0;
   return Math.max(0, TRAPS[type].cost - (slot?.costDiscount || 0));
@@ -146,7 +161,7 @@ export function getOrientedTrapBox(trap, game) {
 
     return {
       x: trap.x - 8,
-      y: positive ? trap.y - length : trap.y,
+      y: positive ? trap.y - length : trap.y + LASER_DOWNWARD_OFFSET,
       w: 16,
       h: length,
     };

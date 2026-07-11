@@ -4,7 +4,7 @@ const BGM_BASE_URL = new URL("../assets/audio/bgm/", import.meta.url);
 const SFX_FILES = {
   click: "click.mp3",
   jump: "jump.wav",
-  dash: "dash.mp3",
+  dash: "dash.wav",
   deploy: "deploy.wav",
   electric: "electric.wav",
   fail: "fail.wav",
