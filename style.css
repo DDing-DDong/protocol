@@ -181,6 +181,15 @@ button.secondary {
   box-shadow: 0 0 24px rgba(24, 224, 255, 0.28);
 }
 
+.lobby-button-note {
+  min-height: 42px;
+  color: #b9c4ca;
+  border-color: rgba(154, 165, 172, 0.34);
+  background: rgba(8, 17, 25, 0.84);
+  font-size: 13px;
+  letter-spacing: 1.4px;
+}
+
 .lobby-skin-panel {
   position: absolute;
   z-index: 2;
@@ -259,7 +268,8 @@ button.secondary {
   box-shadow: 0 0 16px rgba(39, 255, 200, 0.34);
 }
 
-.lobby-skin-purchase-modal {
+.lobby-skin-purchase-modal,
+.lobby-path-note-modal {
   position: fixed;
   z-index: 240;
   inset: 0;
@@ -269,7 +279,8 @@ button.secondary {
   background: rgba(3, 8, 13, 0.68);
 }
 
-.lobby-skin-purchase-card {
+.lobby-skin-purchase-card,
+.lobby-path-note-card {
   width: min(360px, calc(100vw - 36px));
   display: grid;
   gap: 14px;
@@ -281,16 +292,42 @@ button.secondary {
   text-align: center;
 }
 
+.lobby-path-note-card {
+  width: min(520px, calc(100vw - 36px));
+  text-align: left;
+}
+
 .lobby-skin-purchase-card h2 {
   margin: 0;
   color: #18e0ff;
   font-size: 22px;
 }
 
-.lobby-skin-purchase-card p {
+.lobby-skin-purchase-card p,
+.lobby-path-note-version {
   margin: 0;
   color: #c4e9f4;
   line-height: 1.5;
+}
+
+.lobby-path-note-version {
+  color: #18e0ff;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.lobby-path-note-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: #d9f5ff;
+  line-height: 1.45;
+}
+
+.lobby-path-note-close {
+  justify-self: center;
+  min-width: 120px;
 }
 
 .lobby-skin-purchase-actions {

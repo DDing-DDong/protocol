@@ -28,7 +28,7 @@ import {
 } from "./trap.js?v=20260711-stage4-laser-rotate-tip";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260711-stage4-laser-rotate-tip";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
-import { initLobby } from "./lobby.js?v=20260709-stage-clear-sfx";
+import { initLobby } from "./lobby.js?v=20260711-path-note";
 
 const BGM_TRACKS = {
   play: "neon-circuit-drift.mp3",
