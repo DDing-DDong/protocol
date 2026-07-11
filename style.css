@@ -2834,6 +2834,60 @@ body.mobile-client .overlay:not(.dialogue-overlay) .overlay-card > button {
   padding: 7px 12px;
 }
 
+body.mobile-client .overlay.reward-select-overlay {
+  padding: 4px;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card {
+  width: min(820px, calc(100% - 8px));
+  max-height: calc(100% - 8px);
+  min-height: 0;
+  gap: clamp(4px, 1.4dvh, 10px);
+  padding: clamp(18px, 4dvh, 34px) clamp(22px, 5dvw, 52px) clamp(20px, 4dvh, 34px);
+  overflow: hidden;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card h2 {
+  font-size: clamp(18px, 4.2dvh, 24px);
+  line-height: 1.05;
+}
+
+body.mobile-client .overlay.reward-select-overlay .overlay-card p {
+  font-size: clamp(11px, 2.6dvh, 13px);
+  line-height: 1.25;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-list {
+  gap: clamp(5px, 1.2dvh, 8px);
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-card {
+  min-height: clamp(46px, 12dvh, 64px);
+  padding: 7px clamp(20px, 6dvw, 42px);
+  font-size: clamp(11px, 2.6dvh, 13px);
+  line-height: 1.18;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-card strong {
+  margin-bottom: 2px;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-actions {
+  flex-wrap: nowrap;
+  gap: clamp(8px, 2dvw, 14px);
+  margin-top: 0;
+}
+
+body.mobile-client .overlay.reward-select-overlay .reward-actions > button {
+  flex: 1 1 0;
+  max-width: 250px;
+  min-width: 0;
+  min-height: clamp(44px, 11dvh, 62px);
+  padding: 8px clamp(14px, 4dvw, 28px);
+  font-size: clamp(12px, 2.7dvh, 14px);
+  white-space: nowrap;
+}
+
 body.mobile-client .dialogue-overlay .overlay-card {
   width: min(900px, calc(100% - 16px));
   height: 92px;

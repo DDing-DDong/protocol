@@ -16,7 +16,7 @@ import {
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260707-mobile-panels-fit2";
 import { createHacker, updateAttack, activateHack } from "./player.js?v=20260711-action-sfx-gated";
-import { initUI } from "./ui.js?v=20260711-action-sfx-gated";
+import { initUI } from "./ui.js?v=20260711-mobile-polish";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260711-stage4-laser-rotate-tip";
 import {
   placeTrapAtSlot,

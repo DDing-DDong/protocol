@@ -30,7 +30,7 @@ const VISUAL_SLOT_H = 11;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
 const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
 const BACKGROUND_IMAGE_BASE_URL = new URL("../assets/images/Background_image/", import.meta.url);
-const ASSET_VERSION = "20260711-action-sfx-gated";
+const ASSET_VERSION = "20260711-mobile-polish";
 const TRAP_IMAGE_FILES = {
   laser: "laser.png",
   laserEmpowered: "laser-empowered.png",
@@ -2827,11 +2827,15 @@ export function initUI(callbacks) {
     const appear = clamp01(progress / 0.14);
     const disappear = clamp01((1 - progress) / 0.12);
     const alpha = Math.min(appear, disappear);
-    const panelW = CANVAS_WIDTH * 0.72;
-    const panelH = CANVAS_HEIGHT * 0.86;
-    const imageSize = Math.min(CANVAS_WIDTH * 0.72, CANVAS_HEIGHT * 1.34);
+    const compactEffect = isCompactGuideLayout();
+    const panelW = CANVAS_WIDTH * (compactEffect ? 0.64 : 0.72);
+    const panelH = CANVAS_HEIGHT * (compactEffect ? 0.7 : 0.86);
+    const imageSize = Math.min(
+      CANVAS_WIDTH * (compactEffect ? 0.62 : 0.72),
+      CANVAS_HEIGHT * (compactEffect ? 1.08 : 1.34)
+    );
     const cx = CANVAS_WIDTH / 2;
-    const cy = CANVAS_HEIGHT / 2 + CANVAS_HEIGHT * 0.1;
+    const cy = CANVAS_HEIGHT / 2 + CANVAS_HEIGHT * (compactEffect ? 0.05 : 0.1);
 
     ctx.save();
     ctx.globalAlpha = 0.2 * alpha;
