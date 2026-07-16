@@ -150,7 +150,7 @@ const game = {
   stage: 1,
   turn: TURN.ATTACK,
   bannerTurn: TURN.ATTACK,
-  timer: 30,
+  timer: 15,
   attackTimerStarted: false,
   attackPaused: false,
   messageCooldown: 0,

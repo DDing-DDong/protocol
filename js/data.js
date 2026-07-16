@@ -253,7 +253,7 @@ export const stages = [
       fx: ["scan-line", "soft-glow"],
     },
     objective: "데이터 코어 탈취",
-    timeLimit: 30,
+    timeLimit: 15,
     playerStart: {
       x: 72,
       y: 392,
@@ -1038,7 +1038,7 @@ export function createMetrics() {
 }
 
 export function getStageTime(stage) {
-  if (stage % 2 === 1) return 30;
+  if (stage % 2 === 1) return 15;
 
   const stageData = getStageById(stage);
   if (stageData && stageData.timeLimit) return stageData.timeLimit;

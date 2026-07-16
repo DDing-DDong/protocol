@@ -1676,8 +1676,11 @@ kbd {
 .dialogue-skip-btn {
   position: absolute;
   z-index: 72;
-  top: 12px;
-  left: 14px;
+  top: -42px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 78px;
   min-height: 30px;
   padding: 6px 10px;
@@ -1688,6 +1691,13 @@ kbd {
   box-shadow: 0 0 14px rgba(24, 224, 255, 0.14);
   font-size: 12px;
   font-weight: 900;
+}
+
+.dialogue-overlay .overlay-card > .dialogue-skip-btn {
+  align-self: auto;
+  display: inline-flex;
+  min-width: 78px;
+  margin-top: 0;
 }
 
 @keyframes dialogue-arrow-blink {

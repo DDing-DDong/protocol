@@ -734,7 +734,7 @@ export function initUI(callbacks) {
       stopOverlayTyping();
       onSkip();
     });
-    ui.overlay.appendChild(button);
+    (ui.overlayCard || ui.overlay).appendChild(button);
   }
 
   function updateUI(game) {
