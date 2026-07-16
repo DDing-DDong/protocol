@@ -110,7 +110,7 @@
   const game = {
     stage: 1,
     turn: TURN.ATTACK,
-    timer: 48,
+    timer: 15,
     messageCooldown: 0,
     recordTimer: 0,
     replayIndex: 0,
@@ -220,6 +220,8 @@
   }
 
   function getStageTime(stage) {
+    if (isAttackStage(stage)) return 15;
+
     if (stage <= 3) return 48;
     if (stage <= 7) return 42;
     if (stage <= 11) return 38;

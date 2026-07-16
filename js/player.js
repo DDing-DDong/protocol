@@ -34,6 +34,9 @@ const ATTACK_INPUT_CODES = new Set([
 const NO_INPUT_KEYS = new Set();
 const WORLD_TOP = 0;
 const WALL_GRAB_SLIDE_SPEED = 70;
+const WALL_CLIMB_SPEED = 100;
+const WALL_AUTO_GRAB_DISTANCE = 14;
+const WALL_HAND_HEIGHT_RATIO = 0;
 const WALL_STICK_TIME = 1;
 const WALL_RELEASE_SLIDE_SPEED = 115;
 const WALL_JUMP_X_SPEED = 280;
@@ -77,6 +80,7 @@ export function createHacker(game) {
     wallSide: 0,
     wallStickSide: 0,
     wallStickTimer: 0,
+    wallClimbing: false,
     wallAttachEffectTime: 0,
     wallSlideEffectTime: 0,
     wallContactSide: 0,
@@ -213,7 +217,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
     const wallJumpSide = getWallJumpSide(h);
     const pressingAwayFromWall = isPressingAwayFromWall(wallJumpSide, left, right);
 
-    if (jump && wallJumpSide && (!h.wallJumpInputLock || pressingAwayFromWall)) {
+    if (jump && wallJumpSide && pressingAwayFromWall && !h.wallJumpInputLock) {
       performWallJump(h, wallJumpSide, dash && pressingAwayFromWall);
     } else if (jump && h.onGround) {
       h.vy = -h.jumpPower;
@@ -275,6 +279,7 @@ function performWallJump(h, wallSide, useSlideBoost = false) {
   h.wallSide = 0;
   h.wallStickSide = 0;
   h.wallStickTimer = 0;
+  h.wallClimbing = false;
   h.wallAttachEffectTime = 0;
   h.wallSlideEffectTime = 0;
   h.wallContactSide = 0;
@@ -305,6 +310,7 @@ function lockHackerMovementForHack(h) {
   h.wallSide = 0;
   h.wallStickSide = 0;
   h.wallStickTimer = 0;
+  h.wallClimbing = false;
   h.wallAttachEffectTime = 0;
   h.wallSlideEffectTime = 0;
   h.wallContactSide = 0;
@@ -507,6 +513,7 @@ function canIgnoreCamera(game) {
 function moveAndCollide(entity, dt, game, keys) {
   const holdingLeft = keys.has("ArrowLeft");
   const holdingRight = keys.has("ArrowRight");
+  const holdingUp = keys.has("ArrowUp");
 
   entity.wallGrab = false;
   entity.wallSide = 0;
@@ -520,13 +527,15 @@ function moveAndCollide(entity, dt, game, keys) {
   }
   collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRight);
   collideClosedFirewallsX(entity, previousX, game);
+  grabNearbyForwardWall(entity, game, holdingLeft, holdingRight);
 
   if (!entity.wallGrab) {
     entity.wallStickSide = 0;
     entity.wallStickTimer = 0;
+    entity.wallClimbing = false;
     entity.wallSlideEffectTime = 0;
   } else {
-    updateWallStick(entity, dt);
+    updateWallStick(entity, dt, holdingUp);
   }
 
   const previousY = entity.y;
@@ -552,6 +561,7 @@ function moveAndCollide(entity, dt, game, keys) {
       entity.wallSide = 0;
       entity.wallStickSide = 0;
       entity.wallStickTimer = 0;
+      entity.wallClimbing = false;
       entity.wallAttachEffectTime = 0;
       entity.wallSlideEffectTime = 0;
       entity.wallContactSide = 0;
@@ -571,6 +581,7 @@ function moveAndCollide(entity, dt, game, keys) {
     entity.wallSide = 0;
     entity.wallStickSide = 0;
     entity.wallStickTimer = 0;
+    entity.wallClimbing = false;
     entity.wallAttachEffectTime = 0;
     entity.wallSlideEffectTime = 0;
     entity.wallContactSide = 0;
@@ -593,6 +604,7 @@ function moveAndCollide(entity, dt, game, keys) {
     entity.wallSide = 0;
     entity.wallStickSide = 0;
     entity.wallStickTimer = 0;
+    entity.wallClimbing = false;
     entity.wallAttachEffectTime = 0;
     entity.wallSlideEffectTime = 0;
     entity.wallContactSide = 0;
@@ -620,6 +632,7 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
   for (const platform of game.platforms || []) {
     const wallBox = getPlatformWallBox(platform);
     if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
+    if (!canReachWallWithHands(entity, wallBox)) continue;
 
     const hitLeftFace = movingRight &&
       previousBox.x + previousBox.w <= wallBox.x &&
@@ -632,12 +645,12 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
     if (hitLeftFace) {
       entity.x = wallBox.x - entity.w;
       entity.vx = Math.min(0, entity.vx);
-      if (holdingRight) grabWall(entity, 1);
+      grabWall(entity, 1);
       break;
     } else if (hitRightFace) {
       entity.x = wallBox.x + wallBox.w;
       entity.vx = Math.max(0, entity.vx);
-      if (holdingLeft) grabWall(entity, -1);
+      grabWall(entity, -1);
       break;
     } else if (alreadyOverlapping) {
       resolvePlatformWallOverlapX(entity, previousBox, wallBox, holdingLeft, holdingRight);
@@ -653,17 +666,54 @@ function resolvePlatformWallOverlapX(entity, previousBox, wallBox, holdingLeft, 
   if (previousCenter <= wallCenter) {
     entity.x = wallBox.x - entity.w;
     entity.vx = Math.min(0, entity.vx);
-    if (holdingRight) grabWall(entity, 1);
+    grabWall(entity, 1);
     return;
   }
 
   entity.x = wallBox.x + wallBox.w;
   entity.vx = Math.max(0, entity.vx);
-  if (holdingLeft) grabWall(entity, -1);
+  grabWall(entity, -1);
+}
+
+function grabNearbyForwardWall(entity, game, holdingLeft, holdingRight) {
+  if (entity.onGround || entity.wallGrab || entity.isDashing) return;
+
+  const facingSide = holdingRight && !holdingLeft
+    ? 1
+    : holdingLeft && !holdingRight
+      ? -1
+      : entity.facing || 1;
+
+  for (const platform of game.platforms || []) {
+    const wallBox = getPlatformWallBox(platform);
+    if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
+    if (!canReachWallWithHands(entity, wallBox)) continue;
+
+    if (facingSide > 0) {
+      const distance = wallBox.x - (entity.x + entity.w);
+      if (distance < 0 || distance > WALL_AUTO_GRAB_DISTANCE) continue;
+      entity.x = wallBox.x - entity.w;
+      entity.vx = Math.min(0, entity.vx);
+      grabWall(entity, 1);
+      return;
+    }
+
+    const distance = entity.x - (wallBox.x + wallBox.w);
+    if (distance < 0 || distance > WALL_AUTO_GRAB_DISTANCE) continue;
+    entity.x = wallBox.x + wallBox.w;
+    entity.vx = Math.max(0, entity.vx);
+    grabWall(entity, -1);
+    return;
+  }
 }
 
 function getVerticalOverlap(a, b) {
   return Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+}
+
+function canReachWallWithHands(entity, wallBox) {
+  const handY = entity.y + entity.h * WALL_HAND_HEIGHT_RATIO;
+  return wallBox.y <= handY;
 }
 
 function getPlatformWallBox(platform) {
@@ -699,9 +749,19 @@ function grabWall(entity, side) {
   setHackerHeight(entity, entity.standHeight || HACKER_STAND_HEIGHT);
 }
 
-function updateWallStick(entity, dt) {
+function updateWallStick(entity, dt, holdingUp = false) {
   const wasSticking = (entity.wallStickTimer || 0) > 0;
   entity.wallStickTimer = Math.max(0, (entity.wallStickTimer || 0) - dt);
+
+  if (holdingUp) {
+    entity.wallClimbing = true;
+    entity.vy = -WALL_CLIMB_SPEED;
+    entity.wallStickTimer = 0;
+    entity.wallSlideEffectTime = 0;
+    return;
+  }
+
+  entity.wallClimbing = false;
 
   if (entity.wallStickTimer > 0) {
     entity.vy = 0;

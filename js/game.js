@@ -150,7 +150,7 @@ const game = {
   stage: 1,
   turn: TURN.ATTACK,
   bannerTurn: TURN.ATTACK,
-  timer: 30,
+  timer: 15,
   attackTimerStarted: false,
   attackPaused: false,
   messageCooldown: 0,
@@ -208,8 +208,8 @@ const STAGE_ONE_HACKING_TIP =
 const STAGE_ONE_FLOOR_TRAP_TIP =
   "감전패널이나 EMP패널같은 바닥함정은 슬라이딩으로 회피할 수 있습니다.";
 const STAGE_ONE_WALL_TIPS = [
-  "벽에서 방향키를 이용하면 잠시동안 벽에 달라붙을 수 있습니다.",
-  "점프와 반대방향 방향키를 동시에 누르면 대각선 방향으로 점프해서 올라갈 수 있습니다.",
+  "공중에서 앞에 벽이 가까우면 자동으로 벽에 달라붙을 수 있습니다.",
+  "벽에 붙은 상태에서 위 방향키를 누르면 벽을 타고 올라갑니다. 반대 방향키와 위 방향키를 함께 누르면 벽점프를 합니다.",
 ];
 
 const STAGE_ONE_REWARD_DIALOGUE = [

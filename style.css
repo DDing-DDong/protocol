@@ -428,9 +428,11 @@ body.lobby-active.lobby-settings-open .topbar {
 }
 
 .topbar-actions {
+  width: var(--attack-status-row-width);
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  justify-content: flex-end;
   position: relative;
 }
 
@@ -542,6 +544,11 @@ body.lobby-active.lobby-settings-open .topbar {
 }
 
 .canvas-panel {
+  --attack-status-right: 18px;
+  --attack-status-gap: 8px;
+  --attack-status-row-width: 244px;
+  --attack-skill-width: 88px;
+  --attack-timer-width: calc(var(--attack-status-row-width) - var(--attack-skill-width) - var(--attack-status-gap));
   position: relative;
   min-width: 0;
   width: 100%;
@@ -858,7 +865,11 @@ body.lobby-active.lobby-settings-open .topbar {
 
 .attack-skills-hud {
   top: 74px;
-  right: 190px;
+  right: calc(var(--attack-status-right) + var(--attack-status-row-width) - var(--attack-skill-width));
+}
+
+.attack-skills-toggle {
+  width: var(--attack-skill-width);
 }
 
 .defense-tools-toggle[aria-expanded="true"] {
@@ -1192,13 +1203,14 @@ body.lobby-active.lobby-settings-open .topbar {
   position: absolute;
   z-index: 16;
   top: 74px;
-  right: 18px;
-  min-width: 164px;
+  right: var(--attack-status-right);
+  width: var(--attack-timer-width);
+  min-width: var(--attack-timer-width);
   min-height: 48px;
-  padding: 9px 14px;
+  padding: 9px 4px;
   display: flex;
   justify-content: center;
-  gap: 18px;
+  gap: 12px;
   align-items: center;
   background: rgba(3, 8, 13, 0.82);
   border: 1px solid rgba(24, 224, 255, 0.54);
@@ -1676,8 +1688,11 @@ kbd {
 .dialogue-skip-btn {
   position: absolute;
   z-index: 72;
-  top: 12px;
-  left: 14px;
+  top: -42px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 78px;
   min-height: 30px;
   padding: 6px 10px;
@@ -1688,6 +1703,13 @@ kbd {
   box-shadow: 0 0 14px rgba(24, 224, 255, 0.14);
   font-size: 12px;
   font-weight: 900;
+}
+
+.dialogue-overlay .overlay-card > .dialogue-skip-btn {
+  align-self: auto;
+  display: inline-flex;
+  min-width: 78px;
+  margin-top: 0;
 }
 
 @keyframes dialogue-arrow-blink {
@@ -1921,6 +1943,14 @@ kbd {
     padding: 10px;
   }
 
+  .canvas-panel {
+    --attack-status-right: 10px;
+    --attack-status-gap: 6px;
+    --attack-status-row-width: 184px;
+    --attack-skill-width: 74px;
+    --attack-timer-width: calc(var(--attack-status-row-width) - var(--attack-skill-width) - var(--attack-status-gap));
+  }
+
   .topbar {
     flex-direction: column;
     align-items: flex-start;
@@ -1936,7 +1966,7 @@ kbd {
   }
 
   .topbar-actions {
-    width: 100%;
+    width: var(--attack-status-row-width);
   }
 
   .settings-menu {
@@ -1991,8 +2021,12 @@ kbd {
 
   .defense-tools-hud,
   .attack-skills-hud {
-    top: 78px;
+    top: 64px;
     right: 10px;
+  }
+
+  .attack-skills-hud {
+    right: calc(var(--attack-status-right) + var(--attack-status-row-width) - var(--attack-skill-width));
   }
 
   .defense-tools-panel,
@@ -2045,11 +2079,12 @@ kbd {
   }
 
   .play-timer {
-    top: 10px;
-    right: 10px;
-    min-width: 112px;
+    top: 64px;
+    right: var(--attack-status-right);
+    width: var(--attack-timer-width);
+    min-width: var(--attack-timer-width);
     min-height: 40px;
-    padding: 7px 10px;
+    padding: 7px 3px;
   }
 
   .play-timer span {
@@ -2134,7 +2169,7 @@ kbd {
   }
 
   .topbar-actions {
-    width: auto;
+    width: var(--attack-status-row-width);
     margin-left: auto;
     gap: 6px;
     pointer-events: auto;
@@ -2352,11 +2387,12 @@ kbd {
   }
 
   .play-timer {
-    top: 44px;
-    right: 0;
-    min-width: 88px;
+    top: 40px;
+    right: var(--attack-status-right);
+    width: var(--attack-timer-width);
+    min-width: var(--attack-timer-width);
     min-height: 30px;
-    padding: 4px 6px;
+    padding: 4px 3px;
     justify-content: center;
     gap: 10px;
   }
@@ -2370,8 +2406,8 @@ kbd {
   }
 
   .attack-skills-hud {
-    top: 44px;
-    right: 94px;
+    top: 40px;
+    right: calc(var(--attack-status-right) + var(--attack-status-row-width) - var(--attack-skill-width));
   }
 
   .attack-skills-toggle {
@@ -2574,6 +2610,11 @@ body.mobile-client .game-layout {
 }
 
 body.mobile-client .canvas-panel {
+  --attack-status-right: max(12px, env(safe-area-inset-right));
+  --attack-status-gap: 6px;
+  --attack-status-row-width: 174px;
+  --attack-skill-width: 74px;
+  --attack-timer-width: calc(var(--attack-status-row-width) - var(--attack-skill-width) - var(--attack-status-gap));
   width: 100%;
   height: 100%;
   border: 0;
@@ -2608,7 +2649,7 @@ body.mobile-client .topbar p {
 }
 
 body.mobile-client .topbar-actions {
-  width: auto;
+  width: var(--attack-status-row-width);
   margin-left: auto;
   gap: 5px;
   pointer-events: auto;
@@ -2695,11 +2736,12 @@ body.mobile-client .status-log .log-text {
 }
 
 body.mobile-client .play-timer {
-  top: max(42px, calc(env(safe-area-inset-top) + 34px));
-  right: 0;
-  min-width: 82px;
+  top: max(39px, calc(env(safe-area-inset-top) + 31px));
+  right: var(--attack-status-right);
+  width: var(--attack-timer-width);
+  min-width: var(--attack-timer-width);
   min-height: 30px;
-  padding: 4px 6px;
+  padding: 4px 3px;
   justify-content: center;
   gap: 10px;
 }
@@ -2737,8 +2779,8 @@ body.mobile-client .defense-tools-panel {
 }
 
 body.mobile-client .attack-skills-hud {
-  top: max(42px, calc(env(safe-area-inset-top) + 34px));
-  right: 88px;
+  top: max(39px, calc(env(safe-area-inset-top) + 31px));
+  right: calc(var(--attack-status-right) + var(--attack-status-row-width) - var(--attack-skill-width));
 }
 
 body.mobile-client .attack-skills-toggle {

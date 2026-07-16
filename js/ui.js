@@ -734,7 +734,7 @@ export function initUI(callbacks) {
       stopOverlayTyping();
       onSkip();
     });
-    ui.overlay.appendChild(button);
+    (ui.overlayCard || ui.overlay).appendChild(button);
   }
 
   function updateUI(game) {
@@ -2939,32 +2939,37 @@ export function initUI(callbacks) {
     const handY = h.isSliding ? 0 : -bodyH * 0.22;
     const wallOutward = localSide > 0 ? 1 : -1;
     const slideOutward = -1;
+    const climbing = Boolean(h.wallClimbing);
     const sticking = h.wallGrab && (h.wallStickTimer || 0) > 0;
-    const sliding = h.wallGrab && !sticking;
+    const sliding = h.wallGrab && !sticking && !climbing;
     const attachPower = clamp01((h.wallAttachEffectTime || 0) / 0.24);
     const slidePower = sliding ? 1 : clamp01((h.wallSlideEffectTime || 0) / 0.28);
+
+    if (climbing && attachPower <= 0) return;
 
     ctx.save();
     ctx.shadowBlur = 0;
     ctx.lineCap = "round";
 
-    for (let i = 0; i < 5; i += 1) {
-      const phase = (t * (sliding ? 20 : 13) + i * 0.31) % 1;
-      const y = sticking
-        ? handY + (i - 2) * 4 + Math.sin(t * 18 + i) * 1.5
-        : -bodyH / 2 + 8 + i * (bodyH - 16) / 4 + Math.sin(t * 12 + i) * 2;
-      const length = sticking ? 6 + attachPower * 10 : 18 + i * 4;
-      const drop = sliding ? 12 + phase * 24 : 2 + attachPower * 5;
-      const outward = sticking ? wallOutward : slideOutward;
-      const alpha = (sticking ? 0.24 : 0.34) * (1 - phase * 0.5) + attachPower * 0.12;
+    if (!climbing) {
+      for (let i = 0; i < 5; i += 1) {
+        const phase = (t * (sliding ? 20 : 13) + i * 0.31) % 1;
+        const y = sticking
+          ? handY + (i - 2) * 4 + Math.sin(t * 18 + i) * 1.5
+          : -bodyH / 2 + 8 + i * (bodyH - 16) / 4 + Math.sin(t * 12 + i) * 2;
+        const length = sticking ? 6 + attachPower * 10 : 18 + i * 4;
+        const drop = sliding ? 12 + phase * 24 : 2 + attachPower * 5;
+        const outward = sticking ? wallOutward : slideOutward;
+        const alpha = (sticking ? 0.24 : 0.34) * (1 - phase * 0.5) + attachPower * 0.12;
 
-      ctx.globalAlpha = Math.min(0.82, alpha * Math.max(0.45, slidePower));
-      ctx.strokeStyle = i % 2 === 0 ? "#e9f8ff" : "#27ffc8";
-      ctx.lineWidth = Math.max(1.2, 3 - i * 0.28);
-      ctx.beginPath();
-      ctx.moveTo(handX, y);
-      ctx.lineTo(handX + outward * length, y + drop);
-      ctx.stroke();
+        ctx.globalAlpha = Math.min(0.82, alpha * Math.max(0.45, slidePower));
+        ctx.strokeStyle = i % 2 === 0 ? "#e9f8ff" : "#27ffc8";
+        ctx.lineWidth = Math.max(1.2, 3 - i * 0.28);
+        ctx.beginPath();
+        ctx.moveTo(handX, y);
+        ctx.lineTo(handX + outward * length, y + drop);
+        ctx.stroke();
+      }
     }
 
     if (attachPower > 0) {
