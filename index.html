@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260711-path-note" />
+  <link rel="stylesheet" href="./style.css?v=20260720-defense-panel-grid" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -76,7 +76,7 @@
           <button id="trapToolsToggle" class="defense-tools-toggle" type="button" aria-expanded="false">함정 배치</button>
           <div id="trapToolsPanel" class="defense-tools-panel hidden" aria-label="함정 배치 도구">
             <h2>함정 배치</h2>
-            <p class="hint">함정을 선택한 뒤 맵의 슬롯을 클릭하세요. 삭제를 켜면 배치된 함정을 직접 제거할 수 있습니다.</p>
+            <p class="hint">함정을 배치한 뒤 리플레이를 시작하세요. 표시된 필수 조건을 모두 달성해야 수비에 성공합니다. 배치만으로는 완료되지 않으며, 리플레이에서 실제로 작동해야 합니다. 수비 실패 시 같은 스테이지를 재도전하고 이전 배치는 유지됩니다.</p>
             <div class="trap-budget-row"><span>함정 토큰</span><strong id="budgetLabel">-</strong></div>
             <div class="trap-grid">
               <button class="trap-btn selected" data-trap="laser" data-tooltip="해커를 탐지합니다.&#10;강화: 탐지 +1&#10;선택된 상태에서 다시 클릭하면 회전합니다." type="button"><span class="trap-label"><span class="laser-direction" aria-hidden="true">↑</span>레이저</span> <small>2</small></button>
@@ -137,6 +137,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260716-floor-trap-fit"></script>
+  <script type="module" src="./js/game.js?v=20260720-defense-ux"></script>
 </body>
 </html>

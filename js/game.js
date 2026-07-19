@@ -8,16 +8,17 @@ import {
   createMetrics,
   getStageTime,
   getObjective,
+  getDefenseObjectiveItems,
   pickRewards,
   WIDTH,
   HEIGHT,
   CORE_X,
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
-} from "./data.js?v=20260707-mobile-panels-fit2";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260711-action-sfx-gated";
-import { initUI } from "./ui.js?v=20260716-floor-trap-fit";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260711-stage4-laser-rotate-tip";
+} from "./data.js?v=20260720-defense-ux";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260720-defense-ux";
+import { initUI } from "./ui.js?v=20260720-defense-ux";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260720-defense-ux";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
@@ -25,8 +26,8 @@ import {
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260711-stage4-laser-rotate-tip";
+} from "./trap.js?v=20260720-defense-ux";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260720-defense-ux";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
 import { initLobby } from "./lobby.js?v=20260711-path-note";
 
@@ -108,7 +109,7 @@ const uiModule = initUI({
     uiModule.setDeleteMode(false);
     startReplayMode(game);
     playGameplayBgmForTurn(game.turn);
-    uiModule.setLog("리플레이 중입니다. 해커가 이전 공격 경로를 따라갑니다.");
+    uiModule.setLog("리플레이 중입니다. 배치된 함정이 실제로 작동하는지 확인합니다.");
     uiModule.updateUI(game);
   },
   onDeleteTrapMode: () => {
@@ -222,8 +223,8 @@ const STAGE_TWO_DEFENSE_DIALOGUE = [
   { text: "해당 경로 위에 보안 취약점을 개선할 함정을 배치해야 합니다.\n무작정 모든 길을 막는 것이 아니라, 반드시 통과할 지점을 선별해야 합니다.", portrait: "idle" },
   { text: "표시된 슬롯을 클릭하면 함정을 설치할 수 있습니다.\n함정 토큰은 제한되어 있으므로 경로 전체를 차단하는 방식은 비효율적입니다.", portrait: "idle" },
   { text: "침투자가 지나간 위치, 점프 후 착지하는 지점.\n이런 구간이 가장 취약한 지점입니다.", portrait: "eyes_closed" },
-  { text: "설치가 완료되면 리플레이를 시작해, 개선점을 확인합니다.", portrait: "idle" },
-  { text: "목표는 침입마다 변경됩니다.\n지정된 조건을 달성해 방어를 성공시켜야 합니다.", portrait: "idle" },
+  { text: "설치가 완료되면 리플레이를 시작해, 개선점을 확인합니다.\n배치만으로는 조건이 완료되지 않고, 리플레이에서 실제로 작동해야 합니다.", portrait: "idle" },
+  { text: "목표는 침입마다 변경됩니다.\n표시된 필수 조건을 모두 달성해야 방어에 성공하며, 실패하면 같은 스테이지를 이전 배치와 함께 재도전합니다.", portrait: "idle" },
   { text: "정확한 방해 한 번으로도 전체 침투 시간을 무너뜨릴 수 있습니다.\n방어 준비를 개시합니다.", portrait: "happy" },
 ];
 
@@ -748,6 +749,9 @@ function endStage(success, text) {
   clearStageAudioState();
   const completedStage = game.stage;
   const completedTurn = game.turn;
+  const resultText = completedTurn === TURN.DEFENSE_REPLAY
+    ? buildDefenseResultText(game, success)
+    : text;
   game.turn = TURN.ENDING;
   game.bannerTurn = completedTurn;
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
@@ -767,7 +771,7 @@ function endStage(success, text) {
   if (!success) {
     uiModule.showOverlay({
       title: "스테이지 실패",
-      text: `${text}\n같은 스테이지를 다시 시도합니다.`,
+      text: `${resultText}\n같은 스테이지를 다시 시도합니다. 이전 배치는 유지되므로 부족한 조건에 맞춰 함정 위치나 방향을 수정하세요.`,
       buttonText: "재도전",
       onButton: () => {
         game.stage = completedStage;
@@ -794,7 +798,7 @@ function endStage(success, text) {
     game.tutorialFlags.stage1Reward = true;
     showDialogueSequence("AI 시스템", STAGE_ONE_REWARD_DIALOGUE, {
       finalButtonText: "보상 확인",
-      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, resultText),
     });
     return;
   }
@@ -802,7 +806,7 @@ function endStage(success, text) {
   if (completedStage === 2 && completedTurn === TURN.DEFENSE_REPLAY) {
     showDialogueSequence("해커", STAGE_TWO_CLEAR_HACKER_DIALOGUE, {
       finalButtonText: "보상 확인",
-      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, resultText),
     });
     return;
   }
@@ -810,12 +814,47 @@ function endStage(success, text) {
   if (completedStage === 3 && completedTurn === TURN.ATTACK) {
     showDialogueSequence("AI 시스템", STAGE_THREE_REWARD_DIALOGUE, {
       finalButtonText: "보상 확인",
-      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, text),
+      onComplete: () => showStageClearRewardOverlay(completedStage, completedTurn, resultText),
     });
     return;
   }
 
-  showStageClearRewardOverlay(completedStage, completedTurn, text);
+  showStageClearRewardOverlay(completedStage, completedTurn, resultText);
+}
+
+function buildDefenseResultText(game, success) {
+  const items = getDefenseObjectiveItems(game);
+  if (items.length === 0) return success ? "방어 목표를 달성했습니다." : "방어 목표를 달성하지 못했습니다.";
+
+  const resultLines = items.map((item) => (
+    `${item.complete ? "✓" : "✕"} ${item.label}: ${item.progress}`
+  ));
+  if (success) {
+    return [
+      "수비 성공: 모든 필수 조건을 달성했습니다.",
+      "목표별 결과",
+      ...resultLines,
+    ].join("\n");
+  }
+
+  const incomplete = items.filter((item) => !item.complete);
+  const reasons = incomplete
+    .map((item) => item.failureReason)
+    .filter(Boolean);
+  const inactiveTraps = incomplete
+    .filter((item) => item.id.startsWith("trap-"))
+    .map((item) => item.label);
+  const recommendations = incomplete
+    .map((item) => item.recommendation)
+    .filter(Boolean);
+
+  return [
+    `실패 원인: ${reasons.join(" ") || "필수 조건이 남아 있습니다."}`,
+    "목표별 결과",
+    ...resultLines,
+    inactiveTraps.length > 0 ? `미작동 필수 함정: ${inactiveTraps.join(", ")}` : "",
+    recommendations.length > 0 ? `추천 수정 방향: ${recommendations.join(" ")}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 function showStageClearRewardOverlay(completedStage, completedTurn, text) {
@@ -1091,6 +1130,8 @@ function showStageTwoDefenseGuideBubbles() {
       game.tutorialInputLocked = false;
       uiModule.keys.clear();
       playGameplayBgmForTurn(game.turn);
+      uiModule.openObjectivePanel?.();
+      uiModule.openTrapToolsPanel?.();
       uiModule.updateUI(game);
     },
   });
@@ -1104,6 +1145,8 @@ function showStageFourDefenseGuideBubbles() {
       game.tutorialInputLocked = false;
       uiModule.keys.clear();
       playGameplayBgmForTurn(game.turn);
+      uiModule.openObjectivePanel?.();
+      uiModule.openTrapToolsPanel?.();
       uiModule.updateUI(game);
     },
   });

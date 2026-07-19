@@ -9,11 +9,58 @@ export const TURN = {
 };
 
 export const TRAPS = {
-  laser: { name: "레이저", cost: 2, color: "#ff3b67" },
-  shock: { name: "감전패널", cost: 2, color: "#ffcc33" },
-  camera: { name: "카메라", cost: 1, color: "#bb5cff" },
-  firewall: { name: "방화벽", cost: 1, color: "#ff7040" },
-  emp: { name: "EMP패널", cost: 1, color: "#33e6ff" },
+  laser: {
+    name: "레이저",
+    cost: 2,
+    color: "#ff3b67",
+    role: "탐지",
+    attackEffect: "해킹해 무력화",
+    defenseEffect: "해커를 탐지",
+    objectiveLabel: "레이저 1회 작동",
+    objectiveAction: "레이저가 해커 경로에서 실제로 발동해야 합니다.",
+  },
+  shock: {
+    name: "감전패널",
+    cost: 2,
+    color: "#ffcc33",
+    role: "지연",
+    attackEffect: "이동속도 감소",
+    defenseEffect: "해커를 지연",
+    objectiveLabel: "감전패널 1회 작동",
+    objectiveAction: "감전패널이 해커를 실제로 감전시켜야 합니다.",
+  },
+  camera: {
+    name: "카메라",
+    cost: 1,
+    color: "#bb5cff",
+    role: "탐지·강화",
+    attackEffect: "해킹해 무력화",
+    defenseEffect: "해커를 탐지하고 다음 함정을 강화",
+    objectiveLabel: "카메라로 해커 탐지",
+    objectiveAction: "카메라 시야와 경로가 맞아 해커를 실제로 탐지해야 합니다.",
+    placementNote: "선행: 시야 확보 · 설치 순서",
+  },
+  firewall: {
+    name: "방화벽",
+    cost: 1,
+    color: "#ff7040",
+    role: "경로 차단",
+    attackEffect: "강화된 경로를 차단",
+    defenseEffect: "강화 시 해커 경로를 차단",
+    objectiveLabel: "방화벽으로 경로 차단",
+    objectiveAction: "카메라 탐지 후 방화벽이 닫혀 해커 경로를 실제로 차단해야 합니다.",
+    placementNote: "선행 조건: 카메라 탐지",
+  },
+  emp: {
+    name: "EMP패널",
+    cost: 1,
+    color: "#33e6ff",
+    role: "에너지 흡수",
+    attackEffect: "슬라이딩으로 회피",
+    defenseEffect: "해커의 에너지를 흡수",
+    objectiveLabel: "EMP패널로 에너지 흡수",
+    objectiveAction: "EMP패널이 해커에게 실제로 발동해 에너지를 흡수해야 합니다.",
+  },
 };
 
 export const FIREWALL_BLOCK_TIME = 5;
@@ -1118,8 +1165,10 @@ export function formatDefenseObjective(objective) {
   if (objective.energyDrained) parts.push(`에너지 ${objective.energyDrained} 흡수`);
   if (objective.maxTraps) parts.push(`함정 ${objective.maxTraps}개 이하`);
   if (objective.requiredTrapTypes?.length) {
-    const names = objective.requiredTrapTypes.map((type) => TRAPS[type].name).join("/");
-    parts.push(`${names} 사용`);
+    const labels = objective.requiredTrapTypes
+      .map((type) => TRAPS[type].objectiveLabel || `${TRAPS[type].name} 1회 작동`)
+      .join(" / ");
+    parts.push(labels);
   }
   return parts.join(" · ");
 }
@@ -1136,8 +1185,12 @@ export function getDefenseObjectiveItems(game) {
     items.push({
       id: "detections",
       label: `탐지 ${objective.detections}회`,
-      progress: `${Math.min(metrics.detections || 0, objective.detections)} / ${objective.detections}`,
+      progress: `${metrics.detections || 0} / ${objective.detections}`,
       complete: (metrics.detections || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.detections,
+      currentValue: metrics.detections || 0,
+      requiredValue: objective.detections,
+      failureReason: "탐지 횟수가 부족합니다.",
+      recommendation: "레이저 또는 카메라가 해커 경로와 겹치도록 배치한 뒤 리플레이에서 탐지되는지 확인하세요.",
     });
   }
 
@@ -1145,8 +1198,12 @@ export function getDefenseObjectiveItems(game) {
     items.push({
       id: "delay",
       label: `지연 ${formatSeconds(objective.delay)}`,
-      progress: `${formatSeconds(Math.min(metrics.delay || 0, objective.delay))} / ${formatSeconds(objective.delay)}`,
+      progress: `${formatSeconds(metrics.delay || 0)} / ${formatSeconds(objective.delay)}`,
       complete: (metrics.delay || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.delay,
+      currentValue: metrics.delay || 0,
+      requiredValue: objective.delay,
+      failureReason: "해커 지연 시간이 부족합니다.",
+      recommendation: "감전패널을 경로에 배치하거나 카메라로 강화한 방화벽이 실제로 닫히는지 확인하세요.",
     });
   }
 
@@ -1154,8 +1211,12 @@ export function getDefenseObjectiveItems(game) {
     items.push({
       id: "energyDrained",
       label: `에너지 ${objective.energyDrained} 흡수`,
-      progress: `${Math.min(metrics.energyDrained || 0, objective.energyDrained)} / ${objective.energyDrained}`,
+      progress: `${metrics.energyDrained || 0} / ${objective.energyDrained}`,
       complete: (metrics.energyDrained || 0) + DEFENSE_OBJECTIVE_EPSILON >= objective.energyDrained,
+      currentValue: metrics.energyDrained || 0,
+      requiredValue: objective.energyDrained,
+      failureReason: "흡수한 에너지가 부족합니다.",
+      recommendation: "EMP패널을 해커 경로에 배치하고 리플레이에서 실제로 발동시키세요.",
     });
   }
 
@@ -1165,8 +1226,12 @@ export function getDefenseObjectiveItems(game) {
     items.push({
       id: "maxTraps",
       label: `함정 ${objective.maxTraps}개 이하`,
-      progress: extraCount > 0 ? `${count} / ${objective.maxTraps}개 (+${extraCount})` : `${count} / ${objective.maxTraps}개`,
+      progress: extraCount > 0 ? `${count} / ${objective.maxTraps}개 이하 (+${extraCount})` : `${count} / ${objective.maxTraps}개 이하`,
       complete: count <= objective.maxTraps,
+      currentValue: count,
+      requiredValue: objective.maxTraps,
+      failureReason: "함정 수 제한을 초과했습니다.",
+      recommendation: "필수 함정 위주로 남기고 불필요한 배치를 삭제해 제한 이내로 맞추세요.",
     });
   }
 
@@ -1175,9 +1240,17 @@ export function getDefenseObjectiveItems(game) {
     const placed = placedTraps.some((trap) => trap.type === type);
     items.push({
       id: `trap-${type}`,
-      label: `${TRAPS[type].name} 사용`,
-      progress: triggered > 0 ? "작동 완료" : placed ? "배치됨" : "미배치",
+      label: TRAPS[type].objectiveLabel || `${TRAPS[type].name} 1회 작동`,
+      progress: triggered > 0
+        ? "작동 완료 (1 / 1회)"
+        : placed
+          ? "배치됨 · 미작동 (0 / 1회)"
+          : "미배치 (0 / 1회)",
       complete: triggered > 0,
+      currentValue: triggered > 0 ? 1 : 0,
+      requiredValue: 1,
+      failureReason: `${TRAPS[type].name}이(가) 아직 작동하지 않았습니다.`,
+      recommendation: TRAPS[type].objectiveAction || `${TRAPS[type].name}을(를) 배치하고 리플레이에서 실제로 작동시키세요.`,
     });
   }
 
@@ -1188,7 +1261,7 @@ export function getDefenseObjectiveSummary(game) {
   const items = getDefenseObjectiveItems(game);
   if (items.length === 0) return "";
   const completed = items.filter((item) => item.complete).length;
-  return `목표 ${completed}/${items.length}`;
+  return `필수 목표 ${completed}/${items.length} 완료`;
 }
 
 export function pickRewards(type, rewardPoolList, stage = 1, options = {}) {

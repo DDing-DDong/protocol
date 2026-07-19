@@ -12,7 +12,7 @@ import {
   clamp,
   rectsOverlap,
   approach,
-} from "./data.js?v=20260707-mobile-panels-fit2";
+} from "./data.js?v=20260720-defense-ux";
 import {
   empowerNextHazardsByPlacementOrder,
   getHazardHitbox,

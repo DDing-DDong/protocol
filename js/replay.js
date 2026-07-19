@@ -10,7 +10,7 @@ import {
   getShockDelay,
   getDefenseObjectiveItems,
   rectsOverlap,
-} from "./data.js?v=20260707-mobile-panels-fit2";
+} from "./data.js?v=20260720-defense-ux";
 import {
   getTrapHitbox,
   getOrientedTrapBox,
@@ -18,7 +18,7 @@ import {
   isEntityInCameraView,
   empowerNextTrapsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+} from "./trap.js?v=20260720-defense-ux";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;

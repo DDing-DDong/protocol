@@ -12,13 +12,13 @@ import {
   getShockDelay,
   getShockSlowTime,
   SHOCK_SLOW_MULTIPLIER,
-} from "./data.js?v=20260707-mobile-panels-fit2";
+} from "./data.js?v=20260720-defense-ux";
 import {
   getCameraHazardBox,
   getOrientedTrapBox,
   previewNextHazardsByPlacementOrder,
   previewNextTrapsByPlacementOrder,
-} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+} from "./trap.js?v=20260720-defense-ux";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 
 const CANVAS_WIDTH = 1200;
@@ -349,8 +349,10 @@ export function initUI(callbacks) {
   let pendingEmpowerPreviewGuide = false;
   let empowerPreviewGuideShown = false;
   let pendingLaserRotateGuideTarget = null;
-  let objectivePanelOpen = false;
-  let trapToolsPanelOpen = false;
+  let objectivePanelOpen = true;
+  let trapToolsPanelOpen = true;
+  let defenseObjectiveWasVisible = false;
+  let defenseToolsWereVisible = false;
   let reopenTrapToolsAfterMapAction = false;
   let reopenTrapToolsTimer = null;
   let selectedTrapPreview = null;
@@ -763,6 +765,8 @@ export function initUI(callbacks) {
       ? String(game.defenseBudget)
       : game.turn === TURN.DEFENSE_REPLAY ? "리플레이 중" : "-";
     const showDefenseTools = game.turn === TURN.DEFENSE_BUILD;
+    if (showDefenseTools && !defenseToolsWereVisible) trapToolsPanelOpen = true;
+    defenseToolsWereVisible = showDefenseTools;
     if (!showDefenseTools) {
       trapToolsPanelOpen = false;
       reopenTrapToolsAfterMapAction = false;
@@ -814,7 +818,7 @@ export function initUI(callbacks) {
       game.showFailedDefenseLayout;
 
     if (hasDefenseObjectives && isDefenseView) {
-      return "수비 목표를 달성해서 보안을 강화";
+      return "아래 필수 조건을 모두 달성해 보안을 강화";
     }
 
     return getObjective(game.stage);
@@ -824,11 +828,12 @@ export function initUI(callbacks) {
     const laserBtn = ui.defenseTools?.querySelector('[data-trap="laser"]');
     if (laserBtn) {
       laserBtn.dataset.tooltip = [
-        "해커를 탐지 및 공격합니다.",
+        "[공격턴]",
+        "해킹해 무력화합니다.",
         "",
-        "공격턴: 해커에게 피해 1",
-        "",
-        "수비턴: 탐지 +1합니다.",
+        "[수비턴]",
+        "레이저로 해커를 탐지합니다.",
+        "작동 시: 탐지 +1",
         "",
         "설치한 칸을 다시 누르면 회전합니다.",
       ].join("\n");
@@ -837,19 +842,23 @@ export function initUI(callbacks) {
     const shockBtn = ui.defenseTools?.querySelector('[data-trap="shock"]');
     if (shockBtn) {
       shockBtn.dataset.tooltip = [
-        "해커를 감전시킵니다.",
+        "[공격턴]",
+        `감전되어 ${formatSeconds(getShockSlowTime(null, game))}간 이동속도가 감소합니다.`,
         "",
-        `공격턴: ${formatSeconds(getShockSlowTime(null, game))}간 이동속도 -${formatPercent(1 - SHOCK_SLOW_MULTIPLIER)}`,
-        "",
-        `수비턴: 해커 (현재 ${formatSeconds(getShockDelay(null, game))}) 지연`,
+        "[수비턴]",
+        `감전패널 1회 작동: 해커 ${formatSeconds(getShockDelay(null, game))} 지연`,
+        `이동속도 -${formatPercent(1 - SHOCK_SLOW_MULTIPLIER)}`,
       ].join("\n");
     }
 
     const cameraBtn = ui.defenseTools?.querySelector('[data-trap="camera"]');
     if (cameraBtn) {
       cameraBtn.dataset.tooltip = [
-        "해커를 탐지합니다.",
+        "[공격턴]",
+        "해킹해 무력화합니다.",
         "",
+        "[수비턴]",
+        "카메라로 해커를 탐지합니다.",
         getCameraEmpowerCount(game) > 1
           ? `설치된 순서대로 함정 ${getCameraEmpowerCount(game)}개를 강화합니다.`
           : "설치된 순서대로 함정을 강화합니다.",
@@ -863,18 +872,24 @@ export function initUI(callbacks) {
     const firewallBtn = ui.defenseTools?.querySelector('[data-trap="firewall"]');
     if (firewallBtn) {
       firewallBtn.dataset.tooltip = [
-        "카메라 탐지 전에는 작동하지않습니다.",
+        "[공격턴]",
+        "강화된 방화벽이 경로를 차단합니다.",
         "",
-        `카메라 탐지시 (현재 ${formatSeconds(getFirewallBlockTime(game))}) 차단`,
+        "[수비턴]",
+        "카메라 탐지 후 방화벽이 닫혀 경로를 차단합니다.",
+        `작동 시: ${formatSeconds(getFirewallBlockTime(game))} 차단`,
       ].join("\n");
     }
 
     const empBtn = ui.defenseTools?.querySelector('[data-trap="emp"]');
     if (empBtn) {
       empBtn.dataset.tooltip = [
-        "해커의 에너지를 흡수합니다.",
+        "[공격턴]",
+        "슬라이딩으로 회피할 수 있습니다.",
         "",
-        "에너지를 (현재 20)흡수합니다.",
+        "[수비턴]",
+        "EMP패널로 해커의 에너지를 흡수합니다.",
+        "작동 시: 에너지 20 흡수",
       ].join("\n");
     }
   }
@@ -933,8 +948,25 @@ export function initUI(callbacks) {
       name.textContent = TRAPS[type].name;
       label.appendChild(name);
 
+      const roleTag = document.createElement("span");
+      roleTag.className = "trap-role-tag";
+      roleTag.textContent = TRAPS[type].role || "방어";
+      roleTag.title = `핵심 역할: ${TRAPS[type].role || "방어"}`;
+      label.appendChild(roleTag);
+
+      const meta = document.createElement("span");
+      meta.className = "trap-meta";
+      if (TRAPS[type].placementNote) {
+        const condition = document.createElement("span");
+        condition.className = "trap-condition";
+        condition.textContent = TRAPS[type].placementNote;
+        meta.appendChild(condition);
+        btn.classList.add("has-trap-condition");
+      }
+
       btn.replaceChildren(label);
-      if (cost) btn.appendChild(cost);
+      if (cost) meta.appendChild(cost);
+      btn.appendChild(meta);
     }
   }
 
@@ -955,23 +987,36 @@ export function initUI(callbacks) {
 
     if (!visible) {
       objectivePanelOpen = false;
+      defenseObjectiveWasVisible = false;
       ui.objectiveHud.classList.add("hidden");
       ui.objectivePanel.classList.add("hidden");
       ui.objectiveToggle.setAttribute("aria-expanded", "false");
       return;
     }
 
+    if (!defenseObjectiveWasVisible) objectivePanelOpen = true;
+    defenseObjectiveWasVisible = true;
     const completed = items.filter((item) => item.complete).length;
     ui.objectiveHud.classList.remove("hidden");
-    ui.objectiveToggle.textContent = `목표 ${completed}/${items.length}`;
+    ui.objectiveToggle.textContent = `필수 목표 ${completed}/${items.length} 완료`;
     ui.objectiveToggle.setAttribute("aria-expanded", objectivePanelOpen ? "true" : "false");
     ui.objectivePanel.classList.toggle("hidden", !objectivePanelOpen);
     ui.objectivePanel.replaceChildren();
 
     const title = document.createElement("div");
     title.className = "objective-panel-title";
-    title.textContent = "수비 목표";
+    title.textContent = "수비 목표 · 모든 조건 필수";
     ui.objectivePanel.appendChild(title);
+
+    const requiredNote = document.createElement("p");
+    requiredNote.className = "objective-required-note";
+    requiredNote.textContent = "아래 필수 조건을 모두 달성하세요.";
+    ui.objectivePanel.appendChild(requiredNote);
+
+    const retryNote = document.createElement("p");
+    retryNote.className = "objective-retry-note";
+    retryNote.textContent = "실패하면 같은 스테이지를 재도전하며 이전 배치는 유지됩니다.";
+    ui.objectivePanel.appendChild(retryNote);
 
     const list = document.createElement("div");
     list.className = "objective-checklist";
@@ -1020,17 +1065,17 @@ export function initUI(callbacks) {
         before: openTrapToolsPanel,
         target: () => ui.defenseTools?.querySelector('[data-trap="shock"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="shock"]'),
-        text: "감전패널은 공격때는 이동속도를 감소시킵니다.",
+        text: "[공격턴] 감전패널은 해커의 이동속도를 감소시킵니다.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="shock"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="shock"]'),
-        text: "수비때는 기본적으로 1초를 지연시키지만, 선택한 강화효과로 1초가 증가했습니다.",
+        text: "[수비턴] 감전패널은 해커에게 실제로 닿아야 지연 조건이 완료됩니다.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="emp"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="emp"]'),
-        text: "이번에는 에너지 흡수를 위해 EMP패널을 설치합시다.",
+        text: "EMP패널은 해커에게 실제로 작동해야 에너지를 흡수합니다.",
       },
     ];
 
@@ -1042,7 +1087,7 @@ export function initUI(callbacks) {
     if (!ui.startReplayBtn) return;
     showGuideBubble(
       ui.startReplayBtn,
-      "함정 설치가 완료되었다면 리플레이를 재생해서 수비목표를 모두 달성합시다.",
+      "함정을 배치한 뒤 리플레이를 시작하세요. 배치 후 실제로 작동시켜야 하며, 표시된 필수 조건을 모두 달성해야 수비에 성공합니다.",
       null,
       { blockTargetActivation: true }
     );
@@ -1068,17 +1113,17 @@ export function initUI(callbacks) {
         before: openTrapToolsPanel,
         target: () => ui.defenseTools?.querySelector('[data-trap="firewall"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="firewall"]'),
-        text: "방화벽은 기본적으로 아무런 효과가 없지만, 카메라에 탐지되면 긴 지연의 차단벽을 설치합니다.",
+        text: "방화벽은 카메라 탐지 전에는 열려 있고, 탐지 후에만 닫혀 경로를 차단합니다.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="camera"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="camera"]'),
-        text: "카메라와 방화벽을 설치해, 수비목표의 지연 6초를 달성해봅시다.",
+        text: "카메라로 먼저 해커를 탐지한 뒤 방화벽이 실제로 작동하도록 배치하세요.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
           ui.defenseTools?.querySelector('[data-trap="laser"]'),
-        text: "레이저는 카메라보다 유연한 방향으로 해커를 탐지할 수 있습니다.",
+        text: "레이저는 방향을 맞춰 해커를 실제로 탐지해야 조건이 완료됩니다.",
       },
       {
         target: () => ui.defenseTools?.querySelector('[data-trap="laser"] .trap-button-icon') ||
@@ -3339,6 +3384,8 @@ export function initUI(callbacks) {
     queueStageFourLaserRotateGuide,
     showReplayStartGuideBubble,
     hideGuideBubble,
+    openObjectivePanel,
+    openTrapToolsPanel,
     setLog,
     updateLaserDirection,
     setDeleteMode,

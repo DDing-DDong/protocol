@@ -356,7 +356,6 @@ body.lobby-active.lobby-settings-open .topbar {
   z-index: 220;
 }
 
-body.lobby-active.lobby-settings-open .topbar > div:first-child,
 body.lobby-active.lobby-settings-open #restartBtn,
 body.lobby-active.lobby-settings-open #pauseAttackBtn {
   display: none;
@@ -1019,6 +1018,21 @@ body.lobby-active.lobby-settings-open .topbar {
   font-weight: 900;
 }
 
+.objective-required-note,
+.objective-retry-note {
+  margin: 0 0 6px;
+  color: #e9fff9;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.objective-retry-note {
+  margin-bottom: 9px;
+  color: #9ac7d6;
+  font-weight: 700;
+}
+
 .objective-checklist {
   display: grid;
   gap: 5px;
@@ -1370,8 +1384,10 @@ body.lobby-active.lobby-settings-open .topbar {
 
 .trap-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .trap-btn {
@@ -1379,18 +1395,84 @@ body.lobby-active.lobby-settings-open .topbar {
   background: #17283b;
   color: #e9f8ff;
   border: 1px solid #2d516d;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr;
+  grid-template-areas: "label cost";
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  align-items: stretch;
   gap: 8px;
+  overflow: hidden;
 }
 
 .trap-label {
+  grid-area: label;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   flex: 1;
+}
+
+.trap-role-tag {
+  padding: 2px 5px;
+  border: 1px solid rgba(39, 255, 200, 0.42);
+  border-radius: 999px;
+  color: #b9ffe9;
+  background: rgba(39, 255, 200, 0.10);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.trap-meta {
+  display: contents;
+}
+
+.trap-condition {
+  grid-area: condition;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  color: #ffd08a;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trap-btn small {
+  grid-area: cost;
+  align-self: center;
+}
+
+.trap-btn.has-trap-condition {
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label cost"
+    "condition condition";
+  min-height: 58px;
+}
+
+.trap-btn.has-trap-condition {
+  border-color: rgba(255, 208, 138, 0.68);
+  box-shadow: inset 0 0 12px rgba(255, 112, 64, 0.10);
+}
+
+.trap-btn.selected .trap-role-tag {
+  color: #031018;
+  border-color: rgba(3, 16, 24, 0.42);
+  background: rgba(233, 248, 255, 0.42);
+}
+
+.trap-btn.selected .trap-condition {
+  color: #031018;
 }
 
 .trap-name {
@@ -2675,6 +2757,7 @@ body.mobile-client .settings-panel {
   width: min(236px, calc(100dvw - 24px));
   max-height: calc(100dvh - 24px);
   overflow: auto;
+  touch-action: pan-y;
 }
 
 body.mobile-client .hud-tutorial-bubble {
@@ -3009,4 +3092,172 @@ body.mobile-client.mobile-portrait .lobby-root {
   height: 100dvw;
   transform: rotate(-90deg) translateX(-100%);
   transform-origin: top left;
+}
+
+/* Mobile defense HUD fit: keep both required panels usable without covering the map. */
+@media (hover: none) and (pointer: coarse) {
+  body.mobile-client .objective-hud,
+  body.mobile-client .defense-tools-hud {
+    max-width: calc(50dvw - 14px);
+  }
+
+  body.mobile-client .objective-panel {
+    width: min(210px, calc(50dvw - 28px));
+    max-height: calc(100dvh - 124px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+  }
+
+  body.mobile-client .objective-panel-title {
+    font-size: 11px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  body.mobile-client .objective-required-note,
+  body.mobile-client .objective-retry-note {
+    font-size: 10px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  body.mobile-client .objective-check-row {
+    min-height: 31px;
+  }
+
+  body.mobile-client .defense-tools-panel {
+    width: min(330px, calc(50dvw - 28px));
+    max-height: calc(100dvh - 92px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+  }
+
+  body.mobile-client .defense-tools-panel .hint {
+    max-height: 6.2em;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+    overflow-wrap: anywhere;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-btn {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 1fr;
+    grid-template-areas: "label cost";
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+    align-items: stretch;
+    padding: 6px;
+    overflow: hidden;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-btn.has-trap-condition {
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label cost"
+      "condition condition";
+    min-height: 58px;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-label {
+    grid-area: label;
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    line-height: 1.1;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-name {
+    font-size: 10px;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-role-tag {
+    max-width: 64px;
+    padding: 2px 4px;
+    font-size: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-meta {
+    display: contents;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-condition {
+    grid-area: condition;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    font-size: 8px;
+    line-height: 1.1;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+  }
+
+  body.mobile-client .defense-tools-panel .trap-btn small {
+    grid-area: cost;
+    align-self: center;
+    font-size: 10px;
+  }
+
+  body.mobile-client .defense-tools-panel .tool-actions button {
+    min-height: 40px;
+    padding-inline: 6px;
+    font-size: 11px;
+  }
+
+  body.mobile-client .trap-btn[data-tooltip]::before,
+  body.mobile-client .trap-btn[data-tooltip]::after {
+    display: none;
+  }
+
+  body.mobile-client .overlay-card p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  body.mobile-client .overlay.reward-select-overlay .overlay-card {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  body.mobile-client.mobile-portrait .objective-hud,
+  body.mobile-client.mobile-portrait .defense-tools-hud {
+    max-width: calc(50dvh - 14px);
+  }
+
+  body.mobile-client.mobile-portrait .objective-panel {
+    width: min(210px, calc(50dvh - 28px));
+    max-height: calc(100dvw - 124px);
+  }
+
+  body.mobile-client.mobile-portrait .defense-tools-panel {
+    width: min(330px, calc(50dvh - 28px));
+    max-height: calc(100dvw - 92px);
+  }
 }
