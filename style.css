@@ -564,7 +564,7 @@ body.lobby-active.lobby-settings-open .topbar {
 .empower-preview {
   position: absolute;
   z-index: 10;
-  top: 14px;
+  top: 68px;
   left: 50%;
   transform: translateX(-50%);
   min-height: 46px;

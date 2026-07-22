@@ -15,10 +15,10 @@ import {
   CORE_X,
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
-} from "./data.js?v=20260720-defense-ux";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260720-defense-ux";
-import { initUI } from "./ui.js?v=20260720-defense-ux";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260720-defense-ux";
+} from "./data.js?v=20260722-single-camera-boost";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260722-wall-ledge-mantle";
+import { initUI } from "./ui.js?v=20260722-shock-visual-size";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260722-shock-tile-alignment";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
@@ -26,8 +26,8 @@ import {
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260720-defense-ux";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260720-defense-ux";
+} from "./trap.js?v=20260722-shock-tile-alignment";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260722-shock-tile-alignment";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
 import { initLobby } from "./lobby.js?v=20260711-path-note";
 import { getBestStage, resetBestStage, saveBestStage } from "./repositories/localGameRepository.js";
@@ -1042,6 +1042,7 @@ function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
     !game.tutorialFlags.stage2Defense
   ) {
     game.tutorialFlags.stage2Defense = true;
+    uiModule.closeDefenseGuidePanels?.();
     showDialogueSequence("AI 시스템", STAGE_TWO_DEFENSE_DIALOGUE, {
       finalButtonText: "방어 준비",
       keepCurrentBgm: true,

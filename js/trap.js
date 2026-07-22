@@ -1,11 +1,13 @@
 // trap.js
 // 책임: 함정 생성, 배치, 트랩 판정과 관련된 로직을 담당합니다.
 
-import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js?v=20260720-defense-ux";
+import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js?v=20260722-single-camera-boost";
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
+export const FLOOR_TRAP_WIDTH = 48;
 const LASER_DOWNWARD_OFFSET = 14;
+const CAMERA_EMPOWER_TARGET_TYPES = new Set(["laser", "firewall"]);
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return false;
@@ -168,7 +170,7 @@ export function getOrientedTrapBox(trap, game) {
   }
 
   if (trap.type === "shock") {
-    return { x: trap.x - 36, y: trap.y - 8, w: 72, h: 14 };
+    return { x: trap.x - FLOOR_TRAP_WIDTH / 2, y: trap.y - 8, w: FLOOR_TRAP_WIDTH, h: 14 };
   }
 
   if (trap.type === "emp") {
@@ -278,6 +280,77 @@ export function empowerNextTrapByPlacementOrder(game) {
 
 export function empowerNextTrapsByPlacementOrder(game) {
   return empowerNextTrapsInList(game, game.placedTraps, getCameraEmpowerCount(game));
+}
+
+export function getCameraEmpowerAssignments(game, traps = game?.placedTraps) {
+  const assignments = [];
+  const pending = [];
+  const empowerCount = getCameraEmpowerCount(game);
+
+  for (const trap of traps || []) {
+    if (trap?.type === "camera") {
+      const assignment = { camera: trap, targets: [] };
+      assignments.push(assignment);
+      pending.push({ assignment, remaining: empowerCount });
+      continue;
+    }
+
+    if (!CAMERA_EMPOWER_TARGET_TYPES.has(trap?.type)) continue;
+    while (pending.length > 0 && pending[0].remaining <= 0) pending.shift();
+    if (pending.length === 0) continue;
+
+    pending[0].assignment.targets.push(trap);
+    pending[0].remaining -= 1;
+    if (pending[0].remaining <= 0) pending.shift();
+  }
+
+  return assignments;
+}
+
+export function empowerCameraTargetsByPlacementOrder(game, camera, traps = game?.placedTraps) {
+  if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
+  const assignment = getCameraEmpowerAssignments(game, traps)
+    .find((entry) => entry.camera === camera || entry.camera?.id === camera.id);
+  if (!assignment) return [];
+
+  const empowered = [];
+  for (const target of assignment.targets) {
+    if (!target || target.empowered || game.metrics.alertCharge <= 0) continue;
+    target.empowered = true;
+    game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
+    empowered.push(target);
+  }
+  return empowered;
+}
+
+export function empowerAttackTargetForCamera(game, camera, hazards = game?.baseHazards) {
+  if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
+  const recentDefenseHazards = (hazards || []).filter((hazard) => hazard?.carried);
+  const stageHazards = (hazards || []).filter((hazard) => !hazard?.carried);
+  const stage = Number(game?.stage) || 1;
+  const firstRecentCameraIndex = recentDefenseHazards.findIndex((hazard) => hazard?.type === "camera");
+  const recentTargetsAfterCamera = firstRecentCameraIndex >= 0
+    ? recentDefenseHazards
+      .slice(firstRecentCameraIndex + 1)
+      .filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
+    : [];
+  const cameras = stage <= 3
+    ? stageHazards.filter((hazard) => hazard?.type === "camera")
+    : [recentDefenseHazards, stageHazards]
+      .flatMap((group) => group.filter((hazard) => hazard?.type === "camera"));
+  const targets = stage <= 3
+    ? stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
+    : [
+      ...recentTargetsAfterCamera,
+      ...stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type)),
+    ];
+  const cameraIndex = cameras.indexOf(camera);
+  const target = cameraIndex >= 0 ? targets[cameraIndex] : null;
+  if (!target || target.empowered) return [];
+
+  target.empowered = true;
+  game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
+  return [target];
 }
 
 export function previewNextTrapsByPlacementOrder(game) {

@@ -130,12 +130,6 @@ export const rewardPool = {
       applyEffect: (game) => { game.mods.defenseBudgetBonus += 2; },
     }),
     createEffectReward({
-      name: "감시 네트워크",
-      desc: "카메라 탐지 시 다음 함정 1개를 추가로 강화합니다.",
-      target: "defense",
-      applyEffect: (game) => { game.mods.cameraNetworkBonus += CAMERA_NETWORK_EMPOWER_BONUS; },
-    }),
-    createEffectReward({
       name: "레이저 길이 증가",
       desc: "방어 턴 레이저의 길이가 증가합니다.",
       target: "defense",
@@ -1067,7 +1061,7 @@ export function getShockDelay(trap, game) {
 }
 
 export function getCameraEmpowerCount(game) {
-  return 1 + (game?.mods?.cameraNetworkBonus || 0);
+  return 1;
 }
 
 export function createMetrics() {

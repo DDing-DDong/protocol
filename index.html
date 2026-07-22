@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260720-defense-panel-grid" />
+  <link rel="stylesheet" href="./style.css?v=20260722-camera-order" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -81,7 +81,7 @@
             <div class="trap-grid">
               <button class="trap-btn selected" data-trap="laser" data-tooltip="해커를 탐지합니다.&#10;강화: 탐지 +1&#10;선택된 상태에서 다시 클릭하면 회전합니다." type="button"><span class="trap-label"><span class="laser-direction" aria-hidden="true">↑</span>레이저</span> <small>2</small></button>
               <button class="trap-btn" data-trap="shock" data-tooltip="해커를 감전시켜 이동을 지연시키고 이동속도를 낮춥니다.&#10;공격턴: 이동속도 45% 감소 2초&#10;강화: 지연/감속 지속 +0.8초" type="button">감전패널 <small>2</small></button>
-              <button class="trap-btn" data-trap="camera" data-tooltip="피해를 주지않지만 해커를 탐지해 경보를 충전합니다.&#10;경보는 설치 순서대로 다음 함정 1개를 강화합니다.&#10;감시 네트워크 보상: 강화 +1개" type="button">카메라 <small>1</small></button>
+              <button class="trap-btn" data-trap="camera" data-tooltip="피해를 주지않지만 해커를 탐지해 경보를 충전합니다.&#10;설치 순서대로 다음 레이저 또는 방화벽 1개를 강화합니다." type="button">카메라 <small>1</small></button>
               <button class="trap-btn" data-trap="firewall" data-tooltip="기본 상태에서는 열려 있습니다.&#10;강화: 현재 5초 동안 경로 차단&#10;방화벽 강화 보상: +1초" type="button">방화벽 <small>1</small></button>
               <button class="trap-btn" data-trap="emp" data-tooltip="해커의 에너지를 20 흡수합니다.&#10;강화: 에너지 흡수 +10" type="button">EMP패널 <small>1</small></button>
             </div>
@@ -137,6 +137,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260720-defense-ux"></script>
+  <script type="module" src="./js/game.js?v=20260722-wall-ledge-mantle"></script>
 </body>
 </html>
