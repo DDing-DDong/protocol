@@ -16,7 +16,7 @@ import {
   getCameraHazardBox,
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
-} from "./trap.js?v=20260722-single-camera-boost";
+} from "./trap.js?v=20260722-shock-tile-alignment";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
@@ -26,7 +26,8 @@ const VISUAL_TILE_SIZE = 48;
 const VISUAL_TILE_DRAW_W = 56;
 const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
-const FLOOR_TRAP_VISUAL_W = 60;
+const SHOCK_TRAP_VISUAL_W = 60;
+const EMP_TRAP_VISUAL_W = 48;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
 const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
 const BACKGROUND_IMAGE_BASE_URL = new URL("../assets/images/Background_image/", import.meta.url);
@@ -2493,10 +2494,9 @@ export function initUI(callbacks) {
     }
 
     if (type === "shock" || type === "emp") {
-      // Floor traps occupy one placement slot. Their collision boxes remain
-      // unchanged; only the artwork is constrained so it cannot cover the
-      // neighboring slot or make the effective range look wider than it is.
-      const visualW = FLOOR_TRAP_VISUAL_W;
+      // Floor-trap artwork is slightly wider for readability, but remains
+      // centered on the independent 48px collision box.
+      const visualW = type === "shock" ? SHOCK_TRAP_VISUAL_W : EMP_TRAP_VISUAL_W;
       const visualH = Math.max(12, visualW / getTrapImageAspect(type));
       const groundOffset = 2;
       return bottomAlignedBox(x + w / 2, y + h + groundOffset, visualW, visualH);

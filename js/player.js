@@ -18,7 +18,7 @@ import {
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260722-camera-target-pairs-v2";
+} from "./trap.js?v=20260722-shock-tile-alignment";
 import { recordHacker } from "./replay.js?v=20260722-single-camera-boost";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 

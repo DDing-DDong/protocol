@@ -5,6 +5,7 @@ import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, ge
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
+export const FLOOR_TRAP_WIDTH = 48;
 const LASER_DOWNWARD_OFFSET = 14;
 const CAMERA_EMPOWER_TARGET_TYPES = new Set(["laser", "firewall"]);
 
@@ -169,7 +170,7 @@ export function getOrientedTrapBox(trap, game) {
   }
 
   if (trap.type === "shock") {
-    return { x: trap.x - 36, y: trap.y - 8, w: 72, h: 14 };
+    return { x: trap.x - FLOOR_TRAP_WIDTH / 2, y: trap.y - 8, w: FLOOR_TRAP_WIDTH, h: 14 };
   }
 
   if (trap.type === "emp") {

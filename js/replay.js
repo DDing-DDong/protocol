@@ -18,7 +18,7 @@ import {
   isEntityInCameraView,
   empowerCameraTargetsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260722-single-camera-boost";
+} from "./trap.js?v=20260722-shock-tile-alignment";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;

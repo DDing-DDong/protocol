@@ -2,7 +2,7 @@
 // 책임: 스테이지 로딩과 맵 생성만 담당합니다.
 
 import { GROUND_Y, INFINITE_STAGE_START, LASER_BASE_LENGTH, WIDTH, getFirewallBlockTime, getStageById } from "./data.js?v=20260720-defense-ux";
-import { getOrientedTrapBox } from "./trap.js?v=20260711-stage4-laser-rotate-tip";
+import { FLOOR_TRAP_WIDTH, getOrientedTrapBox } from "./trap.js?v=20260722-shock-tile-alignment";
 
 const TRAP_SLOT_SPACING = 48;
 const START_SLOT_BLOCK_X = 150;
@@ -848,7 +848,44 @@ function cloneTrapNodes(trapNodes) {
 function normalizeStageHazard(hazard, platforms) {
   if (hazard.type === "laser") return normalizeStageLaserHazard(hazard);
   if (hazard.type === "camera") return normalizeStageCameraHazard(hazard, platforms);
+  if (hazard.type === "shock") return normalizeStageShockHazard(hazard, platforms);
   return hazard;
+}
+
+function normalizeStageShockHazard(shock, platforms) {
+  const width = Number(shock.w);
+  const height = Number(shock.h);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return shock;
+
+  const centerX = Number(shock.x) + width / 2;
+  const bottomY = Number(shock.y) + height;
+  let surface = null;
+  let bestDistance = Infinity;
+
+  for (const platform of platforms || []) {
+    if (!isValidPlatformRect(platform)) continue;
+    if (centerX < platform.x || centerX > platform.x + platform.w) continue;
+    const distance = Math.abs(platform.y - bottomY);
+    if (distance >= bestDistance) continue;
+    bestDistance = distance;
+    surface = platform;
+  }
+
+  let snappedCenterX = centerX;
+  if (surface) {
+    const columns = Math.max(1, Math.floor(surface.w / TRAP_SLOT_SPACING));
+    const column = Math.max(0, Math.min(
+      columns - 1,
+      Math.round((centerX - surface.x - TRAP_SLOT_SPACING / 2) / TRAP_SLOT_SPACING)
+    ));
+    snappedCenterX = surface.x + column * TRAP_SLOT_SPACING + TRAP_SLOT_SPACING / 2;
+  }
+
+  return {
+    ...shock,
+    x: snappedCenterX - FLOOR_TRAP_WIDTH / 2,
+    w: FLOOR_TRAP_WIDTH,
+  };
 }
 
 function normalizeStageHazardSurface(hazard, stage, game) {
