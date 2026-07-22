@@ -6,6 +6,7 @@ import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, ge
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
 const LASER_DOWNWARD_OFFSET = 14;
+const CAMERA_EMPOWER_TARGET_TYPES = new Set(["laser", "firewall"]);
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return false;
@@ -278,6 +279,47 @@ export function empowerNextTrapByPlacementOrder(game) {
 
 export function empowerNextTrapsByPlacementOrder(game) {
   return empowerNextTrapsInList(game, game.placedTraps, getCameraEmpowerCount(game));
+}
+
+export function getCameraEmpowerAssignments(game, traps = game?.placedTraps) {
+  const assignments = [];
+  const pending = [];
+  const empowerCount = getCameraEmpowerCount(game);
+
+  for (const trap of traps || []) {
+    if (trap?.type === "camera") {
+      const assignment = { camera: trap, targets: [] };
+      assignments.push(assignment);
+      pending.push({ assignment, remaining: empowerCount });
+      continue;
+    }
+
+    if (!CAMERA_EMPOWER_TARGET_TYPES.has(trap?.type)) continue;
+    while (pending.length > 0 && pending[0].remaining <= 0) pending.shift();
+    if (pending.length === 0) continue;
+
+    pending[0].assignment.targets.push(trap);
+    pending[0].remaining -= 1;
+    if (pending[0].remaining <= 0) pending.shift();
+  }
+
+  return assignments;
+}
+
+export function empowerCameraTargetsByPlacementOrder(game, camera, traps = game?.placedTraps) {
+  if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
+  const assignment = getCameraEmpowerAssignments(game, traps)
+    .find((entry) => entry.camera === camera || entry.camera?.id === camera.id);
+  if (!assignment) return [];
+
+  const empowered = [];
+  for (const target of assignment.targets) {
+    if (!target || target.empowered || game.metrics.alertCharge <= 0) continue;
+    target.empowered = true;
+    game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
+    empowered.push(target);
+  }
+  return empowered;
 }
 
 export function previewNextTrapsByPlacementOrder(game) {

@@ -16,9 +16,9 @@ import {
   getOrientedTrapBox,
   hasLineOfSight,
   isEntityInCameraView,
-  empowerNextTrapsByPlacementOrder,
+  empowerCameraTargetsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260720-defense-ux";
+} from "./trap.js?v=20260722-camera-order";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
@@ -208,7 +208,7 @@ function checkDefenseTraps(r, game, flashLog) {
           : "탐지 +1",
         Math.max(DETECTION_EFFECT_DURATION, game.mods.cameraDelay || 0)
       );
-      const empoweredTraps = empowerNextTrapsByPlacementOrder(game);
+      const empoweredTraps = empowerCameraTargetsByPlacementOrder(game, trap);
       updateObjectiveCompletionEffects(game, trap);
       playSfx("scanner");
       flashLog(formatCameraAlertLog(empoweredTraps));

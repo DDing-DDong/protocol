@@ -15,10 +15,9 @@ import {
 } from "./data.js?v=20260720-defense-ux";
 import {
   getCameraHazardBox,
+  getCameraEmpowerAssignments,
   getOrientedTrapBox,
-  previewNextHazardsByPlacementOrder,
-  previewNextTrapsByPlacementOrder,
-} from "./trap.js?v=20260720-defense-ux";
+} from "./trap.js?v=20260722-camera-order";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
@@ -973,8 +972,40 @@ export function initUI(callbacks) {
   function updateEmpowerPreview(game) {
     if (!ui.empowerPreview) return;
 
-    ui.empowerPreview.classList.add("hidden");
     ui.empowerPreview.replaceChildren();
+    const assignments = game.turn === TURN.DEFENSE_BUILD
+      ? getCameraEmpowerAssignments(game, game.placedTraps)
+      : [];
+    if (assignments.length === 0) {
+      ui.empowerPreview.classList.add("hidden");
+      return;
+    }
+
+    const label = document.createElement("span");
+    label.className = "empower-preview-label";
+    label.textContent = "다음 강화";
+
+    const icons = document.createElement("span");
+    icons.className = "empower-icons";
+    const targets = assignments.flatMap((assignment) => assignment.targets);
+    if (targets.length > 0) {
+      for (const target of targets) {
+        const icon = createTrapIcon(target.type);
+        icon.tabIndex = 0;
+        icon.dataset.tooltip = `${TRAPS[target.type].name} · 설치 순서에 따라 카메라 강화 예정`;
+        icons.appendChild(icon);
+      }
+    }
+
+    const summary = document.createElement("span");
+    summary.className = "empower-summary";
+    summary.textContent = targets.length > 0
+      ? targets.map((target) => TRAPS[target.type].name).join(" → ")
+      : "레이저 또는 방화벽 대기 중";
+
+    ui.empowerPreview.append(label, icons, summary);
+    ui.empowerPreview.classList.remove("hidden");
+    maybeShowPendingEmpowerPreviewGuide();
   }
 
   function updateDefenseObjectiveHUD(game) {
@@ -1047,7 +1078,8 @@ export function initUI(callbacks) {
   }
 
   function showDefenseGuideBubbles({ blockedSlot = null, onComplete } = {}) {
-    closeDefenseGuidePanels();
+    openObjectivePanel();
+    openTrapToolsPanel();
     const steps = [
       {
         target: () => blockedSlot ? createCanvasPointGuideTarget(blockedSlot.x, blockedSlot.y - 8) : null,
@@ -3386,6 +3418,7 @@ export function initUI(callbacks) {
     hideGuideBubble,
     openObjectivePanel,
     openTrapToolsPanel,
+    closeDefenseGuidePanels,
     setLog,
     updateLaserDirection,
     setDeleteMode,

@@ -14,12 +14,12 @@ import {
   approach,
 } from "./data.js?v=20260720-defense-ux";
 import {
-  empowerNextHazardsByPlacementOrder,
+  empowerCameraTargetsByPlacementOrder,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260711-stage4-laser-rotate-tip";
-import { recordHacker } from "./replay.js?v=20260711-stage4-laser-rotate-tip";
+} from "./trap.js?v=20260722-camera-order";
+import { recordHacker } from "./replay.js?v=20260722-camera-order";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const ATTACK_INPUT_CODES = new Set([
@@ -823,7 +823,7 @@ function applyAttackHazards(h, game, flashLog) {
       }
       game.metrics.detections += 1;
       game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
-      const empoweredHazards = empowerNextHazardsByPlacementOrder(game);
+      const empoweredHazards = empowerCameraTargetsByPlacementOrder(game, hazard, game.baseHazards);
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
       playSfx("scanner");
