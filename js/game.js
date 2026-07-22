@@ -16,7 +16,7 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260720-defense-ux";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260720-defense-ux";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260722-solid-platform-collision";
 import { initUI } from "./ui.js?v=20260720-defense-ux";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260720-defense-ux";
 import {

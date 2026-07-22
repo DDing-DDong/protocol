@@ -632,7 +632,8 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
   for (const platform of game.platforms || []) {
     const wallBox = getPlatformWallBox(platform);
     if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
-    if (!canReachWallWithHands(entity, wallBox)) continue;
+    // A platform is always solid. Hand reach only controls the optional
+    // nearby wall grab below; using it here let grounded hackers enter blocks.
 
     const hitLeftFace = movingRight &&
       previousBox.x + previousBox.w <= wallBox.x &&
