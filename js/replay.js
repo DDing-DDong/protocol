@@ -10,7 +10,7 @@ import {
   getShockDelay,
   getDefenseObjectiveItems,
   rectsOverlap,
-} from "./data.js?v=20260720-defense-ux";
+} from "./data.js?v=20260722-single-camera-boost";
 import {
   getTrapHitbox,
   getOrientedTrapBox,
@@ -18,7 +18,7 @@ import {
   isEntityInCameraView,
   empowerCameraTargetsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260722-camera-order";
+} from "./trap.js?v=20260722-single-camera-boost";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
@@ -368,4 +368,4 @@ function recordTrapTrigger(metrics, type) {
 // - 카메라 탐지 시 경보 충전과 설치 순서 기반 함정 강화 처리를 연결하기 위함
 // - EMP, 열린 방화벽, 강화 방화벽, 강화 함정 효과를 수비 리플레이 판정에서 타입별로 분리하기 위함
 // - 수비턴 지연 중 리플레이 해커 글리치 표시 시간을 관리하기 위함
-// - 감시 네트워크 보상에 따라 카메라가 여러 함정을 강화할 수 있도록 하기 위함
+// - 카메라 한 대가 설치 순서상 레이저 또는 방화벽 한 개만 강화하도록 하기 위함

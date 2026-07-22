@@ -1,7 +1,7 @@
 // trap.js
 // 책임: 함정 생성, 배치, 트랩 판정과 관련된 로직을 담당합니다.
 
-import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js?v=20260720-defense-ux";
+import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, getDefenseObjective } from "./data.js?v=20260722-single-camera-boost";
 
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
@@ -320,6 +320,36 @@ export function empowerCameraTargetsByPlacementOrder(game, camera, traps = game?
     empowered.push(target);
   }
   return empowered;
+}
+
+export function empowerAttackTargetForCamera(game, camera, hazards = game?.baseHazards) {
+  if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
+  const recentDefenseHazards = (hazards || []).filter((hazard) => hazard?.carried);
+  const stageHazards = (hazards || []).filter((hazard) => !hazard?.carried);
+  const stage = Number(game?.stage) || 1;
+  const firstRecentCameraIndex = recentDefenseHazards.findIndex((hazard) => hazard?.type === "camera");
+  const recentTargetsAfterCamera = firstRecentCameraIndex >= 0
+    ? recentDefenseHazards
+      .slice(firstRecentCameraIndex + 1)
+      .filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
+    : [];
+  const cameras = stage <= 3
+    ? stageHazards.filter((hazard) => hazard?.type === "camera")
+    : [recentDefenseHazards, stageHazards]
+      .flatMap((group) => group.filter((hazard) => hazard?.type === "camera"));
+  const targets = stage <= 3
+    ? stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
+    : [
+      ...recentTargetsAfterCamera,
+      ...stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type)),
+    ];
+  const cameraIndex = cameras.indexOf(camera);
+  const target = cameraIndex >= 0 ? targets[cameraIndex] : null;
+  if (!target || target.empowered) return [];
+
+  target.empowered = true;
+  game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
+  return [target];
 }
 
 export function previewNextTrapsByPlacementOrder(game) {

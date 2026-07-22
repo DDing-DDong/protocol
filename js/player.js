@@ -12,14 +12,14 @@ import {
   clamp,
   rectsOverlap,
   approach,
-} from "./data.js?v=20260720-defense-ux";
+} from "./data.js?v=20260722-single-camera-boost";
 import {
-  empowerCameraTargetsByPlacementOrder,
+  empowerAttackTargetForCamera,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260722-camera-order";
-import { recordHacker } from "./replay.js?v=20260722-camera-order";
+} from "./trap.js?v=20260722-camera-target-pairs-v2";
+import { recordHacker } from "./replay.js?v=20260722-single-camera-boost";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
 const ATTACK_INPUT_CODES = new Set([
@@ -822,8 +822,12 @@ function applyAttackHazards(h, game, flashLog) {
         return;
       }
       game.metrics.detections += 1;
-      game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
-      const empoweredHazards = empowerCameraTargetsByPlacementOrder(game, hazard, game.baseHazards);
+      let empoweredHazards = [];
+      if (!hazard.cameraEmpowerConsumed) {
+        hazard.cameraEmpowerConsumed = true;
+        game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
+        empoweredHazards = empowerAttackTargetForCamera(game, hazard, game.baseHazards);
+      }
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
       playSfx("scanner");

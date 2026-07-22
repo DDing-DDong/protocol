@@ -8,16 +8,15 @@ import {
   getObjective,
   getDefenseObjectiveItems,
   getFirewallBlockTime,
-  getCameraEmpowerCount,
   getShockDelay,
   getShockSlowTime,
   SHOCK_SLOW_MULTIPLIER,
-} from "./data.js?v=20260720-defense-ux";
+} from "./data.js?v=20260722-single-camera-boost";
 import {
   getCameraHazardBox,
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
-} from "./trap.js?v=20260722-camera-order";
+} from "./trap.js?v=20260722-single-camera-boost";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
@@ -858,13 +857,9 @@ export function initUI(callbacks) {
         "",
         "[수비턴]",
         "카메라로 해커를 탐지합니다.",
-        getCameraEmpowerCount(game) > 1
-          ? `설치된 순서대로 함정 ${getCameraEmpowerCount(game)}개를 강화합니다.`
-          : "설치된 순서대로 함정을 강화합니다.",
+        "설치된 순서대로 레이저 또는 방화벽 1개를 강화합니다.",
         "",
-        "레이저: 탐지+1, 감전패널: 지연/감속 +0.8초",
-        "",
-        "방화벽: 경로차단, EMP패널: 에너지흡수 +10",
+        "레이저: 탐지+1, 방화벽: 경로 차단",
       ].join("\n");
     }
 
@@ -3433,5 +3428,5 @@ export function initUI(callbacks) {
 // - 공격턴으로 넘어온 방화벽도 실제 닫힘/강화 상태와 같은 모습으로 표시하기 위함
 // - 카메라 회전을 제거하고 상단 본체와 하향 시야 형태로 고정하기 위함
 // - 설치형/스테이지 카메라 표시 크기를 20% 줄인 공통 크기로 통일하기 위함
-// - 감전패널 이동속도 감소와 감시 네트워크 보상 수치를 툴팁에 반영하기 위함
+// - 감전패널 이동속도 감소와 카메라의 단일 강화 대상 규칙을 툴팁에 반영하기 위함
 // - 별도 회전 버튼 없이 설치한 레이저 칸 재클릭으로 회전하도록 선택 UI를 단순화하기 위함
