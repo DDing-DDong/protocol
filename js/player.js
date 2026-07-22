@@ -43,6 +43,8 @@ const WALL_JUMP_X_SPEED = 280;
 const WALL_JUMP_Y_SPEED = 700;
 const WALL_JUMP_BUFFER_TIME = 0.12;
 const WALL_MIN_CONTACT_HEIGHT = 16;
+const WALL_LEDGE_MANTLE_HEIGHT = 18;
+const WALL_LEDGE_INSET = 2;
 const HACKER_STAND_HEIGHT = 54;
 const HACKER_SLIDE_HEIGHT = 30;
 const SLIDE_POSE_DURATION = 0.16;
@@ -515,6 +517,7 @@ function moveAndCollide(entity, dt, game, keys) {
   const holdingRight = keys.has("ArrowRight");
   const holdingUp = keys.has("ArrowUp");
 
+  const previousWallSide = entity.wallSide || entity.wallStickSide || 0;
   entity.wallGrab = false;
   entity.wallSide = 0;
 
@@ -529,7 +532,13 @@ function moveAndCollide(entity, dt, game, keys) {
   collideClosedFirewallsX(entity, previousX, game);
   grabNearbyForwardWall(entity, game, holdingLeft, holdingRight);
 
-  if (!entity.wallGrab) {
+  const wallSide = entity.wallSide || previousWallSide;
+  const climbedOntoLedge = holdingUp && isHoldingTowardWall(wallSide, holdingLeft, holdingRight) &&
+    tryClimbOntoPlatformLedge(entity, game, wallSide);
+
+  if (climbedOntoLedge) {
+    clearWallGrabState(entity);
+  } else if (!entity.wallGrab) {
     entity.wallStickSide = 0;
     entity.wallStickTimer = 0;
     entity.wallClimbing = false;
@@ -540,7 +549,7 @@ function moveAndCollide(entity, dt, game, keys) {
 
   const previousY = entity.y;
   entity.y += entity.vy * dt;
-  entity.onGround = false;
+  entity.onGround = climbedOntoLedge;
 
   if (entity.y < WORLD_TOP) {
     entity.y = WORLD_TOP;
@@ -611,6 +620,49 @@ function moveAndCollide(entity, dt, game, keys) {
     entity.wallContactTimer = 0;
     entity.wallJumpDashTimer = 0;
   }
+}
+
+function isHoldingTowardWall(wallSide, holdingLeft, holdingRight) {
+  if (wallSide > 0) return holdingRight && !holdingLeft;
+  if (wallSide < 0) return holdingLeft && !holdingRight;
+  return false;
+}
+
+function tryClimbOntoPlatformLedge(entity, game, wallSide) {
+  if (!wallSide) return false;
+  const feetY = entity.y + entity.h;
+
+  for (const platform of game.platforms || []) {
+    const touchesFace = wallSide > 0
+      ? Math.abs(entity.x + entity.w - platform.x) <= WALL_AUTO_GRAB_DISTANCE
+      : Math.abs(entity.x - (platform.x + platform.w)) <= WALL_AUTO_GRAB_DISTANCE;
+    if (!touchesFace) continue;
+    if (feetY < platform.y - 2 || feetY > platform.y + WALL_LEDGE_MANTLE_HEIGHT) continue;
+
+    entity.x = wallSide > 0
+      ? platform.x + WALL_LEDGE_INSET
+      : platform.x + platform.w - entity.w - WALL_LEDGE_INSET;
+    entity.y = platform.y - entity.h;
+    entity.vx = 0;
+    entity.vy = 0;
+    entity.onGround = true;
+    return true;
+  }
+
+  return false;
+}
+
+function clearWallGrabState(entity) {
+  entity.wallGrab = false;
+  entity.wallSide = 0;
+  entity.wallStickSide = 0;
+  entity.wallStickTimer = 0;
+  entity.wallClimbing = false;
+  entity.wallAttachEffectTime = 0;
+  entity.wallSlideEffectTime = 0;
+  entity.wallContactSide = 0;
+  entity.wallContactTimer = 0;
+  entity.wallJumpDashTimer = 0;
 }
 
 function getEdgeWallSide(entity, holdingLeft, holdingRight) {

@@ -16,7 +16,7 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260722-single-camera-boost";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260722-shock-tile-alignment";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260722-wall-ledge-mantle";
 import { initUI } from "./ui.js?v=20260722-shock-visual-size";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260722-shock-tile-alignment";
 import {
