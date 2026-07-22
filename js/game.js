@@ -30,6 +30,7 @@ import {
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260720-defense-ux";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
 import { initLobby } from "./lobby.js?v=20260711-path-note";
+import { getBestStage, resetBestStage, saveBestStage } from "./repositories/localGameRepository.js";
 
 const BGM_TRACKS = {
   play: "neon-circuit-drift.mp3",
@@ -176,7 +177,7 @@ const game = {
   stageState: createStageState(),
   stageLayoutSelections: {},
   defenseBudget: 4,
-  infiniteBest: Number(localStorage.getItem("traceProtocolBest") || 0),
+  infiniteBest: getBestStage(),
   hacker: null,
   replayHacker: null,
   deleteMode: false,
@@ -975,7 +976,7 @@ function applyReward(reward, options = {}) {
 function updateBest(stage, success) {
   if (success && stage > game.infiniteBest) {
     game.infiniteBest = stage;
-    localStorage.setItem("traceProtocolBest", String(stage));
+    saveBestStage(stage);
   }
 }
 
@@ -1226,7 +1227,7 @@ function maybeShowStageTwoReplayGuide() {
 function resetGame() {
   stageStarted = true;
   stopBgm();
-  localStorage.removeItem("traceProtocolBest");
+  resetBestStage();
   resetRunState({ clearBest: true });
   setupStage();
 }

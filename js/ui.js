@@ -20,6 +20,7 @@ import {
   previewNextTrapsByPlacementOrder,
 } from "./trap.js?v=20260720-defense-ux";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
+import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 540;
@@ -70,7 +71,6 @@ const HACKER_IMAGE_BASE_URL = new URL("../assets/images/hacker_new_frames/", imp
 const HACKER_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/hacker_script/", import.meta.url);
 const AI_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_script/", import.meta.url);
 const AI_ANDROID_SCRIPT_IMAGE_BASE_URL = new URL("../assets/images/AI_skin1/", import.meta.url);
-const AI_SKIN_STORAGE_KEY = "traceProtocolAiPortraitSkin";
 const GUIDE_BUBBLE_SKIP_STORAGE_KEY = "traceProtocolSkipGuideBubbles";
 const AI_SCRIPT_SKINS = {
   classic: {
@@ -272,7 +272,7 @@ function createAiScriptImagesBySkin() {
 }
 
 function getSelectedAiSkin() {
-  const stored = localStorage.getItem(AI_SKIN_STORAGE_KEY);
+  const stored = getSelectedSkin();
   return AI_SCRIPT_SKINS[stored] ? stored : "classic";
 }
 

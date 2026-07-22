@@ -2,10 +2,14 @@
 // Handles only Splash/Lobby screen transitions and lobby button wiring.
 
 import { playLobbyBgm, unlockAudio } from "./audio.js?v=20260711-dash-wav";
+import {
+  getPurchasedSkins as loadPurchasedSkins,
+  getSelectedSkin as loadSelectedSkin,
+  savePurchasedSkins,
+  saveSelectedSkin,
+} from "./repositories/localGameRepository.js";
 
 const SPLASH_DELAY_MS = 1400;
-const AI_SKIN_STORAGE_KEY = "traceProtocolAiPortraitSkin";
-const AI_SKIN_PURCHASE_STORAGE_KEY = "traceProtocolPurchasedAiSkins";
 const SELECTABLE_AI_SKINS = [
   {
     id: "classic",
@@ -49,12 +53,7 @@ export function initLobby({
   root?.appendChild(pathNoteModal);
 
   const getPurchasedSkins = () => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(AI_SKIN_PURCHASE_STORAGE_KEY) || "[]");
-      return new Set(Array.isArray(stored) ? stored : []);
-    } catch {
-      return new Set();
-    }
+    return new Set(loadPurchasedSkins());
   };
 
   const isSkinOwned = (skinId) => {
@@ -66,11 +65,11 @@ export function initLobby({
   const purchaseSkin = (skinId) => {
     const purchased = getPurchasedSkins();
     purchased.add(skinId);
-    localStorage.setItem(AI_SKIN_PURCHASE_STORAGE_KEY, JSON.stringify([...purchased]));
+    savePurchasedSkins([...purchased]);
   };
 
   const getSelectedSkin = () => {
-    const stored = localStorage.getItem(AI_SKIN_STORAGE_KEY);
+    const stored = loadSelectedSkin();
     if (SELECTABLE_AI_SKINS.some((skin) => skin.id === stored) && isSkinOwned(stored)) return stored;
     return SELECTABLE_AI_SKINS[0].id;
   };
@@ -112,14 +111,14 @@ export function initLobby({
     });
   };
 
-  const selectSkin = (skinId) => {
+  const selectSkin = (skinId, { persist = true } = {}) => {
     const nextSkin = SELECTABLE_AI_SKINS.some((skin) => skin.id === skinId) ? skinId : SELECTABLE_AI_SKINS[0].id;
     if (!isSkinOwned(nextSkin)) {
       pendingPurchaseSkinId = nextSkin;
       setSkinPurchaseModalOpen(true, "confirm");
       return;
     }
-    localStorage.setItem(AI_SKIN_STORAGE_KEY, nextSkin);
+    if (persist) saveSelectedSkin(nextSkin);
     refreshSkinButtons();
     document.dispatchEvent(new CustomEvent("protocol:ai-skin-change", {
       detail: { skin: nextSkin },
@@ -161,7 +160,7 @@ export function initLobby({
   };
 
   window.setTimeout(showLobby, SPLASH_DELAY_MS);
-  selectSkin(getSelectedSkin());
+  selectSkin(getSelectedSkin(), { persist: false });
   refreshSkinButtons();
 
   root?.addEventListener("pointerdown", startLobbyBgm);
