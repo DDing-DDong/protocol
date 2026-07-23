@@ -2,7 +2,12 @@
 // 책임: 스테이지 로딩과 맵 생성만 담당합니다.
 
 import { GROUND_Y, INFINITE_STAGE_START, LASER_BASE_LENGTH, WIDTH, getFirewallBlockTime, getStageById } from "./data.js?v=20260720-defense-ux";
-import { FLOOR_TRAP_WIDTH, getOrientedTrapBox } from "./trap.js?v=20260722-shock-tile-alignment";
+import {
+  FLOOR_TRAP_HEIGHT,
+  FLOOR_TRAP_SURFACE_LIFT,
+  FLOOR_TRAP_WIDTH,
+  getOrientedTrapBox,
+} from "./trap.js?v=20260723-floor-trap-lift";
 
 const TRAP_SLOT_SPACING = 48;
 const START_SLOT_BLOCK_X = 150;
@@ -900,9 +905,12 @@ function normalizeStageHazardSurface(hazard, stage, game) {
   const surface = findClosestHazardTopSurface(hazard, anchor, width, height, stage, game);
   if (!surface) return hazard;
 
+  const isFloorTrap = hazard.type === "shock" || hazard.type === "emp";
+
   return {
     ...hazard,
-    y: surface.y - height,
+    h: isFloorTrap ? FLOOR_TRAP_HEIGHT : height,
+    y: isFloorTrap ? surface.y - FLOOR_TRAP_HEIGHT - FLOOR_TRAP_SURFACE_LIFT : surface.y - height,
   };
 }
 

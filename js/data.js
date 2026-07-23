@@ -124,10 +124,13 @@ export const DEFENSE_OBJECTIVES = {
 export const rewardPool = {
   attack: [
     createEffectReward({
-      name: "함정 토큰 +2",
-      desc: "다음 방어 턴에서 함정 토큰이 2개 증가합니다.",
+      name: "함정 토큰 +1 · 설치 함정 +1",
+      desc: "다음 방어 턴에서 함정 토큰이 1개 증가하고, 함정 1개를 제한 외로 추가 설치할 수 있습니다.",
       target: "defense",
-      applyEffect: (game) => { game.mods.defenseBudgetBonus += 2; },
+      applyEffect: (game) => {
+        game.mods.defenseBudgetBonus += 1;
+        game.mods.extraTrapPlacements += 1;
+      },
     }),
     createEffectReward({
       name: "레이저 길이 증가",
@@ -1024,8 +1027,10 @@ export function createDefaultMods() {
     maxEnergy: 100,
     dashCooldown: 0.85,
     shieldDrain: 48,
+    hackInvincibilityBonus: 0,
     freeHit: 0,
     defenseBudgetBonus: 0,
+    extraTrapPlacements: 0,
     cameraNetworkBonus: 0,
     laserBoost: 0,
     firewallDelay: 0,

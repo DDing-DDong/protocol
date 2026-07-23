@@ -6,8 +6,10 @@ import { TURN, TRAPS, LASER_BASE_LENGTH, cryptoSafeId, getCameraEmpowerCount, ge
 export const CAMERA_W = 90;
 export const CAMERA_H = 94;
 export const FLOOR_TRAP_WIDTH = 48;
+export const FLOOR_TRAP_HEIGHT = 12;
+export const FLOOR_TRAP_SURFACE_LIFT = 2;
 const LASER_DOWNWARD_OFFSET = 14;
-const CAMERA_EMPOWER_TARGET_TYPES = new Set(["laser", "firewall"]);
+const CAMERA_EMPOWER_TARGET_TYPES = new Set(["laser", "shock", "firewall", "emp"]);
 
 export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flashLog) {
   if (game.turn !== TURN.DEFENSE_BUILD || slot.occupied) return false;
@@ -17,7 +19,8 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
   }
 
   const objective = getDefenseObjective(game.stage);
-  const extraUse = canUseExtraTrap(game, selectedTrap);
+  const extraUseSource = getExtraTrapUseSource(game, selectedTrap);
+  const extraUse = Boolean(extraUseSource);
   if (objective?.maxTraps && countObjectiveTraps(game) >= objective.maxTraps) {
     if (!extraUse) {
       flashLog(`이번 방어 목표는 함정 ${objective.maxTraps}개 이하입니다.`);
@@ -45,12 +48,14 @@ export function placeTrapAtSlot(game, slot, selectedTrap, selectedRotation, flas
     costPaid: cost,
     usedFreePlacement,
     extraUse,
+    extraUseSource,
   };
 
   slot.occupied = true;
   game.placedTraps.push(trap);
   if (usedFreePlacement) game.stageState.freeTrapPlacementsUsed += 1;
-  if (extraUse) game.stageState.extraTrapUsesByType[selectedTrap] -= 1;
+  if (extraUseSource === "typed") game.stageState.extraTrapUsesByType[selectedTrap] -= 1;
+  if (extraUseSource === "generic") game.mods.extraTrapPlacements -= 1;
   game.defenseBudget -= cost;
   flashLog(`${TRAPS[selectedTrap].name}${extraUse ? " 제한 외" : ""} 배치 완료. 남은 함정 토큰 ${game.defenseBudget}`);
 }
@@ -113,8 +118,10 @@ function canUseFreeTrapPlacement(game) {
   return used < available;
 }
 
-function canUseExtraTrap(game, type) {
-  return (game?.stageState?.extraTrapUsesByType?.[type] || 0) > 0;
+function getExtraTrapUseSource(game, type) {
+  if ((game?.stageState?.extraTrapUsesByType?.[type] || 0) > 0) return "typed";
+  if ((game?.mods?.extraTrapPlacements || 0) > 0) return "generic";
+  return "";
 }
 
 function countObjectiveTraps(game) {
@@ -126,9 +133,10 @@ function restorePlacementUses(game, trap) {
     game.stageState.freeTrapPlacementsUsed = Math.max(0, game.stageState.freeTrapPlacementsUsed - 1);
   }
 
-  if (trap.extraUse) {
+  if (trap.extraUseSource === "typed") {
     game.stageState.extraTrapUsesByType[trap.type] = (game.stageState.extraTrapUsesByType[trap.type] || 0) + 1;
   }
+  if (trap.extraUseSource === "generic") game.mods.extraTrapPlacements = (game.mods.extraTrapPlacements || 0) + 1;
 }
 
 export function normalizeRotation(value) {
@@ -170,11 +178,21 @@ export function getOrientedTrapBox(trap, game) {
   }
 
   if (trap.type === "shock") {
-    return { x: trap.x - FLOOR_TRAP_WIDTH / 2, y: trap.y - 8, w: FLOOR_TRAP_WIDTH, h: 14 };
+    return {
+      x: trap.x - FLOOR_TRAP_WIDTH / 2,
+      y: trap.y - FLOOR_TRAP_HEIGHT - FLOOR_TRAP_SURFACE_LIFT,
+      w: FLOOR_TRAP_WIDTH,
+      h: FLOOR_TRAP_HEIGHT,
+    };
   }
 
   if (trap.type === "emp") {
-    return { x: trap.x - 32, y: trap.y - 8, w: 64, h: 14 };
+    return {
+      x: trap.x - 32,
+      y: trap.y - FLOOR_TRAP_HEIGHT - FLOOR_TRAP_SURFACE_LIFT,
+      w: 64,
+      h: FLOOR_TRAP_HEIGHT,
+    };
   }
 
   if (trap.type === "camera") {

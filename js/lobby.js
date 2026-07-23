@@ -10,6 +10,7 @@ import {
 } from "./repositories/localGameRepository.js";
 
 const SPLASH_DELAY_MS = 1400;
+const CLASSIC_CLEAR_STORAGE_KEY = "traceProtocolClassicStage11Returned";
 const SELECTABLE_AI_SKINS = [
   {
     id: "classic",
@@ -41,13 +42,19 @@ export function initLobby({
   const skinPanel = createSkinPanel();
   const skinPurchaseModal = createSkinPurchaseModal();
   const pathNoteModal = createPathNoteModal();
+  const modePanel = createModePanel();
+  const stageSelectPanel = createStageSelectPanel();
 
   let active = true;
   let helpOverlayOpen = false;
   let skinPanelOpen = false;
+  let modePanelOpen = false;
+  let stageSelectOpen = false;
   let pendingPurchaseSkinId = "";
 
   document.body.classList.add("lobby-active");
+  startBtn?.after(modePanel);
+  root?.appendChild(stageSelectPanel);
   skinBtn?.after(skinPanel);
   root?.appendChild(skinPurchaseModal);
   root?.appendChild(pathNoteModal);
@@ -78,6 +85,53 @@ export function initLobby({
     skinPanelOpen = Boolean(open);
     skinBtn?.setAttribute("aria-expanded", skinPanelOpen ? "true" : "false");
     skinPanel.classList.toggle("hidden", !skinPanelOpen);
+  };
+
+  const isDarkWebUnlocked = () => {
+    try {
+      return localStorage.getItem(CLASSIC_CLEAR_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  };
+
+  const refreshModeButtons = () => {
+    const unlocked = isDarkWebUnlocked();
+    const darkWebButton = modePanel.querySelector("[data-mode='darkweb']");
+    darkWebButton?.classList.toggle("locked", !unlocked);
+    darkWebButton?.querySelector(".lobby-mode-condition")?.classList.toggle("hidden", unlocked);
+    if (darkWebButton) {
+      darkWebButton.disabled = !unlocked;
+      darkWebButton.setAttribute("aria-disabled", unlocked ? "false" : "true");
+    }
+  };
+
+  const setModePanelOpen = (open) => {
+    modePanelOpen = Boolean(open);
+    startBtn?.setAttribute("aria-expanded", modePanelOpen ? "true" : "false");
+    modePanel.classList.toggle("hidden", !modePanelOpen);
+    refreshModeButtons();
+  };
+
+  const setStageSelectOpen = (open) => {
+    stageSelectOpen = Boolean(open);
+    stageSelectPanel.classList.toggle("hidden", !stageSelectOpen);
+    lobbyScreen?.classList.toggle("hidden", stageSelectOpen);
+    modePanel.classList.add("hidden");
+    if (!stageSelectOpen) setModePanelOpen(false);
+  };
+
+  const showStageSelect = () => {
+    active = true;
+    root?.classList.remove("hidden");
+    document.body.classList.add("lobby-active");
+    document.body.classList.remove("lobby-modal-open", "lobby-settings-open");
+    splashScreen?.classList.add("hidden");
+    setSkinPanelOpen(false);
+    setModePanelOpen(false);
+    setSkinPurchaseModalOpen(false);
+    setPathNoteModalOpen(false);
+    setStageSelectOpen(true);
   };
 
   const setSkinPurchaseModalOpen = (open, mode = "confirm") => {
@@ -131,6 +185,8 @@ export function initLobby({
     document.body.classList.add("lobby-active");
     document.body.classList.remove("lobby-modal-open", "lobby-settings-open");
     setSkinPanelOpen(false);
+    setModePanelOpen(false);
+    setStageSelectOpen(false);
     setSkinPurchaseModalOpen(false);
     setPathNoteModalOpen(false);
     splashScreen?.classList.add("hidden");
@@ -142,6 +198,7 @@ export function initLobby({
     root?.classList.add("hidden");
     document.body.classList.remove("lobby-active", "lobby-modal-open", "lobby-settings-open");
     setSkinPanelOpen(false);
+    setModePanelOpen(false);
     setSkinPurchaseModalOpen(false);
     setPathNoteModalOpen(false);
   };
@@ -170,8 +227,42 @@ export function initLobby({
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
+    setSkinPanelOpen(false);
+    setModePanelOpen(!modePanelOpen);
+  });
+
+  modePanel.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-mode]");
+    if (!button || button.disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startLobbyBgm();
+    setModePanelOpen(false);
+    const mode = button.dataset.mode || "classic";
+    if (mode === "classic") {
+      showStageSelect();
+      return;
+    }
     hideLobby();
-    onStart?.();
+    onStart?.(mode);
+  });
+
+  stageSelectPanel.addEventListener("click", (event) => {
+    const stageButton = event.target?.closest?.("[data-stage]");
+    if (stageButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const stage = Number(stageButton.dataset.stage) || 1;
+      setStageSelectOpen(false);
+      hideLobby();
+      onStart?.("classic", stage);
+      return;
+    }
+    if (event.target?.closest?.("[data-action='back-to-lobby']")) {
+      event.preventDefault();
+      event.stopPropagation();
+      setStageSelectOpen(false);
+    }
   });
 
   helpBtn?.addEventListener("click", (event) => {
@@ -258,6 +349,9 @@ export function initLobby({
     if (skinPanelOpen && !event.target?.closest?.("#lobbySkinBtn, .lobby-skin-panel")) {
       setSkinPanelOpen(false);
     }
+    if (modePanelOpen && !event.target?.closest?.("#lobbyStartBtn, .lobby-mode-panel")) {
+      setModePanelOpen(false);
+    }
     if (!document.body.classList.contains("lobby-settings-open")) return;
     if (event.target?.closest?.(".settings-menu, #lobbySettingsBtn")) return;
     document.body.classList.remove("lobby-settings-open");
@@ -275,7 +369,52 @@ export function initLobby({
     showLobby,
     hideLobby,
     playLobbyBgm: startLobbyBgm,
+    refreshModeButtons,
+    showStageSelect,
   };
+}
+
+function createStageSelectPanel() {
+  const panel = document.createElement("section");
+  panel.className = "lobby-stage-select hidden";
+  panel.setAttribute("aria-label", "클래식 모드 스테이지 선택");
+  panel.innerHTML = `
+    <div class="lobby-stage-select-header">
+      <div><p class="lobby-kicker">CLASSIC MODE</p><h2>SELECT STAGE</h2><p>플레이할 스테이지를 선택하세요.</p></div>
+      <button class="lobby-button" type="button" data-action="back-to-lobby">BACK TO LOBBY</button>
+    </div>
+    <div class="lobby-stage-scroller" tabindex="0" aria-label="스테이지 목록">
+      <div class="lobby-stage-track">
+        ${Array.from({ length: 11 }, (_, index) => `<button class="lobby-stage-card" type="button" data-stage="${index + 1}"><span>STAGE</span><strong>${index + 1}</strong><small>${index % 2 === 0 ? "ATTACK" : "DEFENSE"}</small></button>`).join("")}
+      </div>
+    </div>
+    <p class="lobby-stage-scroll-hint">← → 또는 좌우로 스크롤</p>
+  `;
+  const scroller = panel.querySelector(".lobby-stage-scroller");
+  scroller?.addEventListener("wheel", (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    scroller.scrollLeft += event.deltaY;
+  }, { passive: false });
+  return panel;
+}
+
+function createModePanel() {
+  const panel = document.createElement("div");
+  panel.className = "lobby-mode-panel hidden";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "게임 모드 선택");
+  panel.innerHTML = `
+    <button class="lobby-mode-option" type="button" data-mode="classic">
+      <span class="lobby-mode-number">01</span>
+      <span><strong>CLASSIC MODE</strong><small>튜토리얼과 스토리가 있는 기존 캠페인</small></span>
+    </button>
+    <button class="lobby-mode-option" type="button" data-mode="darkweb">
+      <span class="lobby-mode-number">02</span>
+      <span><strong>DARK WEB MODE</strong><small>사이드 맵을 돌파하고 메인 코어 룸으로 진입</small><em class="lobby-mode-condition">조건: 클래식 모드 클리어</em></span>
+    </button>
+  `;
+  return panel;
 }
 
 function createSkinPanel() {

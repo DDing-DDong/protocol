@@ -15,9 +15,9 @@ import {
   CORE_X,
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
-} from "./data.js?v=20260722-single-camera-boost";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260722-wall-ledge-mantle";
-import { initUI } from "./ui.js?v=20260722-shock-visual-size";
+} from "./data.js?v=20260723-shield-module";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260723-shield-module";
+import { initUI } from "./ui.js?v=20260723-darkweb-reopen-fix";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260722-shock-tile-alignment";
 import {
   placeTrapAtSlot,
@@ -26,10 +26,10 @@ import {
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260722-shock-tile-alignment";
+} from "./trap.js?v=20260723-floor-trap-lift";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260722-shock-tile-alignment";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
-import { initLobby } from "./lobby.js?v=20260711-path-note";
+import { initLobby } from "./lobby.js?v=20260723-stage-select-items";
 import { getBestStage, resetBestStage, saveBestStage } from "./repositories/localGameRepository.js";
 
 const BGM_TRACKS = {
@@ -37,6 +37,18 @@ const BGM_TRACKS = {
   ending: "clear-bgm.mp3",
 };
 const GUIDE_BUBBLE_SKIP_STORAGE_KEY = "traceProtocolSkipGuideBubbles";
+const CLASSIC_CLEAR_STORAGE_KEY = "traceProtocolClassicStage11Returned";
+const DARK_WEB_BEST_ZONE_STORAGE_KEY = "traceProtocolDarkWebBestZone";
+const DARK_WEB_REQUIRED_SIDE_CLEARS = 3;
+const DARK_WEB_FIRST_STAGE = 13;
+const DARK_WEB_SIDE_MAP_IDS = [1, 3, 7, 9];
+const DARK_WEB_ROUTES = {
+  1: { up: 7, right: 3 },
+  3: { up: 9, left: 1 },
+  7: { right: 9, down: 1 },
+  9: { left: 7, down: 3 },
+};
+const DARK_WEB_MAP_LABELS = { 1: "A", 3: "B", 5: "C", 7: "D", 9: "E" };
 
 function shouldSkipGuideBubbles() {
   return localStorage.getItem(GUIDE_BUBBLE_SKIP_STORAGE_KEY) === "true";
@@ -119,7 +131,7 @@ const uiModule = initUI({
     uiModule.setLog(game.deleteMode ? "삭제할 함정을 클릭/터치하세요." : "함정 삭제 모드를 해제했습니다.");
     return game.deleteMode;
   },
-  onRestart: resetGame,
+  onRestart: openClassicStageSelect,
   onHelp: showHelp,
   onExitGame: exitGame,
   onTrapSelected: (type, wasSelected) => {
@@ -138,6 +150,8 @@ const uiModule = initUI({
   onToggleAttackPause: toggleAttackPause,
   onResumeAttackPause: resumeAttackPause,
   onReturnToLobby: returnToLobby,
+  onOpenDarkWebMap: showDarkWebMapOverlay,
+  onUseFailureItem: (itemId) => useFailureItem(itemId),
   onTutorialBubbleInput: handleTutorialBubbleInput,
   onGuideBubbleSkipChanged: (enabled) => {
     if (!enabled) return;
@@ -149,6 +163,7 @@ const uiModule = initUI({
 });
 
 const game = {
+  mode: "classic",
   stage: 1,
   turn: TURN.ATTACK,
   bannerTurn: TURN.ATTACK,
@@ -178,16 +193,21 @@ const game = {
   stageLayoutSelections: {},
   defenseBudget: 4,
   infiniteBest: getBestStage(),
+  darkWeb: createDarkWebState(),
+  darkWebBestZone: getStoredDarkWebBestZone(),
   hacker: null,
   replayHacker: null,
   deleteMode: false,
   showFailedDefenseLayout: false,
   showSuccessDefenseLayout: false,
+  failureContext: null,
   completedObjectiveEffectIds: new Set(),
   objectiveSparkTimer: 0,
   tutorialFlags: createTutorialFlags(),
   tutorialInputLocked: false,
   tutorialBubble: null,
+  stageSelectionDirect: false,
+  items: createItemState(),
 };
 
 let lastTime = performance.now();
@@ -294,6 +314,147 @@ function createStageState(mods = createDefaultMods()) {
   };
 }
 
+function createItemState() {
+  return {
+    attackTime: 1,
+    energyMax: 1,
+    shieldModule: 1,
+    revive: 1,
+    replay: 1,
+  };
+}
+
+function createStageSelectionRecording() {
+  const points = [];
+  const startX = 64;
+  const endX = CORE_X + 18;
+  const count = Math.max(2, Math.ceil((endX - startX) / 24));
+  for (let index = 0; index < count; index += 1) {
+    points.push({
+      t: index * 0.06,
+      x: startX + ((endX - startX) * index) / (count - 1),
+      y: 388,
+      h: 54,
+      vx: 0,
+      vy: 0,
+      facing: 1,
+      onGround: true,
+      isSliding: false,
+      landingPoseTime: 0,
+      wallSide: 0,
+      energyUsed: 0,
+    });
+  }
+  return points;
+}
+
+function seedSkippedDefenseTraps(stage) {
+  const slots = game.trapSlots || [];
+  const count = Math.min(4, 2 + Math.floor(Math.max(0, stage - 3) / 2));
+  const types = ["laser", "shock", "camera", "emp"];
+  const traps = slots.slice(0, count).map((slot, index) => {
+    const type = types[index % types.length];
+    return {
+      id: `stage-select-trap-${stage}-${index}`,
+      type,
+      x: slot.x,
+      y: slot.y,
+      rotation: type === "laser" ? 90 : 0,
+      empowered: false,
+      closed: false,
+      closedTime: 0,
+    };
+  });
+  if (traps.length > 0) game.carriedTrapsByStage.set(stage, traps);
+}
+
+function createDarkWebMapUpgrades() {
+  return Object.fromEntries(
+    DARK_WEB_SIDE_MAP_IDS.map((mapId) => [mapId, { trap: [], hacker: [] }])
+  );
+}
+
+function getDarkWebUpgradeList(mapId, kind) {
+  const value = game.darkWeb?.mapUpgrades?.[mapId]?.[kind];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
+}
+
+function appendDarkWebUpgrade(mapId, kind, reward) {
+  const upgrades = game.darkWeb?.mapUpgrades?.[mapId];
+  if (!upgrades || !reward) return;
+  if (!Array.isArray(upgrades[kind])) upgrades[kind] = upgrades[kind] ? [upgrades[kind]] : [];
+  upgrades[kind].push(reward);
+}
+
+function getStoredDarkWebBestZone() {
+  try {
+    return Number(localStorage.getItem(DARK_WEB_BEST_ZONE_STORAGE_KEY) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function createDarkWebState() {
+  return {
+    active: false,
+    zone: 1,
+    sideClears: 0,
+    currentMap: 1,
+    currentRoom: "side",
+    mapUpgrades: createDarkWebMapUpgrades(),
+    permanentTrapUpgrades: [],
+    sideClearHintBlinkUntil: 0,
+    mapReopenHintShown: false,
+    reviveUsed: false,
+  };
+}
+
+function getDarkWebSideClearLimit(zone = game.darkWeb?.zone || 1) {
+  return Math.min(6, DARK_WEB_REQUIRED_SIDE_CLEARS + Math.floor(Math.max(0, zone - 1) / 3));
+}
+
+function getDarkWebStage(room = game.darkWeb?.currentRoom) {
+  const zoneOffset = Math.max(0, (game.darkWeb?.zone || 1) - 1) * 4;
+  return DARK_WEB_FIRST_STAGE + zoneOffset + (room === "core" ? 2 : 0);
+}
+
+function getDarkWebUpgradeEffects(stageType) {
+  if (!game.darkWeb?.active) return [];
+
+  const upgradeKey = stageType === "defense" ? "trap" : "hacker";
+  const mapIds = game.darkWeb.currentRoom === "core"
+    ? DARK_WEB_SIDE_MAP_IDS
+    : [game.darkWeb.currentMap];
+  const dedupeAcrossMaps = game.darkWeb.currentRoom === "core";
+  const effects = [];
+  const firstMapByReward = new Map();
+  for (const mapId of mapIds) {
+    for (const reward of getDarkWebUpgradeList(mapId, upgradeKey)) {
+      if (!reward || typeof reward.applyEffect !== "function") continue;
+      const key = reward.id || `${reward.name}|${reward.baseDesc || reward.desc || ""}`;
+      if (dedupeAcrossMaps && firstMapByReward.has(key) && firstMapByReward.get(key) !== mapId) continue;
+      if (dedupeAcrossMaps && !firstMapByReward.has(key)) firstMapByReward.set(key, mapId);
+      effects.push(reward);
+    }
+  }
+
+  if (stageType === "defense") {
+    for (const permanent of game.darkWeb.permanentTrapUpgrades || []) {
+      if (!permanent?.applyEffect) continue;
+      effects.push(permanent);
+    }
+  }
+
+  return effects;
+}
+
+function applyDarkWebUpgradeEffects(stageType) {
+  for (const reward of getDarkWebUpgradeEffects(stageType)) {
+    reward.applyEffect(game, reward);
+  }
+}
+
 function createTutorialFlags() {
   return {
     stage1Intro: false,
@@ -306,6 +467,9 @@ function createTutorialFlags() {
     stage3Intro: false,
     stage4Defense: false,
     stage4LaserRotateTip: false,
+    darkWebMapIntro: false,
+    darkWebSideMapUpgradeIntro: false,
+    darkWebCoreIntro: false,
   };
 }
 
@@ -362,10 +526,11 @@ function registerRestoredTrapUsage(trap) {
     game.stageState.freeTrapPlacementsUsed += 1;
   }
 
-  if (trap.extraUse) {
+  if (trap.extraUseSource === "typed") {
     const remaining = game.stageState.extraTrapUsesByType[trap.type] || 0;
     game.stageState.extraTrapUsesByType[trap.type] = Math.max(0, remaining - 1);
   }
+  if (trap.extraUseSource === "generic") game.mods.extraTrapPlacements = Math.max(0, (game.mods.extraTrapPlacements || 0) - 1);
 }
 
 function getTrapRefund(trap) {
@@ -386,6 +551,7 @@ function setupStage(options = {}) {
   game.turn = isAttack ? TURN.ATTACK : TURN.DEFENSE_BUILD;
   game.bannerTurn = game.turn;
   applyActiveEffectsForStage(isAttack ? "attack" : "defense");
+  applyDarkWebUpgradeEffects(isAttack ? "attack" : "defense");
   game.stageState = createStageState(game.mods);
   game.timer = getStageTime(game.stage);
   game.attackTimerStarted = false;
@@ -407,8 +573,12 @@ function setupStage(options = {}) {
   game.placedTraps = [];
   game.platforms = createPlatforms(game.stage, game);
   game.core = { x: CORE_X, y: 392, w: 42, h: 70 };
-  game.baseHazards = createBaseHazards(game.stage, game);
   game.trapSlots = createTrapSlots(game.stage, game);
+  if (isAttack && game.stageSelectionDirect) {
+    seedSkippedDefenseTraps(game.stage);
+    game.stageSelectionDirect = false;
+  }
+  game.baseHazards = createBaseHazards(game.stage, game);
   if (keepDefenseTraps) {
     restoreTrapSlotEffects(preservedTrapSlotEffects);
   } else {
@@ -455,6 +625,7 @@ function snapshotDefenseTraps(traps) {
     costPaid: trap.costPaid,
     usedFreePlacement: trap.usedFreePlacement,
     extraUse: trap.extraUse,
+    extraUseSource: trap.extraUseSource,
     empowered: false,
     closed: false,
     closedTime: 0,
@@ -757,6 +928,7 @@ function endStage(success, text) {
   game.bannerTurn = completedTurn;
   game.showFailedDefenseLayout = !success && completedTurn === TURN.DEFENSE_REPLAY;
   game.showSuccessDefenseLayout = success && completedTurn === TURN.DEFENSE_REPLAY;
+  game.failureContext = success ? null : { stage: completedStage, turn: completedTurn };
   updateBest(completedStage, success);
   playSfx(success ? "success" : "fail");
   if (success && completedStage === 11) {
@@ -765,16 +937,26 @@ function endStage(success, text) {
     playLobbyBgm();
   }
 
-  if (success && completedStage % 2 === 0) {
+  if (success && completedStage % 2 === 0 && game.mode !== "darkweb") {
     carryDefenseTrapsToNextStage(game, completedStage + 1);
   }
 
   if (!success) {
+    const darkWebFailure = game.mode === "darkweb";
+    const failureHint = completedTurn === TURN.DEFENSE_REPLAY
+      ? "같은 스테이지를 다시 시도합니다. 이전 배치는 유지되므로 부족한 조건에 맞춰 함정 위치나 방향을 수정하세요."
+      : "공격에 실패했습니다. 이동 경로와 해킹 타이밍을 조정한 뒤 다시 시도하세요.";
     uiModule.showOverlay({
       title: "스테이지 실패",
-      text: `${resultText}\n같은 스테이지를 다시 시도합니다. 이전 배치는 유지되므로 부족한 조건에 맞춰 함정 위치나 방향을 수정하세요.`,
-      buttonText: "재도전",
+      text: `${resultText}\n${failureHint}`,
+      buttonText: darkWebFailure ? "로비로" : "재도전",
+      failureItems: true,
+      onUseFailureItem: useFailureItem,
       onButton: () => {
+        if (darkWebFailure) {
+          returnToLobby();
+          return;
+        }
         game.stage = completedStage;
         setupStage({
           keepDefenseTraps: completedStage % 2 === 0 && completedTurn === TURN.DEFENSE_REPLAY,
@@ -785,6 +967,11 @@ function endStage(success, text) {
   }
 
   consumeActiveEffectsForStage(completedTurn);
+
+  if (game.mode === "darkweb") {
+    handleDarkWebStageClear(completedStage, completedTurn, resultText);
+    return;
+  }
 
   if (completedStage === 11) {
     showDialogueSequence("해커", STAGE_ELEVEN_CORE_DIALOGUE, {
@@ -821,6 +1008,276 @@ function endStage(success, text) {
   }
 
   showStageClearRewardOverlay(completedStage, completedTurn, resultText);
+}
+
+function useFailureItem(itemId) {
+  const context = game.failureContext;
+  if (!context || !game.items?.[itemId]) return;
+  if (itemId === "revive" && game.mode !== "darkweb") return;
+  if (itemId === "replay" && context.turn !== TURN.DEFENSE_REPLAY) return;
+  if (game.mode === "darkweb" && itemId !== "revive" && !game.darkWeb.reviveUsed) return;
+
+  game.items[itemId] -= 1;
+  if (itemId === "revive" && game.mode === "darkweb") game.darkWeb.reviveUsed = true;
+  uiModule.hideOverlay();
+
+  if (itemId === "replay") {
+    game.failureContext = null;
+    game.turn = TURN.DEFENSE_BUILD;
+    game.showFailedDefenseLayout = false;
+    startReplayMode(game);
+    playGameplayBgmForTurn(game.turn);
+    uiModule.setLog("해커턴 재생 아이템을 사용했습니다. 수비 리플레이를 한 번 더 시작합니다.");
+    uiModule.updateUI(game);
+    return;
+  }
+
+  game.stage = context.stage;
+  setupStage({ keepDefenseTraps: context.turn === TURN.DEFENSE_REPLAY });
+  if (itemId === "attackTime" && game.turn === TURN.ATTACK) {
+    game.timer += 5;
+    uiModule.setLog("공격 시간 증가 아이템을 사용했습니다. 제한 시간이 5초 늘어났습니다.");
+  } else if (itemId === "energyMax" && game.hacker) {
+    game.mods.maxEnergy += 20;
+    game.hacker.maxEnergy = game.mods.maxEnergy;
+    game.hacker.energy = game.hacker.maxEnergy;
+    uiModule.setLog("에너지 최대치 증가 아이템을 사용했습니다.");
+  } else if (itemId === "shieldModule") {
+    game.mods.hackInvincibilityBonus += 0.5;
+    uiModule.setLog("실드모듈을 사용했습니다. 해킹 중 무적 시간이 0.5초 늘어납니다.");
+  } else if (itemId === "revive") {
+    if (game.hacker) game.hacker.hp = Math.max(1, game.hacker.hp || 0);
+    uiModule.setLog("부활 아이템을 사용했습니다. 이번 게임에서 추가 아이템을 사용할 수 있습니다.");
+  }
+  game.failureContext = null;
+  uiModule.updateUI(game);
+}
+
+function handleDarkWebStageClear(completedStage, completedTurn, resultText) {
+  const roomLabel = game.darkWeb.currentRoom === "core"
+    ? "메인 코어 룸"
+    : `사이드 맵 ${DARK_WEB_MAP_LABELS[game.darkWeb.currentMap]}`;
+
+  if (completedTurn === TURN.ATTACK) {
+    if (game.darkWeb.currentRoom === "core") {
+      game.stage = completedStage + 1;
+      playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
+      setupStage({ keepCurrentBgm: true });
+      return;
+    }
+
+    const showReward = () => showDarkWebRewardOverlay("trap", roomLabel, resultText);
+    if (
+      game.darkWeb.currentRoom === "side" &&
+      game.darkWeb.currentMap === 1 &&
+      game.darkWeb.sideClears === 0 &&
+      !game.tutorialFlags.darkWebSideMapUpgradeIntro
+    ) {
+      game.tutorialFlags.darkWebSideMapUpgradeIntro = true;
+      uiModule.showDarkWebUpgradeGuideBubbles?.({ onComplete: showReward });
+    } else {
+      showReward();
+    }
+    return;
+  }
+
+  if (game.darkWeb.currentRoom === "core") {
+    showDarkWebZoneClearOverlay(resultText);
+    return;
+  }
+
+  game.darkWeb.sideClears += 1;
+  showDarkWebRewardOverlay("hacker", roomLabel, resultText);
+}
+
+function showDarkWebRewardOverlay(kind, roomLabel, resultText) {
+  playLobbyBgm();
+  const completedStage = game.stage;
+  const rewards = getDarkWebRewardChoices(completedStage, kind);
+  let selectedReward = rewards[0] || null;
+  const targetLabel = kind === "trap" ? "함정 강화" : "해커 강화";
+  const linkedMapIds = getConnectedDarkWebMapIds(game.darkWeb.currentMap);
+
+  uiModule.showOverlay({
+    title: `${roomLabel} · ${targetLabel}`,
+    text: `${resultText || "스테이지를 클리어했습니다."}\n현재 맵과 연결된 맵 중 1곳에 같은 ${targetLabel}을 추가 적용합니다.\n구역 ${game.darkWeb.zone} · 사이드 맵 ${DARK_WEB_MAP_LABELS[game.darkWeb.currentMap]}/${getDarkWebSideClearLimit()}`,
+    rewards,
+    selectedReward,
+    onRewardSelected: (reward) => {
+      selectedReward = reward;
+    },
+    buttonText: "맵 강화 적용",
+    onButton: () => {
+      if (selectedReward) {
+        appendDarkWebUpgrade(game.darkWeb.currentMap, kind, selectedReward);
+        const linkedMap = linkedMapIds[Math.floor(Math.random() * linkedMapIds.length)];
+        if (linkedMap) appendDarkWebUpgrade(linkedMap, kind, selectedReward);
+      }
+
+      if (kind === "trap") {
+        game.stage = completedStage + 1;
+        playGameplayBgmForTurn(TURN.DEFENSE_BUILD);
+        setupStage({ keepCurrentBgm: true });
+        return;
+      }
+
+      showDarkWebRouteOverlay();
+    },
+  });
+}
+
+function getConnectedDarkWebMapIds(mapId) {
+  return [...new Set(Object.values(DARK_WEB_ROUTES[Number(mapId)] || {}).map(Number))]
+    .filter((id) => DARK_WEB_SIDE_MAP_IDS.includes(id) && id !== Number(mapId));
+}
+
+function showDarkWebMapOverlay() {
+  if (game.mode !== "darkweb" || (game.turn === TURN.ENDING && game.failureContext)) return;
+  const currentMap = game.darkWeb.currentRoom === "core" ? 5 : game.darkWeb.currentMap;
+  const coreGuide = !game.tutorialFlags.darkWebCoreIntro;
+  if (coreGuide) game.tutorialFlags.darkWebCoreIntro = true;
+  uiModule.showOverlay({
+    title: "DARK WEB · 지도",
+    text: "맵을 터치하면 해당 맵에 적용된 함정 강화와 해커 강화를 확인할 수 있습니다.",
+    buttonText: "지도 닫기",
+    onButton: closeDarkWebMapOverlay,
+    map: {
+      zone: game.darkWeb.zone,
+      sideClears: game.darkWeb.sideClears,
+      required: getDarkWebSideClearLimit(),
+      current: currentMap,
+      selected: currentMap,
+      coreGuide,
+      upgradesByMap: game.darkWeb.mapUpgrades,
+      onNodeSelected: (destination) => showDarkWebMoveConfirmOverlay(destination, game.darkWeb.sideClears >= getDarkWebSideClearLimit()),
+      nodes: DARK_WEB_SIDE_MAP_IDS.map((id) => ({ id, label: `SIDE MAP ${DARK_WEB_MAP_LABELS[id]}` })).concat([
+        { id: 5, label: "MAIN CORE ROOM · C", locked: game.darkWeb.currentRoom !== "core" && game.darkWeb.sideClears < getDarkWebSideClearLimit() },
+      ]),
+    },
+  });
+}
+
+function closeDarkWebMapOverlay() {
+  uiModule.hideGuideBubble?.();
+  uiModule.hideOverlay();
+  uiModule.updateUI(game);
+  if (
+    game.mode !== "darkweb" ||
+    (game.turn === TURN.ENDING && game.failureContext) ||
+    game.darkWeb.mapReopenHintShown
+  ) return;
+  game.darkWeb.mapReopenHintShown = true;
+  uiModule.showDarkWebMapReopenHint?.();
+}
+
+function showDarkWebRouteOverlay() {
+  const sideClearLimit = getDarkWebSideClearLimit();
+  const coreAvailable = game.darkWeb.sideClears >= sideClearLimit;
+  const coreGuide = !game.tutorialFlags.darkWebCoreIntro;
+  if (coreGuide) game.tutorialFlags.darkWebCoreIntro = true;
+
+  uiModule.showOverlay({
+    title: "DARK WEB · ROUTE MAP",
+    text: coreAvailable
+      ? `구역 ${game.darkWeb.zone}의 사이드 맵 목표를 달성했습니다.\n메인 코어 룸에서 지금까지의 모든 맵 강화가 적용됩니다.`
+      : `구역 ${game.darkWeb.zone} · 사이드 맵 ${game.darkWeb.sideClears}/${sideClearLimit}\n지도의 맵을 두 번 누르면 이동을 확인할 수 있습니다.`,
+    buttonText: "지도 닫기",
+    onButton: closeDarkWebMapOverlay,
+    map: {
+      zone: game.darkWeb.zone,
+      sideClears: game.darkWeb.sideClears,
+      required: sideClearLimit,
+      current: game.darkWeb.currentMap,
+      selected: game.darkWeb.currentMap,
+      coreGuide,
+      upgradesByMap: game.darkWeb.mapUpgrades,
+      onNodeSelected: (destination) => showDarkWebMoveConfirmOverlay(destination, coreAvailable),
+      nodes: DARK_WEB_SIDE_MAP_IDS.map((id) => ({ id, label: `SIDE MAP ${DARK_WEB_MAP_LABELS[id]}` })).concat([
+        { id: 5, label: "MAIN CORE ROOM · C", locked: !coreAvailable },
+      ]),
+    },
+  });
+}
+
+function showDarkWebMoveConfirmOverlay(destination, coreAvailable) {
+  const currentMap = Number(game.darkWeb.currentMap);
+  const nextMap = Number(destination);
+  if (nextMap === currentMap) return;
+  const canEnterCore = nextMap === 5 && coreAvailable;
+  const canMoveToSide = DARK_WEB_SIDE_MAP_IDS.includes(nextMap) && getConnectedDarkWebMapIds(currentMap).includes(nextMap);
+  if (!canEnterCore && !canMoveToSide) return;
+
+  const destinationLabel = DARK_WEB_MAP_LABELS[nextMap] || "C";
+  uiModule.showOverlay({
+    title: "DARK WEB · 이동 확인",
+    text: `현재 맵 ${DARK_WEB_MAP_LABELS[currentMap]}에서 ${destinationLabel} 맵으로 이동하시겠습니까?\n확인하면 현재 맵을 떠나고 선택한 맵의 공격 턴이 시작됩니다.`,
+    choices: [
+      { name: "확인", desc: `${destinationLabel} 맵으로 이동합니다.`, onSelect: () => startDarkWebRoom(canEnterCore ? "core" : nextMap) },
+      { name: "취소", desc: "현재 지도 화면으로 돌아갑니다.", onSelect: () => showDarkWebRouteOverlay() },
+    ],
+  });
+}
+
+function startDarkWebRoom(destination) {
+  if (destination === "core") {
+    game.darkWeb.currentRoom = "core";
+    game.darkWeb.currentMap = 5;
+  } else {
+    game.darkWeb.currentRoom = "side";
+    game.darkWeb.currentMap = Number(destination) || 1;
+  }
+
+  game.stage = getDarkWebStage();
+  playGameplayBgmForTurn(TURN.ATTACK);
+  setupStage({ keepCurrentBgm: true });
+}
+
+function showDarkWebZoneClearOverlay(resultText) {
+  const trapRewards = [];
+  const seenRewards = new Set();
+  for (const mapId of DARK_WEB_SIDE_MAP_IDS) {
+    for (const reward of getDarkWebUpgradeList(mapId, "trap")) {
+      const key = reward.id || `${reward.name}|${reward.baseDesc || reward.desc || ""}`;
+      if (seenRewards.has(key)) continue;
+      seenRewards.add(key);
+      trapRewards.push({
+        ...reward,
+        name: `${reward.name} · MAP ${DARK_WEB_MAP_LABELS[mapId]}`,
+        desc: `${reward.baseDesc || reward.desc}\n다음 구역의 모든 맵에 영구 유지됩니다.`,
+      });
+    }
+  }
+  let selectedReward = trapRewards[0] || null;
+
+  uiModule.showOverlay({
+    title: `ZONE ${game.darkWeb.zone} CLEAR`,
+    text: `${resultText || "메인 코어에 도달했습니다."}\n다음 구역으로 이동합니다. 함정 강화 1개를 선택해 모든 맵에 영구 유지하세요. 기존 맵 강화는 계속 누적됩니다.`,
+    rewards: trapRewards,
+    selectedReward,
+    onRewardSelected: (reward) => {
+      selectedReward = reward;
+    },
+    buttonText: trapRewards.length > 0 ? "영구 강화 확정" : "다음 구역",
+    onButton: () => advanceDarkWebZone(selectedReward),
+  });
+}
+
+function advanceDarkWebZone(permanentTrapUpgrade) {
+  const nextZone = game.darkWeb.zone + 1;
+  const permanentTrapUpgrades = [...(game.darkWeb.permanentTrapUpgrades || [])];
+  if (permanentTrapUpgrade) permanentTrapUpgrades.push(permanentTrapUpgrade);
+  game.darkWeb = createDarkWebState();
+  game.darkWeb.active = true;
+  game.darkWeb.zone = nextZone;
+  game.darkWeb.permanentTrapUpgrades = permanentTrapUpgrades;
+  game.stage = getDarkWebStage();
+  game.darkWebBestZone = Math.max(game.darkWebBestZone, nextZone - 1);
+  try {
+    localStorage.setItem(DARK_WEB_BEST_ZONE_STORAGE_KEY, String(game.darkWebBestZone));
+  } catch {
+  }
+  playGameplayBgmForTurn(TURN.ATTACK);
+  setupStage({ keepCurrentBgm: true });
 }
 
 function buildDefenseResultText(game, success) {
@@ -922,7 +1379,10 @@ function showDataTheftEndingRoute() {
         title: "TRACE COMPLETE",
         text: "도시는 AI의 감시에서 해방되었다.\n하지만 삭제된 명령의 주인은 끝내 발견되지 않았다.",
         buttonText: "로비로 이동",
-        onButton: returnToLobby,
+        onButton: () => {
+          markClassicStage11Clear();
+          returnToLobby();
+        },
       });
     },
   });
@@ -935,15 +1395,23 @@ function showDeepTraceRoute() {
     onComplete: () => {
       uiModule.showOverlay({
         title: "TRACE DEEPER",
-        text: "중앙 코어 아래, AI조차 접근할 수 없는 기록 계층이 열렸다.\n어두운 코어 내부로 계속해서 접근해보자.",
-        buttonText: "무한 모드 시작",
+        text: "중앙 코어 아래, AI조차 접근할 수 없는 기록 계층이 열렸다.\n클래식 모드의 기록을 저장하고 로비에서 DARK WEB MODE를 선택할 수 있습니다.",
+        buttonText: "로비로 이동",
         onButton: () => {
-          game.stage = 12;
-          setupStage();
+          markClassicStage11Clear();
+          returnToLobby();
         },
       });
     },
   });
+}
+
+function markClassicStage11Clear() {
+  try {
+    localStorage.setItem(CLASSIC_CLEAR_STORAGE_KEY, "true");
+  } catch {
+  }
+  lobbyModule?.refreshModeButtons?.();
 }
 
 function getStageRewardChoices(completedStage, completedTurn) {
@@ -953,6 +1421,36 @@ function getStageRewardChoices(completedStage, completedTurn) {
   return pickRewards(type, rewardPool, completedStage, preferredRewardId
     ? { preferredRewardId, markPreferred: true }
     : {});
+}
+
+function getDarkWebRewardChoices(completedStage, kind) {
+  const completedTurn = kind === "trap" ? TURN.ATTACK : TURN.DEFENSE_REPLAY;
+  const zoneBonus = Math.min(4, Math.floor(Math.max(0, (game.darkWeb.zone || 1) - 1) / 3));
+  const rewards = getStageRewardChoices(completedStage, completedTurn);
+  return rewards.map((reward) => ({
+    ...reward,
+    baseDesc: reward.baseDesc || reward.desc,
+    desc: zoneBonus > 0
+      ? `${reward.baseDesc || reward.desc}\nDARK WEB 구역 보정 +${zoneBonus}`
+      : (reward.baseDesc || reward.desc),
+    applyEffect: (currentGame, effect) => {
+      reward.applyEffect(currentGame, effect);
+      if (zoneBonus > 0) applyDarkWebRewardBonus(currentGame, kind, zoneBonus);
+    },
+  }));
+}
+
+function applyDarkWebRewardBonus(currentGame, kind, zoneBonus) {
+  if (kind === "trap") {
+    currentGame.mods.defenseBudgetBonus += zoneBonus;
+    currentGame.mods.laserBoost += zoneBonus * 3;
+    currentGame.mods.firewallDelay += zoneBonus * 0.25;
+    return;
+  }
+
+  currentGame.mods.maxEnergy += zoneBonus * 5;
+  currentGame.mods.dashCooldown = Math.max(0.45, currentGame.mods.dashCooldown - zoneBonus * 0.04);
+  currentGame.mods.shieldDrain = Math.max(28, currentGame.mods.shieldDrain - zoneBonus * 2);
 }
 
 function getFixedRewardId(completedStage, completedTurn) {
@@ -974,6 +1472,7 @@ function applyReward(reward, options = {}) {
 }
 
 function updateBest(stage, success) {
+  if (game.mode === "darkweb") return;
   if (success && stage > game.infiniteBest) {
     game.infiniteBest = stage;
     saveBestStage(stage);
@@ -1226,17 +1725,39 @@ function maybeShowStageTwoReplayGuide() {
 }
 
 function resetGame() {
+  const currentMode = game.mode;
   stageStarted = true;
   stopBgm();
   resetBestStage();
-  resetRunState({ clearBest: true });
-  setupStage();
+  resetRunState({ clearBest: true, mode: currentMode });
+  if (currentMode === "darkweb") {
+    startDarkWebMission();
+  } else {
+    setupStage();
+  }
 }
 
-function resetRunState({ clearBest = false } = {}) {
-  game.stage = 1;
+function openClassicStageSelect() {
+  stageStarted = false;
+  stopSfx("electric");
+  uiModule.keys.clear();
+  uiModule.hideOverlay();
+  uiModule.hideGuideBubble?.();
+  uiModule.setSettingsPanelOpen?.(false);
+  lobbyModule?.showStageSelect?.();
+  lobbyModule?.playLobbyBgm?.();
+  return true;
+}
+
+function resetRunState({ clearBest = false, mode = "classic", stage = 1 } = {}) {
+  game.mode = mode === "darkweb" ? "darkweb" : "classic";
+  game.stage = game.mode === "classic" ? Math.max(1, Math.min(11, Number(stage) || 1)) : 1;
   if (clearBest) game.infiniteBest = 0;
   game.lastAttackRecording = [];
+  game.stageSelectionDirect = game.mode === "classic" && game.stage % 2 === 1 && game.stage > 1;
+  if (game.mode === "classic" && game.stage % 2 === 0) {
+    game.lastAttackRecording = createStageSelectionRecording();
+  }
   game.carriedTrapsByStage.clear();
   game.activeEffects = [];
   game.stageState = createStageState();
@@ -1245,6 +1766,28 @@ function resetRunState({ clearBest = false } = {}) {
   game.tutorialFlags = createTutorialFlags();
   game.tutorialInputLocked = false;
   game.tutorialBubble = null;
+  game.darkWeb = createDarkWebState();
+  game.failureContext = null;
+  game.items = createItemState();
+}
+
+function startDarkWebMission() {
+  game.mode = "darkweb";
+  game.darkWeb.active = true;
+  game.darkWeb.zone = 1;
+  game.darkWeb.sideClears = 0;
+  game.darkWeb.currentMap = 1;
+  game.darkWeb.currentRoom = "side";
+  game.stage = getDarkWebStage();
+  setupStage();
+  if (!game.tutorialFlags.darkWebMapIntro) {
+    game.tutorialFlags.darkWebMapIntro = true;
+    uiModule.showDarkWebMapGuideBubbles?.({
+      onSideClearHint: () => {
+        game.darkWeb.sideClearHintBlinkUntil = performance.now() + 3600;
+      },
+    });
+  }
 }
 
 function loop(now) {
@@ -1257,12 +1800,16 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-function startMission() {
+function startMission(mode = "classic", selectedStage = 1) {
   if (stageStarted) return;
   stageStarted = true;
   uiModule.setSettingsPanelOpen?.(false);
-  resetRunState();
-  setupStage();
+  resetRunState({ mode, stage: selectedStage });
+  if (game.mode === "darkweb") {
+    startDarkWebMission();
+  } else {
+    setupStage();
+  }
 }
 
 function returnToLobby() {

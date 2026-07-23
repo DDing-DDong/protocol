@@ -12,13 +12,13 @@ import {
   clamp,
   rectsOverlap,
   approach,
-} from "./data.js?v=20260722-single-camera-boost";
+} from "./data.js?v=20260723-shield-module";
 import {
   empowerAttackTargetForCamera,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260722-shock-tile-alignment";
+} from "./trap.js?v=20260723-floor-trap-lift";
 import { recordHacker } from "./replay.js?v=20260722-single-camera-boost";
 import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
 
@@ -418,16 +418,17 @@ export function activateHack(game, flashLog) {
   h.energy -= cost;
   game.metrics.energyUsed += cost;
   if (freeShield) game.stageState.freeShieldUsesUsed += 1;
-  h.hackChargeTime = HACK_DELAY;
-  h.hackChargeDuration = HACK_DELAY;
-  h.hackEffectTime = HACK_DELAY;
+  const hackInvincibilityTime = HACK_DELAY + (game.mods.hackInvincibilityBonus || 0);
+  h.hackChargeTime = hackInvincibilityTime;
+  h.hackChargeDuration = hackInvincibilityTime;
+  h.hackEffectTime = hackInvincibilityTime;
   h.hackTarget = target;
-  target.hackPendingTime = HACK_DELAY;
-  target.hackPendingDuration = HACK_DELAY;
+  target.hackPendingTime = hackInvincibilityTime;
+  target.hackPendingDuration = hackInvincibilityTime;
 
   flashLog(freeShield
     ? "해킹 시작. 첫 사용 보상으로 에너지를 소모하지 않았습니다."
-    : `해킹 시작. ${HACK_DELAY.toFixed(1)}초 뒤 전방 보안장치를 무력화합니다.`);
+    : `해킹 시작. ${hackInvincibilityTime.toFixed(1)}초 동안 무적 상태로 전방 보안장치를 무력화합니다.`);
 }
 
 function updateHackState(h, dt, flashLog) {

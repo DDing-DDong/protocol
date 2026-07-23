@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260722-camera-order" />
+  <link rel="stylesheet" href="./style.css?v=20260723-darkweb-reopen-fix" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -42,7 +42,8 @@
       <section class="canvas-panel">
         <header class="topbar">
           <div class="topbar-actions">
-            <button id="restartBtn" class="secondary" type="button">처음부터</button>
+            <button id="darkWebMapBtn" class="secondary hidden" type="button">지도</button>
+            <button id="restartBtn" class="secondary" type="button">스테이지 선택</button>
             <button id="pauseAttackBtn" class="secondary timer-pause-btn" type="button" aria-pressed="false">일시정지</button>
             <div class="settings-menu">
               <button id="settingsBtn" class="secondary icon-btn settings-toggle" type="button" aria-label="설정" aria-expanded="false">⚙</button>
@@ -126,7 +127,7 @@
           <h2>시스템</h2>
           <div class="stat-row"><span>공격 모듈</span><strong>이동 · 대시 · 해킹</strong></div>
           <div class="stat-row"><span>방어 모듈</span><strong>레이저 · 감전패널 · 카메라 · 방화벽 · EMP패널</strong></div>
-          <div class="stat-row"><span>진행</span><strong>11단계 + 무한 모드</strong></div>
+          <div class="stat-row"><span>진행</span><strong>CLASSIC MODE / DARK WEB MODE</strong></div>
         </div>
 
         <div class="panel-block">
@@ -137,6 +138,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260722-wall-ledge-mantle"></script>
+  <script type="module" src="./js/game.js?v=20260723-darkweb-reopen-fix"></script>
 </body>
 </html>

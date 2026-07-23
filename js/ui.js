@@ -11,12 +11,12 @@ import {
   getShockDelay,
   getShockSlowTime,
   SHOCK_SLOW_MULTIPLIER,
-} from "./data.js?v=20260722-single-camera-boost";
+} from "./data.js?v=20260723-shield-module";
 import {
   getCameraHazardBox,
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
-} from "./trap.js?v=20260722-shock-tile-alignment";
+} from "./trap.js?v=20260723-floor-trap-lift";
 import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
@@ -28,6 +28,7 @@ const VISUAL_SLOT_W = 44;
 const VISUAL_SLOT_H = 11;
 const SHOCK_TRAP_VISUAL_W = 60;
 const EMP_TRAP_VISUAL_W = 48;
+const FLOOR_TRAP_VISUAL_H = 16;
 const TRAP_IMAGE_BASE_URL = new URL("../assets/images/traps/", import.meta.url);
 const STAGE_IMAGE_BASE_URL = new URL("../assets/images/stage/", import.meta.url);
 const BACKGROUND_IMAGE_BASE_URL = new URL("../assets/images/Background_image/", import.meta.url);
@@ -328,6 +329,7 @@ export function initUI(callbacks) {
     deleteTrapBtn: document.getElementById("deleteTrapBtn"),
     pauseAttackBtn: document.getElementById("pauseAttackBtn"),
     restartBtn: document.getElementById("restartBtn"),
+    darkWebMapBtn: document.getElementById("darkWebMapBtn"),
     settingsBtn: document.getElementById("settingsBtn"),
     settingsPanel: document.getElementById("settingsPanel"),
     bgmVolume: document.getElementById("bgmVolume"),
@@ -485,10 +487,12 @@ export function initUI(callbacks) {
         <button class="mobile-control-btn mobile-dpad-btn mobile-dpad-left" type="button" data-code="ArrowLeft" aria-label="왼쪽 이동">&lt;</button>
         <button class="mobile-control-btn mobile-dpad-btn mobile-dpad-right" type="button" data-code="ArrowRight" aria-label="오른쪽 이동">&gt;</button>
       </div>
+      <button class="mobile-control-btn mobile-map-btn" type="button" data-code="KeyM" aria-label="지도 열기">지도</button>
     `;
 
     canvas.parentElement?.appendChild(controls);
     ui.mobileControls = controls;
+    ui.mobileMapButton = controls.querySelector(".mobile-map-btn");
   }
 
   function showOverlay({
@@ -507,16 +511,51 @@ export function initUI(callbacks) {
     onRewardSkip,
     selectedReward = null,
     onRewardSelected,
+    map = null,
+    failureItems = false,
+    onUseFailureItem,
   }) {
     stopOverlayTyping();
     overlayAction = typeof onButton === "function" ? onButton : hideOverlay;
     ui.overlay.classList.remove("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay");
-    ui.overlayCard?.classList.remove("has-portrait", "click-advances", "typing");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay", "darkweb-route-overlay");
+    ui.overlayCard?.classList.remove("has-portrait", "click-advances", "typing", "failure-overlay");
+    ui.overlayCard?.querySelector(".failure-item-tabs")?.remove();
     resetRewardActions();
     setOverlaySkip(null);
     if (speaker) ui.overlay.classList.add(`speaker-${speaker}`);
     if (!speaker && rewards.length > 0) ui.overlay.classList.add("reward-select-overlay");
+    if (map) ui.overlay.classList.add("darkweb-route-overlay");
+    if (failureItems) {
+      ui.overlayCard?.classList.add("failure-overlay");
+      const tabs = document.createElement("div");
+      tabs.className = "failure-item-tabs";
+      tabs.innerHTML = `<div class="failure-item-tab-title">ITEMS · 실패 직전 사용 가능</div><div class="failure-item-grid"></div>`;
+      const grid = tabs.querySelector(".failure-item-grid");
+      const itemDefinitions = [
+        ["attackTime", "⏱", "공격 시간 +5초", "현재 공격 턴의 제한 시간이 5초 늘어납니다.", "attack"],
+        ["energyMax", "⚡", "에너지 최대치 +20", "최대 에너지를 20 늘리고 즉시 충전합니다.", "attack"],
+        ["shieldModule", "◇", "실드모듈", "해킹 중 무적 시간이 0.5초 늘어납니다.", "attack"],
+        ["revive", "✚", "부활", "DARK WEB에서 1회 부활합니다. 이번 게임에서 1회만 사용할 수 있습니다.", "any"],
+        ["replay", "↻", "해커턴 재생", "수비 리플레이를 한 번 더 시도합니다.", "defense"],
+      ];
+      for (const [id, icon, name, desc, turnType] of itemDefinitions) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "failure-item-button";
+        button.dataset.item = id;
+        button.dataset.itemTurn = turnType;
+        button.innerHTML = `<span class="failure-item-icon">${icon}</span><span><strong>${name}</strong><small>${desc}</small></span>`;
+        button.title = desc;
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onUseFailureItem?.(id);
+        });
+        grid?.appendChild(button);
+      }
+      ui.overlayCard?.insertBefore(tabs, ui.overlayText);
+    }
     if (advanceOnCardClick) {
       ui.overlay.classList.add("dialogue-overlay");
       ui.overlayCard?.classList.add("click-advances");
@@ -528,6 +567,8 @@ export function initUI(callbacks) {
     ui.overlayButton.classList.toggle("hidden", choices.length > 0);
     ui.rewardList.innerHTML = "";
     setOverlayPortrait(portrait, speaker);
+
+    if (map) ui.rewardList.appendChild(createDarkWebRouteMap(map));
 
     let selectedRewardIndex = getInitialSelectedRewardIndex(rewards, selectedReward);
     const rewardButtons = [];
@@ -621,8 +662,9 @@ export function initUI(callbacks) {
   function hideOverlay() {
     stopOverlayTyping();
     ui.overlay.classList.add("hidden");
-    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay");
-    ui.overlayCard?.classList.remove("has-portrait", "click-advances");
+    ui.overlay.classList.remove("speaker-ai", "speaker-hacker", "dialogue-overlay", "reward-select-overlay", "darkweb-route-overlay");
+    ui.overlayCard?.classList.remove("has-portrait", "click-advances", "failure-overlay");
+    ui.overlayCard?.querySelector(".failure-item-tabs")?.remove();
     resetRewardActions();
     setOverlaySkip(null);
     setOverlayPortrait("");
@@ -740,7 +782,9 @@ export function initUI(callbacks) {
   }
 
   function updateUI(game) {
-    ui.stageLabel.textContent = String(game.stage);
+    ui.stageLabel.textContent = game.mode === "darkweb"
+      ? `Z${game.darkWeb?.zone || 1} · ${game.darkWeb?.currentRoom === "core" ? "MAP C" : `MAP ${getDarkWebMapLabel(game.darkWeb?.currentMap)}`}`
+      : String(game.stage);
     ui.turnLabel.textContent = getTurnLabel(game.turn);
     ui.objectiveLabel.textContent = getObjectiveDisplayText(game);
     ui.timerLabel.textContent = game.turn === TURN.ATTACK ? game.timer.toFixed(1) : "-";
@@ -777,9 +821,16 @@ export function initUI(callbacks) {
     ui.trapToolsToggle?.setAttribute("aria-expanded", showDefenseTools && trapToolsPanelOpen ? "true" : "false");
     ui.trapToolsPanel?.classList.toggle("hidden", !showDefenseTools || !trapToolsPanelOpen);
     const showAttackSkills = game.turn === TURN.ATTACK;
+    const showDarkWebMap = game.mode === "darkweb";
+    document.body.classList.toggle("darkweb-active", showDarkWebMap);
     if (!showAttackSkills) attackSkillsPanelOpen = false;
     ui.attackSkills?.classList.toggle("hidden", !showAttackSkills);
-    ui.mobileControls?.classList.toggle("hidden", !showAttackSkills);
+    ui.mobileControls?.classList.toggle("hidden", !showAttackSkills && !showDarkWebMap);
+    ui.mobileControls?.querySelector(".mobile-action-pad")?.classList.toggle("hidden", !showAttackSkills);
+    ui.mobileControls?.querySelector(".mobile-dpad")?.classList.toggle("hidden", !showAttackSkills);
+    ui.mobileMapButton?.classList.toggle("hidden", !showDarkWebMap);
+    ui.darkWebMapBtn?.classList.toggle("hidden", !showDarkWebMap);
+    ui.restartBtn?.classList.toggle("hidden", showDarkWebMap);
     if (!showAttackSkills) clearMobileControlKeys();
     ui.attackSkillsToggle?.setAttribute("aria-expanded", showAttackSkills && attackSkillsPanelOpen ? "true" : "false");
     ui.attackSkillsPanel?.classList.toggle("hidden", !showAttackSkills || !attackSkillsPanelOpen);
@@ -793,6 +844,7 @@ export function initUI(callbacks) {
     ui.helpBtn.disabled = game.turn === TURN.ENDING;
     if (ui.lobbyBtn) ui.lobbyBtn.disabled = false;
     updateEmpowerPreview(game);
+    updateFailureItemButtons(game);
     updateDefenseObjectiveHUD(game);
     updateTrapTooltips(game);
   }
@@ -811,6 +863,11 @@ export function initUI(callbacks) {
   }
 
   function getObjectiveDisplayText(game) {
+    if (game.mode === "darkweb") {
+      if (game.darkWeb?.currentRoom === "core") return "메인 코어 룸 · 모든 맵 강화 적용";
+      return `사이드 맵 ${getDarkWebMapLabel(game.darkWeb?.currentMap)} · ${game.turn === TURN.ATTACK ? "보안 장치 돌파" : "해커 경로 방어"}`;
+    }
+
     const hasDefenseObjectives = getDefenseObjectiveItems(game).length > 0;
     const isDefenseView = game.turn === TURN.DEFENSE_BUILD ||
       game.turn === TURN.DEFENSE_REPLAY ||
@@ -858,9 +915,11 @@ export function initUI(callbacks) {
         "",
         "[수비턴]",
         "카메라로 해커를 탐지합니다.",
-        "설치된 순서대로 레이저 또는 방화벽 1개를 강화합니다.",
+        "설치된 순서대로 다음 함정 1개를 강화합니다.",
         "",
-        "레이저: 탐지+1, 방화벽: 경로 차단",
+        "레이저: 탐지+1, 감전패널: 지연/감속 +0.8초",
+        "",
+        "방화벽: 경로 차단, EMP패널: 에너지 흡수 +10",
       ].join("\n");
     }
 
@@ -988,7 +1047,7 @@ export function initUI(callbacks) {
       for (const target of targets) {
         const icon = createTrapIcon(target.type);
         icon.tabIndex = 0;
-        icon.dataset.tooltip = `${TRAPS[target.type].name} · 설치 순서에 따라 카메라 강화 예정`;
+        icon.dataset.tooltip = getEmpowerPreviewTooltip(target.type);
         icons.appendChild(icon);
       }
     }
@@ -997,11 +1056,39 @@ export function initUI(callbacks) {
     summary.className = "empower-summary";
     summary.textContent = targets.length > 0
       ? targets.map((target) => TRAPS[target.type].name).join(" → ")
-      : "레이저 또는 방화벽 대기 중";
+      : "강화 대상 대기 중";
 
     ui.empowerPreview.append(label, icons, summary);
     ui.empowerPreview.classList.remove("hidden");
     maybeShowPendingEmpowerPreviewGuide();
+  }
+
+  function updateFailureItemButtons(game) {
+    const items = game.items || {};
+    const failedTurnType = game.failureContext?.turn === TURN.DEFENSE_REPLAY ? "defense" : "attack";
+    ui.overlayCard?.querySelectorAll(".failure-item-button").forEach((button) => {
+      const id = button.dataset.item;
+      const turnMismatch = button.dataset.itemTurn !== "any" && button.dataset.itemTurn !== failedTurnType;
+      const darkWebRequiresRevive = game.mode === "darkweb" && id !== "revive" && !game.darkWeb?.reviveUsed;
+      const unavailable = !items[id] || (id === "revive" && game.mode !== "darkweb") || turnMismatch || darkWebRequiresRevive;
+      button.disabled = unavailable;
+      button.classList.toggle("used", !items[id]);
+      button.classList.toggle("hidden", (id === "revive" && game.mode !== "darkweb") || turnMismatch);
+    });
+  }
+
+  function getEmpowerPreviewTooltip(type) {
+    const name = TRAPS[type]?.name || "함정";
+    const effectByType = {
+      laser: "강화 효과: 탐지 +1",
+      shock: "강화 효과: 지연/감속 지속 +0.8초",
+      firewall: "강화 효과: 경로 차단",
+      emp: "강화 효과: 에너지 흡수 +10",
+    };
+    return [
+      `${name} · 카메라 강화 예정`,
+      effectByType[type] || "강화 효과 적용",
+    ].join("\n");
   }
 
   function updateDefenseObjectiveHUD(game) {
@@ -1235,7 +1322,7 @@ export function initUI(callbacks) {
 
       showGuideBubble(target, step.text, () => {
         showGuideBubbleSequence(steps, onComplete, index + 1);
-      });
+      }, step.options || {});
     });
   }
 
@@ -1343,6 +1430,7 @@ export function initUI(callbacks) {
       element: bubble,
       target,
       onAdvance,
+      center: Boolean(options.center),
       cleanup: null,
     };
     positionGuideBubble();
@@ -1405,6 +1493,14 @@ export function initUI(callbacks) {
     const halfWidth = Math.max(compact ? 48 : 60, bubbleRect.width / 2);
     const hostWidth = mobileClient ? host?.clientWidth || hostRect.width : hostRect.width;
     const hostHeight = mobileClient ? host?.clientHeight || hostRect.height : hostRect.height;
+    if (guideBubble.center) {
+      bubble.style.left = `${hostWidth / 2}px`;
+      bubble.style.top = `${hostHeight / 2}px`;
+      bubble.style.transform = "translate(-50%, -50%)";
+      bubble.classList.remove("above-target");
+      return;
+    }
+    bubble.style.transform = "";
     const targetCenter = targetRect.left + targetRect.width / 2;
 
     if (mobileClient) {
@@ -1517,6 +1613,18 @@ export function initUI(callbacks) {
     guideBubble?.element?.remove();
     guideBubble = null;
     guideBubbleInputLocked = false;
+  }
+
+  function showDarkWebMapReopenHint() {
+    const target = ui.darkWebMapBtn || ui.mobileMapButton;
+    if (!target || target.classList.contains("hidden")) return;
+    target.classList.add("darkweb-map-guide-blink");
+    showGuideBubbleSequence([
+      {
+        target: () => target,
+        text: "다시 맵을 확인하려면 지도 버튼을 눌러 확인합니다.",
+      },
+    ], () => target.classList.remove("darkweb-map-guide-blink"));
   }
 
   function summarizeTrapTypes(traps) {
@@ -2497,8 +2605,8 @@ export function initUI(callbacks) {
       // Floor-trap artwork is slightly wider for readability, but remains
       // centered on the independent 48px collision box.
       const visualW = type === "shock" ? SHOCK_TRAP_VISUAL_W : EMP_TRAP_VISUAL_W;
-      const visualH = Math.max(12, visualW / getTrapImageAspect(type));
-      const groundOffset = 2;
+      const visualH = FLOOR_TRAP_VISUAL_H;
+      const groundOffset = 0;
       return bottomAlignedBox(x + w / 2, y + h + groundOffset, visualW, visualH);
     }
 
@@ -3097,10 +3205,11 @@ export function initUI(callbacks) {
     ctx.save();
     ctx.fillStyle = bannerTurn === TURN.ATTACK ? "#ff446a" : "#18e0ff";
     ctx.font = "bold 16px PfStardust30, system-ui";
+    const bannerTitle = game.mode === "darkweb"
+      ? `DARK WEB · ZONE ${game.darkWeb?.zone || 1} · ${game.darkWeb?.currentRoom === "core" ? "MAIN CORE ROOM · C" : `SIDE MAP ${getDarkWebMapLabel(game.darkWeb?.currentMap)}`}`
+      : `STAGE ${game.stage}`;
     ctx.fillText(
-      `STAGE ${game.stage} / ${
-        bannerTurn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"
-      }`,
+      `${bannerTitle} / ${bannerTurn === TURN.ATTACK ? "HACKER ATTACK" : "AI DEFENSE"}`,
       30,
       40
     );
@@ -3108,12 +3217,70 @@ export function initUI(callbacks) {
     ctx.font = "13px PfStardust30, system-ui";
     ctx.fillText(getObjectiveDisplayText(game), 30, 60);
 
-    if (game.stage >= 12) {
+    if (game.mode === "darkweb") {
+      ctx.fillStyle = "#ffcc33";
+      const sideClearBlinking = performance.now() < (game.darkWeb?.sideClearHintBlinkUntil || 0);
+      if (sideClearBlinking && Math.floor(performance.now() / 220) % 2 === 0) ctx.globalAlpha = 0.22;
+      ctx.fillText(`SIDE CLEAR ${game.darkWeb?.sideClears || 0}/${getDarkWebSideClearLimitForUi(game)}`, 880, 40);
+      ctx.globalAlpha = 1;
+    } else if (game.stage >= 12) {
       ctx.fillStyle = "#ffcc33";
       ctx.fillText(`INFINITE MODE · BEST ${game.infiniteBest}`, 700, 40);
     }
 
     ctx.restore();
+  }
+
+  function showDarkWebMapGuideBubbles({ onSideClearHint } = {}) {
+    if (shouldSkipGuideBubbles()) return;
+    const centered = { center: true, blockTargetActivation: true };
+    showGuideBubbleSequence([
+      {
+        target: () => canvas,
+        text: "DARK WEB에서는 사이드 맵을 일정 횟수 이상 클리어해야 CORE ROOM에 도달할 수 있습니다.",
+        options: centered,
+      },
+      {
+        target: () => canvas,
+        text: "클리어 횟수는 오른쪽 상단에 'SIDE CLEAR'로 표시됩니다.",
+        before: onSideClearHint,
+        options: centered,
+      },
+      {
+        target: () => ui.mobileMapButton || canvas,
+        text: "M키/지도 버튼을 눌러 현재 위치와 각 맵의 함정 해커 강화를 확인할 수 있습니다.",
+        options: centered,
+      },
+    ]);
+  }
+
+  function showDarkWebUpgradeGuideBubbles({ onComplete } = {}) {
+    if (shouldSkipGuideBubbles()) {
+      onComplete?.();
+      return;
+    }
+    const centered = { center: true, blockTargetActivation: true };
+    showGuideBubbleSequence([
+      {
+        target: () => canvas,
+        text: "사이드 맵에서는 클리어시 맵에 강화효과가 추가됩니다.",
+        options: centered,
+      },
+      {
+        target: () => canvas,
+        text: "강화효과는 이번 구역에서 계속 누적되며 각 방마다 따로따로 적용됩니다.",
+        options: centered,
+      },
+      {
+        target: () => canvas,
+        text: "메인 코어 룸을 클리어하면 함정 강화가 1개씩 영구 누적되며, 나머지 해커 및 함정 강화는 초기화됩니다.",
+        options: centered,
+      },
+    ], onComplete);
+  }
+
+  function getDarkWebSideClearLimitForUi(game) {
+    return Math.min(6, 3 + Math.floor(Math.max(0, (game.darkWeb?.zone || 1) - 1) / 3));
   }
 
   function getStageBannerTurn(game) {
@@ -3188,6 +3355,12 @@ export function initUI(callbacks) {
         return;
       }
 
+      if (event.code === "KeyM" && !event.repeat) {
+        event.preventDefault();
+        callbacks.onOpenDarkWebMap?.();
+        return;
+      }
+
       if (event.code === "Escape" && !event.repeat) {
         event.preventDefault();
         callbacks.onToggleAttackPause();
@@ -3253,6 +3426,17 @@ export function initUI(callbacks) {
       event.stopPropagation();
       callbacks.onToggleAttackPause();
     });
+
+    let darkWebMapPointerHandledAt = 0;
+    const openDarkWebMap = (event) => {
+      if (event.type === "click" && performance.now() - darkWebMapPointerHandledAt < 500) return;
+      if (event.type === "pointerdown") darkWebMapPointerHandledAt = performance.now();
+      event.preventDefault();
+      event.stopPropagation();
+      callbacks.onOpenDarkWebMap?.();
+    };
+    ui.darkWebMapBtn?.addEventListener("pointerdown", openDarkWebMap);
+    ui.darkWebMapBtn?.addEventListener("click", openDarkWebMap);
 
     ui.objectiveToggle?.addEventListener("click", (event) => {
       event.preventDefault();
@@ -3356,6 +3540,11 @@ export function initUI(callbacks) {
       event.preventDefault();
       event.stopPropagation();
       unlockAudio();
+      if (button.classList.contains("mobile-map-btn")) {
+        releaseKey(button);
+        callbacks.onOpenDarkWebMap?.();
+        return;
+      }
       if (callbacks.onTutorialBubbleInput?.()) {
         releaseKey(button);
         return;
@@ -3388,6 +3577,95 @@ export function initUI(callbacks) {
     }
   }
 
+  function createDarkWebRouteMap(map) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "darkweb-route-map";
+
+    const heading = document.createElement("div");
+    heading.className = "darkweb-route-map-heading";
+    heading.textContent = `ZONE ${map.zone || 1} · SIDE MAP ${mapLabel(map.current)} · ${map.sideClears || 0}/${map.required || 3}`;
+    wrapper.appendChild(heading);
+
+    const details = document.createElement("div");
+    details.className = "darkweb-route-details";
+    wrapper.appendChild(details);
+
+    const grid = document.createElement("div");
+    grid.className = "darkweb-route-grid";
+    const positions = { 7: "node-7", 9: "node-9", 1: "node-1", 3: "node-3", 5: "node-5" };
+    for (const node of map.nodes || []) {
+      const element = document.createElement("button");
+      element.type = "button";
+      element.className = `darkweb-route-node ${positions[node.id] || ""}`;
+      element.classList.toggle("current", Number(node.id) === Number(map.current));
+      element.classList.toggle("core", Number(node.id) === 5);
+      element.classList.toggle("guide-blink", Number(node.id) === 5 && Boolean(map.coreGuide));
+      element.classList.toggle("locked", Boolean(node.locked));
+      element.textContent = mapLabel(node.id);
+      if (node.label) element.title = node.label;
+      element.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (Number(map.selected) === Number(node.id)) {
+          map.onNodeSelected?.(Number(node.id));
+          return;
+        }
+        map.selected = Number(node.id);
+        renderMapDetails(node.id);
+      });
+      grid.appendChild(element);
+    }
+    wrapper.appendChild(grid);
+
+    if (map.coreGuide) {
+      const coreNode = grid.querySelector(".node-5");
+      if (coreNode) {
+        showGuideBubbleSequence([
+          {
+            target: () => coreNode,
+            text: "중앙이 메인 코어 룸입니다.",
+            options: { blockTargetActivation: true },
+          },
+          {
+            target: () => coreNode,
+            text: "어떤 맵에서도 접근할 수 있으며, SIDE CLEAR횟수를 모두 채우면 접근이 가능합니다.",
+            options: { blockTargetActivation: true },
+          },
+          {
+            target: () => coreNode,
+            text: "지금까지 선택했던 모든 해커, 함정 강화가 적용되며 클리어 시 함정강화 1개가 영구적으로 강화됩니다.",
+            options: { blockTargetActivation: true },
+          },
+        ], () => coreNode.classList.remove("guide-blink"));
+      }
+    }
+
+    function renderMapDetails(mapId) {
+      const upgrades = map.upgradesByMap?.[mapId] || {};
+      const trapList = Array.isArray(upgrades.trap) ? upgrades.trap : (upgrades.trap ? [upgrades.trap] : []);
+      const hackerList = Array.isArray(upgrades.hacker) ? upgrades.hacker : (upgrades.hacker ? [upgrades.hacker] : []);
+      details.innerHTML = `
+        <strong>MAP ${escapeHTML(mapLabel(mapId))} 강화 현황</strong>
+        <span>함정 강화: ${escapeHTML(trapList.map((reward) => reward.name).join(", ") || "없음")}</span>
+        <span>해커 강화: ${escapeHTML(hackerList.map((reward) => reward.name).join(", ") || "없음")}</span>
+      `;
+      wrapper.querySelectorAll(".darkweb-route-node").forEach((nodeElement) => {
+        nodeElement.classList.toggle("inspected", nodeElement.textContent === mapLabel(mapId));
+      });
+    }
+
+    renderMapDetails(map.selected || map.current || 1);
+    return wrapper;
+  }
+
+  function mapLabel(mapId) {
+    return ({ 1: "A", 3: "B", 5: "C", 7: "D", 9: "E" })[Number(mapId)] || String(mapId);
+  }
+
+  function getDarkWebMapLabel(mapId) {
+    return mapLabel(mapId || 1);
+  }
+
   function escapeHTML(text) {
     return String(text).replace(/[&<>"']/g, (ch) => ({
       "&": "&amp;",
@@ -3410,6 +3688,9 @@ export function initUI(callbacks) {
     showStageFourGuideBubbles,
     queueStageFourLaserRotateGuide,
     showReplayStartGuideBubble,
+    showDarkWebMapGuideBubbles,
+    showDarkWebUpgradeGuideBubbles,
+    showDarkWebMapReopenHint,
     hideGuideBubble,
     openObjectivePanel,
     openTrapToolsPanel,
