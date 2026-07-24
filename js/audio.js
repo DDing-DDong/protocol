@@ -58,6 +58,7 @@ export function setSfxVolume(value) {
   for (const active of activeBufferSources.values()) {
     active.gain.gain.value = getEffectiveSfxVolume(active.baseVolume);
   }
+  if (sfxVolume <= 0) stopAllSfx();
 }
 
 export function setBgmVolume(value) {
@@ -90,6 +91,10 @@ export function setBackgroundBgmEnabled(enabled) {
 export function playSfx(name, options = {}) {
   const file = SFX_FILES[name];
   if (!file) return;
+  if (sfxVolume <= 0) {
+    stopSfx(name);
+    return;
+  }
 
   if (playBufferedSfx(name, file, options)) return;
 

@@ -6,7 +6,6 @@ import {
   TRAPS,
   getStageTime,
   getFirewallBlockTime,
-  getCameraEmpowerCount,
   getShockDelay,
   getDefenseObjectiveItems,
   rectsOverlap,
@@ -18,8 +17,8 @@ import {
   isEntityInCameraView,
   empowerCameraTargetsByPlacementOrder,
   tickPlacedTrapTimers,
-} from "./trap.js?v=20260723-floor-trap-lift";
-import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
+} from "./trap.js?v=20260724-camera-placement-order";
+import { playSfx, stopSfx } from "./audio.js?v=20260724-stage-effect-cleanup";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;
@@ -163,15 +162,25 @@ function tickTrapCooldowns(r, dt) {
 
 function checkDefenseTraps(r, game, flashLog) {
   for (const trap of game.placedTraps) {
-    if (trap.type === "camera" && !isEntityInCameraView(r, trap, game)) continue;
-    if (!rectsOverlap(r, getTrapHitbox(trap, game))) continue;
-    if (trap.type === "camera" && !cameraCanSeeHacker(trap, r, game)) continue;
+    const key = `${trap.id}-${trap.type}`;
+    const overlapsTrap = rectsOverlap(r, getTrapHitbox(trap, game));
+    if (trap.type === "camera") {
+      const cameraDetectsHacker =
+        overlapsTrap &&
+        isEntityInCameraView(r, trap, game) &&
+        cameraCanSeeHacker(trap, r, game);
+      if (!cameraDetectsHacker) {
+        r.triggeredTraps.delete(key);
+        continue;
+      }
+    } else if (!overlapsTrap) {
+      continue;
+    }
     if (canSlidePastFloorTrap(r, trap)) {
       if (trap.type === "shock") playSfx("electric", { maxDuration: 0.45, volume: 0.24 });
       continue;
     }
 
-    const key = `${trap.id}-${trap.type}`;
     if (r.triggeredTraps.has(key)) continue;
     if (r.trapCooldowns.has(key)) continue;
     r.triggeredTraps.add(key);
@@ -191,10 +200,9 @@ function checkDefenseTraps(r, game, flashLog) {
 
     if (trap.type === "camera") {
       game.metrics.detections += 1;
-      game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
+      game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + 1);
       recordTrapTrigger(game.metrics, trap.type);
       trap.detectFlash = 0.35;
-      r.trapCooldowns.set(key, 1.2);
       if (game.mods.cameraDelay > 0) {
         game.replayPause = Math.max(game.replayPause, game.mods.cameraDelay);
         r.glitchTime = Math.max(r.glitchTime || 0, game.mods.cameraDelay);

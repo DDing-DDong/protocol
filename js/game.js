@@ -16,9 +16,9 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260723-shield-module";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260723-shield-module";
-import { initUI } from "./ui.js?v=20260724-splash-click-sfx";
-import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260722-shock-tile-alignment";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260724-right-angle-wall-climb";
+import { initUI } from "./ui.js?v=20260724-replay-first-click";
+import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260724-shared-attack-hazards";
 import {
   placeTrapAtSlot,
   removeTrapAtPosition,
@@ -26,10 +26,14 @@ import {
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260723-floor-trap-lift";
-import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260722-shock-tile-alignment";
-import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260724-background-bgm-keepalive";
-import { initLobby } from "./lobby.js?v=20260724-lobby-mission-shop";
+} from "./trap.js?v=20260724-camera-hack-body";
+import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260724-stage-effect-cleanup";
+import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260724-stage-effect-cleanup";
+import { initLobby } from "./lobby.js?v=20260724-daily-mission-rewards-v2";
+import {
+  recordDailyMissionEvent,
+  recordStageClearForDailyMissions,
+} from "./repositories/dailyMissionRepository.js?v=20260724-daily-mission-rewards-v2";
 import { getBestStage, resetBestStage, saveBestStage } from "./repositories/localGameRepository.js";
 
 const BGM_TRACKS = {
@@ -540,7 +544,7 @@ function getTrapRefund(trap) {
 function setupStage(options = {}) {
   uiModule.hideOverlay();
   uiModule.hideGuideBubble?.();
-  stopSfx("electric");
+  clearStageAudioState();
   if (!options.keepCurrentBgm) playLobbyBgm();
   uiModule.keys.clear();
   const isAttack = isAttackStage(game.stage);
@@ -610,6 +614,10 @@ function setupStage(options = {}) {
 
   uiModule.setDeleteMode(false);
   uiModule.updateUI(game);
+  if (game.turn === TURN.DEFENSE_BUILD) {
+    uiModule.openObjectivePanel?.();
+    uiModule.openTrapToolsPanel?.();
+  }
   const showedTutorial = maybeShowStageTutorial({ keepDefenseTraps });
   if (!showedTutorial && !isAttack) playGameplayBgmForTurn(game.turn);
 }
@@ -726,6 +734,19 @@ function clearStageAudioState() {
   }
   game.replayPause = 0;
   game.replayDelaySourceTrapId = "";
+  game.objectiveSparkTimer = 0;
+  game.objectiveSparkDuration = 0;
+  delete game.objectiveSparkLabel;
+  for (const effectTarget of [
+    ...(game.baseHazards || []),
+    ...(game.placedTraps || []),
+    ...(game.trapSlots || []),
+  ]) {
+    delete effectTarget.triggerEffect;
+    delete effectTarget.objectiveSparkTimer;
+    delete effectTarget.objectiveSparkDuration;
+    delete effectTarget.objectiveSparkLabel;
+  }
 }
 
 function updateTutorialBubble(dt) {
@@ -965,6 +986,8 @@ function endStage(success, text) {
     });
     return;
   }
+
+  recordStageClearForDailyMissions({ mode: game.mode, stage: completedStage });
 
   consumeActiveEffectsForStage(completedTurn);
 
@@ -1220,6 +1243,7 @@ function showDarkWebMoveConfirmOverlay(destination, coreAvailable) {
 
 function startDarkWebRoom(destination) {
   if (destination === "core") {
+    recordDailyMissionEvent("darkWebCore");
     game.darkWeb.currentRoom = "core";
     game.darkWeb.currentMap = 5;
   } else {
@@ -1542,7 +1566,6 @@ function maybeShowStageTutorial({ keepDefenseTraps = false } = {}) {
     !game.tutorialFlags.stage2Defense
   ) {
     game.tutorialFlags.stage2Defense = true;
-    uiModule.closeDefenseGuidePanels?.();
     showDialogueSequence("AI 시스템", STAGE_TWO_DEFENSE_DIALOGUE, {
       finalButtonText: "방어 준비",
       keepCurrentBgm: true,
@@ -1740,7 +1763,7 @@ function resetGame() {
 
 function openClassicStageSelect() {
   stageStarted = false;
-  stopSfx("electric");
+  clearStageAudioState();
   uiModule.keys.clear();
   uiModule.hideOverlay();
   uiModule.hideGuideBubble?.();
@@ -1804,6 +1827,7 @@ function loop(now) {
 function startMission(mode = "classic", selectedStage = 1) {
   if (stageStarted) return;
   stageStarted = true;
+  if (mode === "classic") recordDailyMissionEvent("classicPlay");
   uiModule.setSettingsPanelOpen?.(false);
   resetRunState({ mode, stage: selectedStage });
   if (game.mode === "darkweb") {
@@ -1815,7 +1839,7 @@ function startMission(mode = "classic", selectedStage = 1) {
 
 function returnToLobby() {
   stageStarted = false;
-  stopSfx("electric");
+  clearStageAudioState();
   uiModule.keys.clear();
   uiModule.hideOverlay();
   uiModule.hideGuideBubble?.();

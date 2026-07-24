@@ -147,7 +147,7 @@ button.secondary {
 .daily-mission-board {
   width: min(1120px, 100%);
   max-height: calc(100dvh - 44px);
-  overflow: auto;
+  overflow: hidden;
   padding: clamp(20px, 3vw, 34px);
   border: 1px solid rgba(24, 224, 255, 0.42);
   border-radius: 10px;
@@ -343,6 +343,201 @@ button.secondary {
   margin: 0 auto;
 }
 
+.daily-usb-tooltip-target {
+  position: relative;
+  z-index: 12;
+  cursor: help;
+  outline: none;
+}
+
+.daily-usb-tooltip-target::before {
+  content: "하루 최대 획득 가능한 USB는 20개입니다.";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(360px, 82vw);
+  padding: 10px 14px;
+  border: 1px solid rgba(105, 232, 255, 0.68);
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, rgba(24, 224, 255, 0.08), transparent 55%),
+    rgba(3, 13, 21, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48), 0 0 14px rgba(24, 224, 255, 0.16);
+  color: #c9f7ff;
+  font-family: "PfStardust30", monospace;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 5px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.daily-usb-tooltip-target::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  z-index: 21;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(105, 232, 255, 0.68);
+  border-bottom: 1px solid rgba(105, 232, 255, 0.68);
+  background: #03101a;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(45deg);
+  transition: opacity 120ms ease;
+}
+
+.daily-usb-tooltip-target:hover::before,
+.daily-usb-tooltip-target:focus-visible::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.daily-usb-tooltip-target:hover::after,
+.daily-usb-tooltip-target:focus-visible::after {
+  opacity: 1;
+}
+
+.total-usb-history-target {
+  position: relative;
+  z-index: 12;
+  cursor: help;
+  outline: none;
+}
+
+.total-usb-history-popup {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: min(300px, 82vw);
+  padding: 12px 14px;
+  border: 1px solid rgba(105, 232, 255, 0.68);
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, rgba(24, 224, 255, 0.08), transparent 55%),
+    rgba(3, 13, 21, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48), 0 0 14px rgba(24, 224, 255, 0.16);
+  color: #c9f7ff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 5px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.total-usb-history-popup::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(105, 232, 255, 0.68);
+  border-bottom: 1px solid rgba(105, 232, 255, 0.68);
+  background: #03101a;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.total-usb-history-title {
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(105, 232, 255, 0.22);
+  color: #69e8ff;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  text-align: center;
+}
+
+.total-usb-history-popup ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.total-usb-history-popup li {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  color: #bde7f2;
+  font-size: 13px;
+}
+
+.total-usb-history-popup li strong {
+  min-width: 42px;
+  color: #27ffc8;
+  font-size: 14px;
+  text-align: right;
+}
+
+.total-usb-history-target:hover .total-usb-history-popup,
+.total-usb-history-target:focus-visible .total-usb-history-popup {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-height: 750px) and (min-width: 761px) {
+  .lobby-feature-screen {
+    padding-block: 12px;
+  }
+
+  .daily-mission-board {
+    max-height: calc(100dvh - 24px);
+    padding: 16px 22px;
+  }
+
+  .daily-mission-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .daily-mission-header h2 {
+    margin-top: 2px;
+    font-size: 32px;
+  }
+
+  .daily-mission-grid {
+    gap: 10px;
+  }
+
+  .daily-mission-card {
+    min-height: 140px;
+    padding: 30px 14px 10px;
+  }
+
+  .daily-mission-card h3 {
+    line-height: 1.35;
+  }
+
+  .daily-mission-reward {
+    min-height: 36px;
+    margin-top: 8px;
+  }
+
+  .daily-mission-summary {
+    margin-block: 12px 8px;
+  }
+
+  .daily-mission-summary > div {
+    min-height: 48px;
+    padding-block: 7px;
+  }
+
+  .daily-mission-back {
+    padding-block: 8px;
+  }
+}
+
 @media (max-width: 760px) {
   .lobby-feature-screen {
     align-items: start;
@@ -355,6 +550,148 @@ button.secondary {
 
   .daily-mission-card {
     min-height: 150px;
+  }
+}
+
+.daily-mission-claim {
+  align-self: center;
+  width: 100%;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: #dff8ff;
+  font-size: clamp(18px, 1.7vw, 23px);
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(24, 224, 255, 0.18);
+}
+
+.daily-mission-claim:hover {
+  color: #ffffff;
+  transform: none;
+}
+
+.daily-mission-attendance:not(.is-complete) {
+  cursor: pointer;
+}
+
+.daily-mission-attendance:not(.is-complete) .daily-mission-claim {
+  pointer-events: none;
+}
+
+.daily-mission-card.is-complete {
+  pointer-events: none;
+  border-color: rgba(92, 196, 220, 0.22);
+  filter: saturate(0.45);
+  cursor: default;
+}
+
+.daily-mission-card.is-complete::before {
+  content: "CLEAR";
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding-bottom: clamp(42px, 6.5vh, 56px);
+  background:
+    linear-gradient(180deg, rgba(2, 10, 17, 0.72), rgba(2, 8, 14, 0.88));
+  color: #69e8ff;
+  font-family: "PfStardust30", monospace;
+  font-size: clamp(38px, 6vh, 60px);
+  font-weight: 800;
+  letter-spacing: 5px;
+  text-shadow:
+    0 0 5px rgba(105, 232, 255, 0.9),
+    0 0 18px rgba(24, 224, 255, 0.45);
+}
+
+.daily-mission-card.is-complete::after {
+  z-index: 9;
+  opacity: 0.25;
+}
+
+.daily-mission-card.is-complete .daily-mission-reward {
+  position: relative;
+  z-index: 10;
+  opacity: 0.68;
+  filter: saturate(0.8) brightness(0.92);
+}
+
+.daily-mission-card.is-complete .daily-mission-reward strong {
+  color: #dff8ff;
+  text-shadow: 0 0 8px rgba(105, 232, 255, 0.24);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .daily-mission-card.is-complete:hover {
+    border-color: rgba(92, 196, 220, 0.22);
+    box-shadow: inset 0 1px 0 rgba(233, 248, 255, 0.04);
+    transform: translateZ(0);
+  }
+}
+
+/* Keep the desktop mission screen as a single, non-scrolling viewport. */
+@media (min-width: 761px) {
+  #dailyMissionScreen {
+    padding-block: 12px;
+    overflow: hidden;
+  }
+
+  #dailyMissionScreen .daily-mission-board {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    width: min(1120px, 100%);
+    height: calc(100dvh - 24px);
+    max-height: none;
+    padding: clamp(16px, 2.25vh, 24px);
+    overflow: hidden !important;
+  }
+
+  #dailyMissionScreen .daily-mission-header {
+    margin-bottom: clamp(8px, 1.5vh, 16px);
+    padding-bottom: clamp(8px, 1.5vh, 14px);
+  }
+
+  #dailyMissionScreen .daily-mission-header h2 {
+    margin-top: 2px;
+    font-size: clamp(30px, 4.5vh, 42px);
+  }
+
+  #dailyMissionScreen .daily-mission-grid {
+    min-height: 0;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: clamp(8px, 1.5vh, 14px);
+  }
+
+  #dailyMissionScreen .daily-mission-card {
+    min-height: 0;
+    padding: clamp(28px, 4.5vh, 38px) 16px clamp(9px, 1.6vh, 14px);
+  }
+
+  #dailyMissionScreen .daily-mission-card h3 {
+    line-height: 1.35;
+  }
+
+  #dailyMissionScreen .daily-mission-reward {
+    min-height: clamp(34px, 5.5vh, 42px);
+    margin-top: clamp(6px, 1.4vh, 12px);
+  }
+
+  #dailyMissionScreen .daily-mission-summary {
+    min-height: 0;
+    margin: clamp(8px, 1.5vh, 14px) auto clamp(6px, 1vh, 10px);
+  }
+
+  #dailyMissionScreen .daily-mission-summary > div {
+    min-height: clamp(44px, 7vh, 56px);
+    padding-block: 6px;
+  }
+
+  #dailyMissionScreen .daily-mission-back {
+    min-height: 0;
+    padding-block: clamp(7px, 1.3vh, 10px);
   }
 }
 
@@ -3405,6 +3742,62 @@ kbd {
   }
 }
 
+.daily-mission-countdown {
+  display: grid;
+  justify-items: center;
+  justify-self: end;
+  gap: 3px;
+  width: max-content;
+  min-width: 0;
+  color: #bde7f2;
+  font-size: 15px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+#dailyMissionScreen .daily-mission-card h3 {
+  font-size: clamp(18px, 1.7vw, 23px);
+  line-height: 1.45;
+}
+
+.daily-mission-countdown strong {
+  color: #ffe45c;
+  font-size: clamp(17px, 1.7vw, 21px);
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px rgba(255, 228, 92, 0.38);
+}
+
+.daily-mission-card {
+  transform: translateZ(0);
+  transform-origin: center;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .daily-mission-card:hover {
+    z-index: 5;
+    border-color: rgba(24, 224, 255, 0.78);
+    box-shadow:
+      0 12px 28px rgba(0, 0, 0, 0.42),
+      0 0 18px rgba(24, 224, 255, 0.2),
+      inset 0 1px 0 rgba(233, 248, 255, 0.12);
+    transform: scale(1.035) translateZ(0);
+  }
+
+  .daily-mission-card-all:hover {
+    border-color: rgba(255, 65, 200, 0.9);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42), 0 0 20px rgba(255, 65, 200, 0.24);
+  }
+}
+
+@media (max-width: 760px) {
+  .daily-mission-countdown {
+    width: auto;
+    min-width: 0;
+    font-size: 11px;
+  }
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
   body {
     overflow: hidden;
@@ -4015,5 +4408,98 @@ body.mobile-client.mobile-portrait .lobby-root {
   body.mobile-client.mobile-portrait .defense-tools-panel {
     width: min(330px, calc(50dvh - 28px));
     max-height: calc(100dvw - 92px);
+  }
+}
+
+/* Keep every game overlay inside a single viewport without introducing scrollbars. */
+.overlay {
+  overflow: hidden;
+}
+
+.overlay:not(.dialogue-overlay) .overlay-card,
+.failure-overlay {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+@media (max-height: 850px) and (min-width: 721px) {
+  .overlay:not(.dialogue-overlay) {
+    padding: 4px;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card {
+    width: min(760px, calc(100% - 8px));
+    max-height: calc(100% - 8px);
+    gap: clamp(7px, 1.25dvh, 11px);
+    padding: clamp(12px, 2dvh, 18px) clamp(14px, 2.4dvw, 24px);
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card h2 {
+    font-size: clamp(19px, 3.4dvh, 27px);
+    line-height: 1.05;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card p {
+    font-size: clamp(11px, 2.05dvh, 15px);
+    line-height: 1.34;
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-list {
+    gap: clamp(7px, 1.15dvh, 10px);
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-card,
+  .overlay:not(.dialogue-overlay) .choice-card {
+    min-height: clamp(50px, 9.2dvh, 68px);
+    padding: clamp(8px, 1.35dvh, 11px) 12px;
+    font-size: clamp(11px, 1.9dvh, 14px);
+    line-height: 1.28;
+  }
+
+  .overlay.reward-select-overlay .overlay-card {
+    width: min(820px, calc(100% - 8px));
+    max-height: calc(100% - 8px);
+    gap: clamp(6px, 1.05dvh, 9px);
+    padding: clamp(25px, 4.2dvh, 38px) clamp(38px, 5.8dvw, 58px)
+      clamp(23px, 3.9dvh, 36px);
+  }
+
+  .overlay.reward-select-overlay .reward-list {
+    gap: clamp(7px, 1.1dvh, 10px);
+  }
+
+  .overlay.reward-select-overlay .reward-card {
+    min-height: clamp(50px, 9.2dvh, 68px);
+    padding: clamp(7px, 1.2dvh, 10px) clamp(28px, 4dvw, 44px);
+    line-height: 1.28;
+  }
+
+  .overlay.reward-select-overlay .reward-actions {
+    gap: clamp(8px, 1.6dvw, 14px);
+    margin-top: 0;
+  }
+
+  .overlay.reward-select-overlay .reward-actions > button {
+    min-width: 0;
+    width: min(270px, 44%);
+    min-height: clamp(42px, 8.5dvh, 60px);
+    padding: clamp(7px, 1.2dvh, 10px) clamp(18px, 2.8dvw, 32px);
+  }
+
+  .failure-overlay {
+    max-height: calc(100% - 8px);
+  }
+
+  .failure-item-tabs {
+    padding: 8px;
+  }
+
+  .failure-item-grid {
+    gap: 6px;
+  }
+
+  .failure-item-button {
+    min-height: clamp(54px, 9.2dvh, 70px);
+    padding: 7px;
   }
 }

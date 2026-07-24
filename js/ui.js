@@ -16,7 +16,7 @@ import {
   getCameraHazardBox,
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
-} from "./trap.js?v=20260723-floor-trap-lift";
+} from "./trap.js?v=20260724-camera-placement-order";
 import {
   getBackgroundBgmEnabled,
   getBgmVolume,
@@ -26,7 +26,7 @@ import {
   setBgmVolume,
   setSfxVolume,
   unlockAudio,
-} from "./audio.js?v=20260724-background-bgm-keepalive";
+} from "./audio.js?v=20260724-stage-effect-cleanup";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
 const CANVAS_WIDTH = 1200;
@@ -1214,13 +1214,13 @@ export function initUI(callbacks) {
     showGuideBubble(
       ui.startReplayBtn,
       "함정을 배치한 뒤 리플레이를 시작하세요. 배치 후 실제로 작동시켜야 하며, 표시된 필수 조건을 모두 달성해야 수비에 성공합니다.",
-      null,
-      { blockTargetActivation: true }
+      null
     );
   }
 
   function showStageFourGuideBubbles({ onComplete } = {}) {
-    closeDefenseGuidePanels();
+    openObjectivePanel();
+    openTrapToolsPanel();
     const steps = [
       {
         target: () => ui.objectiveToggle,

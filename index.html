@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260724-daily-mission-ui" />
+  <link rel="stylesheet" href="./style.css?v=20260724-single-screen-spacing-v17" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -43,35 +43,40 @@
             <p class="lobby-kicker">DAILY MISSION</p>
             <h2>일일미션</h2>
           </div>
+          <div class="daily-mission-countdown" aria-live="off">
+            <span>일일 미션까지</span>
+            <strong id="dailyMissionCountdown">00시간 00분 00초</strong>
+            <span>남았습니다.</span>
+          </div>
         </header>
 
         <div class="daily-mission-grid">
-          <article class="daily-mission-card">
+          <article class="daily-mission-card daily-mission-attendance" data-mission-id="attendance">
             <span class="daily-mission-index">01</span>
-            <h3>출석 체크</h3>
-            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>1개</strong></div>
+            <button class="daily-mission-claim" type="button">출석 체크</button>
+            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>2개</strong></div>
           </article>
-          <article class="daily-mission-card">
+          <article class="daily-mission-card" data-mission-id="classicPlay">
             <span class="daily-mission-index">02</span>
             <h3>1일 1회<br />CLASSIC MODE 플레이</h3>
-            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>1개</strong></div>
+            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>2개</strong></div>
           </article>
-          <article class="daily-mission-card">
+          <article class="daily-mission-card" data-mission-id="hackerAiClear">
             <span class="daily-mission-index">03</span>
             <h3>해커, AI 스테이지<br />각각 3회 클리어</h3>
-            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>2개</strong></div>
+            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>3개</strong></div>
           </article>
-          <article class="daily-mission-card">
+          <article class="daily-mission-card" data-mission-id="sequentialClear">
             <span class="daily-mission-index">04</span>
-            <h3>무한모드의 해커, AI<br />각각 1스테이지 클리어</h3>
-            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>2개</strong></div>
+            <h3>1스테이지부터 11스테이지까지<br />순서대로 클리어</h3>
+            <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>4개</strong></div>
           </article>
-          <article class="daily-mission-card">
+          <article class="daily-mission-card" data-mission-id="darkWebCore">
             <span class="daily-mission-index">05</span>
             <h3>DARK WEB MODE에서<br />메인 코어 룸 진입</h3>
             <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>4개</strong></div>
           </article>
-          <article class="daily-mission-card daily-mission-card-all">
+          <article class="daily-mission-card daily-mission-card-all" data-mission-id="allDaily">
             <span class="daily-mission-index">06</span>
             <h3>모든 일일 미션 클리어</h3>
             <div class="daily-mission-reward"><span class="usb-token" aria-hidden="true"><i></i><b>USB</b></span><strong>5개</strong></div>
@@ -79,8 +84,16 @@
         </div>
 
         <div class="daily-mission-summary" aria-label="USB 획득 현황">
-          <div><span>오늘 획득한 USB</span><strong id="dailyUsbCount">0</strong></div>
-          <div><span>지금까지 획득한 총 USB</span><strong id="totalUsbCount">0</strong></div>
+          <div class="daily-usb-tooltip-target" tabindex="0">
+            <span>오늘 획득한 USB</span><strong id="dailyUsbCount">0</strong>
+          </div>
+          <div class="total-usb-history-target" tabindex="0">
+            <span>지금까지 획득한 총 USB</span><strong id="totalUsbCount">0</strong>
+            <div class="total-usb-history-popup" role="tooltip">
+              <span class="total-usb-history-title">최근 일주일 USB 획득 기록</span>
+              <ul id="dailyUsbHistoryList"></ul>
+            </div>
+          </div>
         </div>
 
         <button class="lobby-button daily-mission-back" type="button" data-action="back-to-lobby">BACK TO LOBBY</button>
@@ -202,6 +215,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260724-lobby-mission-shop"></script>
+  <script type="module" src="./js/game.js?v=20260724-right-angle-wall-climb"></script>
 </body>
 </html>

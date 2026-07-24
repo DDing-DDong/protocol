@@ -1,13 +1,19 @@
 // js/lobby.js
 // Handles only Splash/Lobby screen transitions and lobby button wiring.
 
-import { playLobbyBgm, playSfx, unlockAudio } from "./audio.js?v=20260724-background-bgm-keepalive";
+import { playLobbyBgm, playSfx, unlockAudio } from "./audio.js?v=20260724-stage-effect-cleanup";
 import {
   getPurchasedSkins as loadPurchasedSkins,
   getSelectedSkin as loadSelectedSkin,
   savePurchasedSkins,
   saveSelectedSkin,
 } from "./repositories/localGameRepository.js";
+import {
+  getDailyMissionState,
+  getDailyUsbHistory,
+  getMillisecondsUntilMidnight,
+  recordDailyMissionEvent,
+} from "./repositories/dailyMissionRepository.js?v=20260724-daily-mission-rewards-v2";
 
 const CLASSIC_CLEAR_STORAGE_KEY = "traceProtocolClassicStage11Returned";
 const SELECTABLE_AI_SKINS = [
@@ -46,6 +52,10 @@ export function initLobby({
   const pathNoteModal = createPathNoteModal();
   const modePanel = createModePanel();
   const stageSelectPanel = createStageSelectPanel();
+  const dailyMissionCountdown = document.getElementById("dailyMissionCountdown");
+  const dailyUsbCount = document.getElementById("dailyUsbCount");
+  const totalUsbCount = document.getElementById("totalUsbCount");
+  const dailyUsbHistoryList = document.getElementById("dailyUsbHistoryList");
 
   let active = true;
   let helpOverlayOpen = false;
@@ -54,6 +64,7 @@ export function initLobby({
   let stageSelectOpen = false;
   let pendingPurchaseSkinId = "";
   let enteringLobby = false;
+  let lastMissionDateKey = "";
 
   document.body.classList.add("lobby-active");
   startBtn?.after(modePanel);
@@ -61,6 +72,55 @@ export function initLobby({
   skinBtn?.after(skinPanel);
   root?.appendChild(skinPurchaseModal);
   root?.appendChild(pathNoteModal);
+
+  const refreshDailyMission = (state = getDailyMissionState()) => {
+    if (dailyUsbCount) dailyUsbCount.textContent = String(state.todayUsb || 0);
+    if (totalUsbCount) totalUsbCount.textContent = String(state.totalUsb || 0);
+    if (dailyUsbHistoryList) {
+      const history = getDailyUsbHistory();
+      dailyUsbHistoryList.innerHTML = history.length
+        ? history.map(({ dateKey, usb, isToday }) => `
+            <li><span>${formatUsbHistoryDate(dateKey, isToday)}</span><strong>${usb}개</strong></li>
+          `).join("")
+        : "<li><span>기록 없음</span><strong>0개</strong></li>";
+    }
+    dailyMissionScreen?.querySelectorAll("[data-mission-id]").forEach((card) => {
+      const complete = Boolean(state.claimed?.[card.dataset.missionId]);
+      card.classList.toggle("is-complete", complete);
+      card.setAttribute("aria-disabled", complete ? "true" : "false");
+      card.querySelector(".daily-mission-claim")?.toggleAttribute("disabled", complete);
+    });
+    lastMissionDateKey = state.dateKey;
+  };
+
+  const formatUsbHistoryDate = (value, isToday = false) => {
+    const [year, month, day] = String(value).split("-").map(Number);
+    const weekday = ["일", "월", "화", "수", "목", "금", "토"][
+      new Date(year, month - 1, day, 12).getDay()
+    ];
+    return `${isToday ? "오늘" : `${month}월 ${day}일`} (${weekday})`;
+  };
+
+  const updateDailyMissionCountdown = () => {
+    const now = new Date();
+    const remaining = Math.max(0, Math.floor(getMillisecondsUntilMidnight(now) / 1000));
+    const hours = Math.floor(remaining / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    const seconds = remaining % 60;
+    if (dailyMissionCountdown) {
+      dailyMissionCountdown.textContent =
+        `${String(hours).padStart(2, "0")}시간 ${String(minutes).padStart(2, "0")}분 ${String(seconds).padStart(2, "0")}초`;
+    }
+    const state = getDailyMissionState(now);
+    if (state.dateKey !== lastMissionDateKey) {
+      refreshDailyMission(state);
+    }
+  };
+
+  refreshDailyMission();
+  updateDailyMissionCountdown();
+  window.setInterval(updateDailyMissionCountdown, 1000);
+  window.addEventListener("protocol:daily-mission-update", (event) => refreshDailyMission(event.detail));
 
   const getPurchasedSkins = () => {
     return new Set(loadPurchasedSkins());
@@ -163,6 +223,13 @@ export function initLobby({
   const setPathNoteModalOpen = (open) => {
     pathNoteModal.classList.toggle("hidden", !open);
     document.body.classList.toggle("lobby-modal-open", Boolean(open));
+  };
+
+  const closeLobbyPopups = (except = "") => {
+    if (except !== "skin") setSkinPanelOpen(false);
+    if (except !== "mode") setModePanelOpen(false);
+    setSkinPurchaseModalOpen(false);
+    setPathNoteModalOpen(false);
   };
 
   const refreshSkinButtons = () => {
@@ -272,8 +339,9 @@ export function initLobby({
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
-    setSkinPanelOpen(false);
-    setModePanelOpen(!modePanelOpen);
+    const shouldOpen = !modePanelOpen;
+    closeLobbyPopups("mode");
+    setModePanelOpen(shouldOpen);
   });
 
   modePanel.addEventListener("click", (event) => {
@@ -324,8 +392,10 @@ export function initLobby({
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
+    const shouldOpen = !skinPanelOpen;
+    closeLobbyPopups("skin");
     refreshSkinButtons();
-    setSkinPanelOpen(!skinPanelOpen);
+    setSkinPanelOpen(shouldOpen);
   });
 
   skinPanel.addEventListener("click", (event) => {
@@ -364,7 +434,7 @@ export function initLobby({
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
-    setSkinPanelOpen(false);
+    closeLobbyPopups();
     setPathNoteModalOpen(true);
   });
 
@@ -380,13 +450,28 @@ export function initLobby({
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
+    closeLobbyPopups();
+    refreshDailyMission();
     showFeatureScreen(dailyMissionScreen);
+  });
+
+  dailyMissionScreen?.querySelector(".daily-mission-attendance")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const state = getDailyMissionState();
+    if (state.claimed?.attendance) {
+      refreshDailyMission(state);
+      return;
+    }
+    playSfx("click");
+    refreshDailyMission(recordDailyMissionEvent("attendance"));
   });
 
   shopBtn?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
+    closeLobbyPopups();
     showFeatureScreen(shopScreen);
   });
 

@@ -239,10 +239,11 @@ function getCameraRangeScale(game, camera) {
 
 export function getCameraDetectionPolygon(camera, game) {
   const box = getCameraHazardBox(camera, game);
-  const bodyW = Math.min(56, box.w * 0.5);
-  const bodyH = Math.min(36, box.h * 0.32);
-  const bodyX = box.x + box.w - bodyW - 2;
-  const bodyY = box.y;
+  const body = getCameraBodyBox(camera, game);
+  const bodyX = body.x;
+  const bodyY = body.y;
+  const bodyW = body.w;
+  const bodyH = body.h;
 
   return [
     { x: bodyX + 4, y: bodyY + bodyH },
@@ -250,6 +251,15 @@ export function getCameraDetectionPolygon(camera, game) {
     { x: bodyX + bodyW - 10, y: box.y + box.h - 1 },
     { x: box.x + 8, y: box.y + box.h - 1 },
   ];
+}
+
+export function getCameraBodyBox(camera, game) {
+  const box = getCameraHazardBox(camera, game);
+  const bodyW = Math.min(56, box.w * 0.5);
+  const bodyH = Math.min(36, box.h * 0.32);
+  const bodyX = box.x + box.w - bodyW - 2;
+  const bodyY = box.y;
+  return { x: bodyX, y: bodyY, w: bodyW, h: bodyH };
 }
 
 export function isPointInPolygon(point, polygon) {
@@ -301,74 +311,25 @@ export function empowerNextTrapsByPlacementOrder(game) {
 }
 
 export function getCameraEmpowerAssignments(game, traps = game?.placedTraps) {
-  const assignments = [];
-  const pending = [];
-  const empowerCount = getCameraEmpowerCount(game);
-
-  for (const trap of traps || []) {
-    if (trap?.type === "camera") {
-      const assignment = { camera: trap, targets: [] };
-      assignments.push(assignment);
-      pending.push({ assignment, remaining: empowerCount });
-      continue;
-    }
-
-    if (!CAMERA_EMPOWER_TARGET_TYPES.has(trap?.type)) continue;
-    while (pending.length > 0 && pending[0].remaining <= 0) pending.shift();
-    if (pending.length === 0) continue;
-
-    pending[0].assignment.targets.push(trap);
-    pending[0].remaining -= 1;
-    if (pending[0].remaining <= 0) pending.shift();
-  }
-
-  return assignments;
+  const camera = (traps || []).find((trap) => trap?.type === "camera");
+  if (!camera) return [];
+  return [{
+    camera,
+    targets: previewNextItemsByPlacementOrder(game, traps).slice(0, 1),
+  }];
 }
 
 export function empowerCameraTargetsByPlacementOrder(game, camera, traps = game?.placedTraps) {
   if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
-  const assignment = getCameraEmpowerAssignments(game, traps)
-    .find((entry) => entry.camera === camera || entry.camera?.id === camera.id);
-  if (!assignment) return [];
-
-  const empowered = [];
-  for (const target of assignment.targets) {
-    if (!target || target.empowered || game.metrics.alertCharge <= 0) continue;
-    target.empowered = true;
-    game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
-    empowered.push(target);
-  }
-  return empowered;
+  return empowerNextTrapsInList(game, traps, 1);
 }
 
 export function empowerAttackTargetForCamera(game, camera, hazards = game?.baseHazards) {
   if (!game?.metrics?.alertCharge || game.metrics.alertCharge <= 0 || !camera) return [];
-  const recentDefenseHazards = (hazards || []).filter((hazard) => hazard?.carried);
-  const stageHazards = (hazards || []).filter((hazard) => !hazard?.carried);
-  const stage = Number(game?.stage) || 1;
-  const firstRecentCameraIndex = recentDefenseHazards.findIndex((hazard) => hazard?.type === "camera");
-  const recentTargetsAfterCamera = firstRecentCameraIndex >= 0
-    ? recentDefenseHazards
-      .slice(firstRecentCameraIndex + 1)
-      .filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
-    : [];
-  const cameras = stage <= 3
-    ? stageHazards.filter((hazard) => hazard?.type === "camera")
-    : [recentDefenseHazards, stageHazards]
-      .flatMap((group) => group.filter((hazard) => hazard?.type === "camera"));
-  const targets = stage <= 3
-    ? stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type))
-    : [
-      ...recentTargetsAfterCamera,
-      ...stageHazards.filter((hazard) => CAMERA_EMPOWER_TARGET_TYPES.has(hazard?.type)),
-    ];
-  const cameraIndex = cameras.indexOf(camera);
-  const target = cameraIndex >= 0 ? targets[cameraIndex] : null;
-  if (!target || target.empowered) return [];
-
-  target.empowered = true;
-  game.metrics.alertCharge = Math.max(0, game.metrics.alertCharge - 1);
-  return [target];
+  const orderedHazards = (hazards || []).filter((hazard) =>
+    camera.carried ? Boolean(hazard?.carried) : !hazard?.carried
+  );
+  return empowerNextTrapsInList(game, orderedHazards, 1);
 }
 
 export function previewNextTrapsByPlacementOrder(game) {
