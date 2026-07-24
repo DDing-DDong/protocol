@@ -6,7 +6,6 @@ import {
   TRAPS,
   getStageTime,
   getFirewallBlockTime,
-  getCameraEmpowerCount,
   getShockSlowTime,
   SHOCK_SLOW_MULTIPLIER,
   clamp,
@@ -15,10 +14,11 @@ import {
 } from "./data.js?v=20260723-shield-module";
 import {
   empowerAttackTargetForCamera,
+  getCameraBodyBox,
   getHazardHitbox,
   isEntityInCameraView,
   tickBaseHazardTimers,
-} from "./trap.js?v=20260723-floor-trap-lift";
+} from "./trap.js?v=20260724-camera-hack-body";
 import { recordHacker } from "./replay.js?v=20260722-single-camera-boost";
 import { playSfx, stopSfx } from "./audio.js?v=20260724-stage-effect-cleanup";
 
@@ -43,7 +43,7 @@ const WALL_JUMP_X_SPEED = 280;
 const WALL_JUMP_Y_SPEED = 700;
 const WALL_JUMP_BUFFER_TIME = 0.12;
 const WALL_MIN_CONTACT_HEIGHT = 16;
-const WALL_LEDGE_MANTLE_HEIGHT = 18;
+const WALL_LEDGE_MANTLE_HEIGHT = 6;
 const WALL_LEDGE_INSET = 2;
 const HACKER_STAND_HEIGHT = 54;
 const HACKER_SLIDE_HEIGHT = 30;
@@ -221,7 +221,7 @@ export function updateAttack(game, dt, keys, flashLog, endStage) {
 
     if (jump && wallJumpSide && pressingAwayFromWall && !h.wallJumpInputLock) {
       performWallJump(h, wallJumpSide, dash && pressingAwayFromWall);
-    } else if (jump && h.onGround) {
+    } else if (jump && h.onGround && !h.wallJumpInputLock) {
       h.vy = -h.jumpPower;
       h.onGround = false;
       h.landingPoseTime = 0;
@@ -461,13 +461,24 @@ function findHackTarget(game, h) {
     if (!isHackableHazard(hazard)) continue;
     if ((hazard.hackedTime || 0) > 0 || (hazard.hackPendingTime || 0) > 0) continue;
 
-    const box = getHazardHitbox(hazard, game);
+    const box = hazard.type === "camera"
+      ? getCameraBodyBox(hazard, game)
+      : getHazardHitbox(hazard, game);
+    if (!isBoxInFacingDirection(h, box)) continue;
     if (!rectsOverlap(scanBox, box)) continue;
     candidates.push({ hazard, distance: getForwardDistance(h, box) });
   }
 
   candidates.sort((a, b) => a.distance - b.distance);
   return candidates[0]?.hazard || null;
+}
+
+function isBoxInFacingDirection(h, box) {
+  const hackerCenterX = h.x + h.w / 2;
+  const targetCenterX = box.x + box.w / 2;
+  return (h.facing || 1) < 0
+    ? targetCenterX < hackerCenterX
+    : targetCenterX > hackerCenterX;
 }
 
 function getHackScanBox(h) {
@@ -534,7 +545,7 @@ function moveAndCollide(entity, dt, game, keys) {
   grabNearbyForwardWall(entity, game, holdingLeft, holdingRight);
 
   const wallSide = entity.wallSide || previousWallSide;
-  const climbedOntoLedge = holdingUp && isHoldingTowardWall(wallSide, holdingLeft, holdingRight) &&
+  let climbedOntoLedge = holdingUp && wallSide &&
     tryClimbOntoPlatformLedge(entity, game, wallSide);
 
   if (climbedOntoLedge) {
@@ -581,6 +592,11 @@ function moveAndCollide(entity, dt, game, keys) {
       entity.y = p.y + p.h;
       entity.vy = 0;
     }
+  }
+
+  if (!climbedOntoLedge && holdingUp && wallSide) {
+    climbedOntoLedge = tryClimbOntoPlatformLedge(entity, game, wallSide);
+    if (climbedOntoLedge) clearWallGrabState(entity);
   }
 
   if (entity.y + entity.h > 462 && entity.vy >= 0) {
@@ -647,6 +663,7 @@ function tryClimbOntoPlatformLedge(entity, game, wallSide) {
     entity.vx = 0;
     entity.vy = 0;
     entity.onGround = true;
+    entity.wallJumpInputLock = true;
     return true;
   }
 
@@ -684,7 +701,8 @@ function collidePlatformWallsX(entity, previousX, game, holdingLeft, holdingRigh
 
   for (const platform of game.platforms || []) {
     const wallBox = getPlatformWallBox(platform);
-    if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
+    const minimumContactHeight = entity.wallClimbing ? 1 : WALL_MIN_CONTACT_HEIGHT;
+    if (getVerticalOverlap(entity, wallBox) < minimumContactHeight) continue;
     // A platform is always solid. Hand reach only controls the optional
     // nearby wall grab below; using it here let grounded hackers enter blocks.
 
@@ -740,7 +758,8 @@ function grabNearbyForwardWall(entity, game, holdingLeft, holdingRight) {
 
   for (const platform of game.platforms || []) {
     const wallBox = getPlatformWallBox(platform);
-    if (getVerticalOverlap(entity, wallBox) < WALL_MIN_CONTACT_HEIGHT) continue;
+    const minimumContactHeight = entity.wallClimbing ? 1 : WALL_MIN_CONTACT_HEIGHT;
+    if (getVerticalOverlap(entity, wallBox) < minimumContactHeight) continue;
     if (!canReachWallWithHands(entity, wallBox)) continue;
 
     if (facingSide > 0) {
@@ -767,7 +786,9 @@ function getVerticalOverlap(a, b) {
 
 function canReachWallWithHands(entity, wallBox) {
   const handY = entity.y + entity.h * WALL_HAND_HEIGHT_RATIO;
-  return wallBox.y <= handY;
+  const feetY = entity.y + entity.h;
+  return wallBox.y <= handY ||
+    (entity.wallClimbing && feetY >= wallBox.y - 2);
 }
 
 function getPlatformWallBox(platform) {
@@ -832,9 +853,20 @@ function updateWallStick(entity, dt, holdingUp = false) {
 
 function applyAttackHazards(h, game, flashLog) {
   for (const hazard of game.baseHazards) {
-    if ((hazard.hackedTime || 0) > 0) continue;
-    if (hazard.type === "camera" && !isEntityInCameraView(h, hazard, game)) continue;
-    if (!rectsOverlap(h, getHazardHitbox(hazard, game))) continue;
+    if ((hazard.hackedTime || 0) > 0) {
+      if (hazard.type === "camera") hazard.cameraEmpowerConsumed = false;
+      continue;
+    }
+    const overlapsHazard = rectsOverlap(h, getHazardHitbox(hazard, game));
+    if (hazard.type === "camera") {
+      const cameraDetectsHacker = overlapsHazard && isEntityInCameraView(h, hazard, game);
+      if (!cameraDetectsHacker) {
+        hazard.cameraEmpowerConsumed = false;
+        continue;
+      }
+    } else if (!overlapsHazard) {
+      continue;
+    }
 
     if (isHackInvincible(h) && hazard.type !== "firewall") continue;
 
@@ -843,7 +875,7 @@ function applyAttackHazards(h, game, flashLog) {
       continue;
     }
 
-    if (h.invincible > 0) continue;
+    if (h.invincible > 0 && hazard.type !== "camera") continue;
 
     if (hazard.type === "firewall" && hazard.empowered && !hazard.closed) {
       hazard.closed = true;
@@ -868,6 +900,8 @@ function applyAttackHazards(h, game, flashLog) {
     }
 
     if (hazard.type === "camera") {
+      if (hazard.cameraEmpowerConsumed) continue;
+      hazard.cameraEmpowerConsumed = true;
       if (canIgnoreCamera(game)) {
         game.stageState.cameraIgnoreUsesUsed += 1;
         h.invincible = 0.35;
@@ -875,12 +909,8 @@ function applyAttackHazards(h, game, flashLog) {
         return;
       }
       game.metrics.detections += 1;
-      let empoweredHazards = [];
-      if (!hazard.cameraEmpowerConsumed) {
-        hazard.cameraEmpowerConsumed = true;
-        game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + getCameraEmpowerCount(game));
-        empoweredHazards = empowerAttackTargetForCamera(game, hazard, game.baseHazards);
-      }
+      game.metrics.alertCharge = Math.min(8, game.metrics.alertCharge + 1);
+      const empoweredHazards = empowerAttackTargetForCamera(game, hazard, game.baseHazards);
       h.invincible = HIT_INVINCIBLE_TIME;
       showDamageFlash(h, hazard.type);
       playSfx("scanner");

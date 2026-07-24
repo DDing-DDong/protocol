@@ -16,8 +16,8 @@ import {
   SAMPLE_STEP,
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260723-shield-module";
-import { createHacker, updateAttack, activateHack } from "./player.js?v=20260724-stage-effect-cleanup";
-import { initUI } from "./ui.js?v=20260724-defense-panels-open";
+import { createHacker, updateAttack, activateHack } from "./player.js?v=20260724-right-angle-wall-climb";
+import { initUI } from "./ui.js?v=20260724-replay-first-click";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260724-shared-attack-hazards";
 import {
   placeTrapAtSlot,
@@ -26,7 +26,7 @@ import {
   carryDefenseTrapsToNextStage,
   getAllowedRotation,
   getTrapCost,
-} from "./trap.js?v=20260723-floor-trap-lift";
+} from "./trap.js?v=20260724-camera-hack-body";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260724-stage-effect-cleanup";
 import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260724-stage-effect-cleanup";
 import { initLobby } from "./lobby.js?v=20260724-daily-mission-rewards-v2";

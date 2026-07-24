@@ -16,7 +16,7 @@ import {
   getCameraHazardBox,
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
-} from "./trap.js?v=20260723-floor-trap-lift";
+} from "./trap.js?v=20260724-camera-placement-order";
 import {
   getBackgroundBgmEnabled,
   getBgmVolume,
@@ -1214,8 +1214,7 @@ export function initUI(callbacks) {
     showGuideBubble(
       ui.startReplayBtn,
       "함정을 배치한 뒤 리플레이를 시작하세요. 배치 후 실제로 작동시켜야 하며, 표시된 필수 조건을 모두 달성해야 수비에 성공합니다.",
-      null,
-      { blockTargetActivation: true }
+      null
     );
   }
 

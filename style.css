@@ -4410,3 +4410,96 @@ body.mobile-client.mobile-portrait .lobby-root {
     max-height: calc(100dvw - 92px);
   }
 }
+
+/* Keep every game overlay inside a single viewport without introducing scrollbars. */
+.overlay {
+  overflow: hidden;
+}
+
+.overlay:not(.dialogue-overlay) .overlay-card,
+.failure-overlay {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+@media (max-height: 850px) and (min-width: 721px) {
+  .overlay:not(.dialogue-overlay) {
+    padding: 4px;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card {
+    width: min(760px, calc(100% - 8px));
+    max-height: calc(100% - 8px);
+    gap: clamp(7px, 1.25dvh, 11px);
+    padding: clamp(12px, 2dvh, 18px) clamp(14px, 2.4dvw, 24px);
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card h2 {
+    font-size: clamp(19px, 3.4dvh, 27px);
+    line-height: 1.05;
+  }
+
+  .overlay:not(.dialogue-overlay) .overlay-card p {
+    font-size: clamp(11px, 2.05dvh, 15px);
+    line-height: 1.34;
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-list {
+    gap: clamp(7px, 1.15dvh, 10px);
+  }
+
+  .overlay:not(.dialogue-overlay) .reward-card,
+  .overlay:not(.dialogue-overlay) .choice-card {
+    min-height: clamp(50px, 9.2dvh, 68px);
+    padding: clamp(8px, 1.35dvh, 11px) 12px;
+    font-size: clamp(11px, 1.9dvh, 14px);
+    line-height: 1.28;
+  }
+
+  .overlay.reward-select-overlay .overlay-card {
+    width: min(820px, calc(100% - 8px));
+    max-height: calc(100% - 8px);
+    gap: clamp(6px, 1.05dvh, 9px);
+    padding: clamp(25px, 4.2dvh, 38px) clamp(38px, 5.8dvw, 58px)
+      clamp(23px, 3.9dvh, 36px);
+  }
+
+  .overlay.reward-select-overlay .reward-list {
+    gap: clamp(7px, 1.1dvh, 10px);
+  }
+
+  .overlay.reward-select-overlay .reward-card {
+    min-height: clamp(50px, 9.2dvh, 68px);
+    padding: clamp(7px, 1.2dvh, 10px) clamp(28px, 4dvw, 44px);
+    line-height: 1.28;
+  }
+
+  .overlay.reward-select-overlay .reward-actions {
+    gap: clamp(8px, 1.6dvw, 14px);
+    margin-top: 0;
+  }
+
+  .overlay.reward-select-overlay .reward-actions > button {
+    min-width: 0;
+    width: min(270px, 44%);
+    min-height: clamp(42px, 8.5dvh, 60px);
+    padding: clamp(7px, 1.2dvh, 10px) clamp(18px, 2.8dvw, 32px);
+  }
+
+  .failure-overlay {
+    max-height: calc(100% - 8px);
+  }
+
+  .failure-item-tabs {
+    padding: 8px;
+  }
+
+  .failure-item-grid {
+    gap: 6px;
+  }
+
+  .failure-item-button {
+    min-height: clamp(54px, 9.2dvh, 70px);
+    padding: 7px;
+  }
+}
