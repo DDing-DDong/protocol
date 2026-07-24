@@ -114,6 +114,36 @@ button.secondary {
     url("./assets/images/Background_image/lobby.png");
 }
 
+.lobby-feature-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(22px, 6vw, 84px);
+  background:
+    linear-gradient(180deg, rgba(3, 8, 13, 0.42), rgba(3, 8, 13, 0.78)),
+    url("./assets/images/Background_image/lobby.png") center / cover no-repeat;
+}
+
+.lobby-feature-card {
+  display: grid;
+  gap: 20px;
+  width: min(520px, 100%);
+  padding: clamp(24px, 4vw, 44px);
+  border: 1px solid rgba(24, 224, 255, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(7, 22, 34, 0.96), rgba(3, 8, 13, 0.96));
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  text-align: center;
+}
+
+.lobby-feature-card h2 {
+  margin: 0;
+  color: #e9f8ff;
+  font-size: clamp(30px, 5vw, 52px);
+  letter-spacing: 2px;
+}
+
 .splash-content,
 .lobby-panel {
   position: relative;
@@ -141,6 +171,18 @@ button.secondary {
   font-weight: 800;
   letter-spacing: 2px;
   text-shadow: 0 0 14px rgba(24, 224, 255, 0.46);
+}
+
+.splash-enter-button {
+  min-width: min(280px, 76vw);
+  min-height: 52px;
+  margin-top: 28px;
+  border: 1px solid rgba(24, 224, 255, 0.72);
+  border-radius: 4px;
+  background: linear-gradient(90deg, #18e0ff, #27ffc8);
+  color: #031018;
+  letter-spacing: 2px;
+  box-shadow: 0 0 28px rgba(24, 224, 255, 0.3);
 }
 
 .splash-content h1,
@@ -420,23 +462,33 @@ button.secondary {
   border: 1px solid #2d516d;
 }
 
-body.lobby-active .topbar,
+body.lobby-active:not(.lobby-ready) .topbar,
 body.lobby-modal-open .topbar {
   display: none;
 }
 
-body.lobby-active.lobby-settings-open .topbar {
+body.lobby-active.lobby-ready:not(.lobby-modal-open) .topbar {
   display: flex;
   z-index: 220;
+  pointer-events: auto;
 }
 
-body.lobby-active.lobby-settings-open #restartBtn,
-body.lobby-active.lobby-settings-open #pauseAttackBtn {
+body.lobby-active.lobby-ready:not(.lobby-modal-open) #app {
+  position: relative;
+  z-index: 161;
+  pointer-events: none;
+}
+
+body.lobby-active .topbar-actions > :not(.settings-menu) {
   display: none;
 }
 
-body.lobby-active.lobby-settings-open .topbar-actions {
+body.lobby-active .topbar-actions {
   margin-left: auto;
+}
+
+body.lobby-active .settings-toggle-row[for="guideBubbleSkipToggle"] {
+  display: none;
 }
 
 body.lobby-active .side-panel,
@@ -463,7 +515,7 @@ body.lobby-active .game-layout {
 }
 
 body.lobby-modal-open .game-layout,
-body.lobby-active.lobby-settings-open .topbar {
+body.lobby-active .topbar {
   pointer-events: auto;
 }
 

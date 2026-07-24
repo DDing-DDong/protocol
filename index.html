@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.webmanifest?v=20260708-icons" />
-  <link rel="stylesheet" href="./style.css?v=20260723-darkweb-reopen-fix" />
+  <link rel="stylesheet" href="./style.css?v=20260724-lobby-mission-shop" />
 </head>
 <body>
   <div id="lobbyRoot" class="lobby-root" aria-live="polite">
@@ -18,6 +18,7 @@
         <p class="splash-kicker">CONNECTING...</p>
         <h1>PROTOCOL</h1>
         <p class="splash-status">INITIALIZING AI NETWORK</p>
+        <button id="splashEnterBtn" class="splash-enter-button" type="button">CLICK</button>
       </div>
     </section>
 
@@ -27,12 +28,27 @@
         <h1>PROTOCOL</h1>
         <p class="lobby-status">Connected to AI Network</p>
         <div class="lobby-actions">
-          <button id="lobbyStartBtn" class="lobby-button lobby-button-primary" type="button">START MISSION</button>
+          <button id="lobbyStartBtn" class="lobby-button lobby-button-primary" type="button">START GAME</button>
           <button id="lobbySkinBtn" class="lobby-button" type="button" aria-expanded="false">SKIN</button>
-          <button id="lobbyHelpBtn" class="lobby-button" type="button">HELP</button>
-          <button id="lobbySettingsBtn" class="lobby-button" type="button">SETTINGS</button>
-          <button id="lobbyPathNoteBtn" class="lobby-button lobby-button-note" type="button">PATH-NOTE</button>
+          <button id="lobbyMissionBtn" class="lobby-button" type="button">MISSON</button>
+          <button id="lobbyShopBtn" class="lobby-button" type="button">SHOP</button>
         </div>
+      </div>
+    </section>
+
+    <section id="dailyMissionScreen" class="lobby-feature-screen hidden" aria-label="일일미션">
+      <div class="lobby-feature-card">
+        <p class="lobby-kicker">MISSION NODE</p>
+        <h2>일일미션</h2>
+        <button class="lobby-button" type="button" data-action="back-to-lobby">BACK TO LOBBY</button>
+      </div>
+    </section>
+
+    <section id="shopScreen" class="lobby-feature-screen hidden" aria-label="상점">
+      <div class="lobby-feature-card">
+        <p class="lobby-kicker">MARKET NODE</p>
+        <h2>상점</h2>
+        <button class="lobby-button" type="button" data-action="back-to-lobby">BACK TO LOBBY</button>
       </div>
     </section>
   </div>
@@ -55,6 +71,11 @@
                 <label class="settings-row" for="sfxVolume">
                   <span>SFX</span>
                   <input id="sfxVolume" type="range" min="0" max="100" step="1" />
+                </label>
+                <label class="settings-row settings-toggle-row" for="backgroundBgmToggle">
+                  <span>백그라운드 사운드 재생</span>
+                  <input id="backgroundBgmToggle" class="settings-switch-input" type="checkbox" />
+                  <span class="settings-switch" aria-hidden="true"></span>
                 </label>
                 <label class="settings-row settings-toggle-row" for="guideBubbleSkipToggle">
                   <span>튜토리얼 말풍선 스킵</span>
@@ -138,6 +159,6 @@
     </main>
   </div>
 
-  <script type="module" src="./js/game.js?v=20260723-darkweb-reopen-fix"></script>
+  <script type="module" src="./js/game.js?v=20260724-lobby-mission-shop"></script>
 </body>
 </html>

@@ -18,6 +18,7 @@ const DEFAULT_SFX_VOLUME = 0.6;
 const DEFAULT_BGM_VOLUME = 0.45;
 const BGM_VOLUME_STORAGE_KEY = "protocol_bgm_volume";
 const SFX_VOLUME_STORAGE_KEY = "protocol_sfx_volume";
+const BACKGROUND_BGM_STORAGE_KEY = "protocol_background_bgm_enabled";
 const BGM_CACHE_VERSION = "";
 const DISABLED_BGM_FILES = new Set();
 const LOBBY_BGM_SRC = "neon-circuit-drift.mp3";
@@ -30,11 +31,13 @@ const audioBuffers = new Map();
 const activeBufferSources = new Map();
 let sfxVolume = loadStoredVolume(SFX_VOLUME_STORAGE_KEY, DEFAULT_SFX_VOLUME);
 let bgmVolume = loadStoredVolume(BGM_VOLUME_STORAGE_KEY, DEFAULT_BGM_VOLUME);
+let backgroundBgmEnabled = loadStoredBoolean(BACKGROUND_BGM_STORAGE_KEY, false);
 let currentBgmSrc = "";
 let pendingBgmSrc = "";
 let bgmPreloaded = false;
 let audioUnlocked = false;
 let audioContext = null;
+let backgroundBgmMonitorId = 0;
 
 export function unlockAudio() {
   if (audioUnlocked) return;
@@ -71,6 +74,17 @@ export function getSfxVolume() {
 
 export function getBgmVolume() {
   return bgmVolume;
+}
+
+export function getBackgroundBgmEnabled() {
+  return backgroundBgmEnabled;
+}
+
+export function setBackgroundBgmEnabled(enabled) {
+  backgroundBgmEnabled = Boolean(enabled);
+  saveStoredBoolean(BACKGROUND_BGM_STORAGE_KEY, backgroundBgmEnabled);
+  updateBackgroundBgmMonitor();
+  syncBgmWithPageActivity();
 }
 
 export function playSfx(name, options = {}) {
@@ -210,10 +224,15 @@ function playElementBgm(src) {
   currentBgmSrc = src;
   player.loop = true;
   player.volume = bgmVolume;
+  if (shouldPauseBgmInBackground()) {
+    pauseBgmForBackground();
+    return;
+  }
   playAudioElement(player, src);
 }
 
 function retryCurrentBgm() {
+  if (shouldPauseBgmInBackground()) return;
   const src = currentBgmSrc || pendingBgmSrc;
   if (!src) return;
   if (isBgmPlayPending(src)) return;
@@ -375,6 +394,54 @@ function forgetBgmPlayPromise(audio) {
   }
 }
 
+function shouldPauseBgmInBackground() {
+  return !backgroundBgmEnabled && isPageBackgrounded();
+}
+
+function isPageBackgrounded() {
+  if (typeof document === "undefined") return false;
+  return document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus());
+}
+
+function pauseBgmForBackground() {
+  for (const audio of bgmPlayers.values()) {
+    forgetBgmPlayPromise(audio);
+    audio.pause();
+  }
+}
+
+function syncBgmWithPageActivity() {
+  if (shouldPauseBgmInBackground()) {
+    pauseBgmForBackground();
+    return;
+  }
+  retryCurrentBgm();
+}
+
+function updateBackgroundBgmMonitor() {
+  if (typeof window === "undefined") return;
+  if (backgroundBgmMonitorId) {
+    window.clearInterval(backgroundBgmMonitorId);
+    backgroundBgmMonitorId = 0;
+  }
+  if (!backgroundBgmEnabled) return;
+
+  backgroundBgmMonitorId = window.setInterval(() => {
+    if (!backgroundBgmEnabled || !isPageBackgrounded()) return;
+    retryCurrentBgm();
+  }, 1000);
+}
+
+function handlePageActivityChange() {
+  syncBgmWithPageActivity();
+  if (!backgroundBgmEnabled || !isPageBackgrounded() || typeof window === "undefined") return;
+
+  // Some browsers suspend media just after the blur/visibility event.
+  // Recheck after that suspension point instead of relying only on the event itself.
+  window.setTimeout(retryCurrentBgm, 100);
+  window.setTimeout(retryCurrentBgm, 500);
+}
+
 function getSfxBaseVolume(options = {}) {
   return clampVolume(options.volume ?? 1);
 }
@@ -407,4 +474,33 @@ function saveStoredVolume(key, value) {
   } catch {
     // Storage can be unavailable in private or restricted contexts.
   }
+}
+
+function loadStoredBoolean(key, fallback) {
+  try {
+    if (typeof window === "undefined") return fallback;
+    const stored = window.localStorage?.getItem(key);
+    if (stored === null || stored === undefined) return fallback;
+    return stored === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function saveStoredBoolean(key, value) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage?.setItem(key, value ? "true" : "false");
+  } catch {
+    // Storage can be unavailable in private or restricted contexts.
+  }
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", handlePageActivityChange);
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("blur", handlePageActivityChange);
+  window.addEventListener("focus", handlePageActivityChange);
+  updateBackgroundBgmMonitor();
 }
