@@ -114,6 +114,257 @@ button.secondary {
     url("./assets/images/Background_image/lobby.png");
 }
 
+.lobby-feature-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(22px, 6vw, 84px);
+  background:
+    linear-gradient(180deg, rgba(3, 8, 13, 0.42), rgba(3, 8, 13, 0.78)),
+    url("./assets/images/Background_image/lobby.png") center / cover no-repeat;
+}
+
+.lobby-feature-card {
+  display: grid;
+  gap: 20px;
+  width: min(520px, 100%);
+  padding: clamp(24px, 4vw, 44px);
+  border: 1px solid rgba(24, 224, 255, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(7, 22, 34, 0.96), rgba(3, 8, 13, 0.96));
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  text-align: center;
+}
+
+.lobby-feature-card h2 {
+  margin: 0;
+  color: #e9f8ff;
+  font-size: clamp(30px, 5vw, 52px);
+  letter-spacing: 2px;
+}
+
+.daily-mission-board {
+  width: min(1120px, 100%);
+  max-height: calc(100dvh - 44px);
+  overflow: auto;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid rgba(24, 224, 255, 0.42);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(24, 224, 255, 0.05), transparent 38%),
+    linear-gradient(180deg, rgba(7, 22, 34, 0.98), rgba(3, 8, 13, 0.98));
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(233, 248, 255, 0.08);
+  scrollbar-color: rgba(24, 224, 255, 0.55) rgba(3, 8, 13, 0.55);
+}
+
+.daily-mission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(24, 224, 255, 0.25);
+}
+
+.daily-mission-header h2 {
+  margin: 5px 0 0;
+  color: #e9f8ff;
+  font-size: clamp(30px, 4vw, 48px);
+  line-height: 1;
+  letter-spacing: 2px;
+  text-shadow: 0 0 18px rgba(24, 224, 255, 0.4);
+}
+
+.daily-mission-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.daily-mission-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 174px;
+  overflow: hidden;
+  padding: 38px 16px 14px;
+  border: 1px solid rgba(154, 199, 214, 0.3);
+  border-radius: 7px;
+  background:
+    linear-gradient(145deg, rgba(24, 224, 255, 0.08), transparent 48%),
+    rgba(9, 25, 38, 0.9);
+  box-shadow: inset 0 1px 0 rgba(233, 248, 255, 0.06);
+}
+
+.daily-mission-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  border-top: 2px solid #18e0ff;
+  border-right: 2px solid #18e0ff;
+  opacity: 0.72;
+}
+
+.daily-mission-card-all {
+  border-color: rgba(255, 65, 200, 0.5);
+  background:
+    linear-gradient(145deg, rgba(255, 65, 200, 0.12), transparent 50%),
+    rgba(18, 18, 42, 0.92);
+}
+
+.daily-mission-index {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  color: #18e0ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.daily-mission-card h3 {
+  align-self: center;
+  margin: 0;
+  color: #dff8ff;
+  font-size: clamp(14px, 1.4vw, 18px);
+  line-height: 1.5;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.daily-mission-reward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 1px solid rgba(24, 224, 255, 0.28);
+  border-radius: 5px;
+  background: rgba(2, 10, 17, 0.72);
+}
+
+.daily-mission-reward strong {
+  color: #f3fbff;
+  font-size: 14px;
+}
+
+.usb-token {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 22px;
+  margin-left: 7px;
+  border: 1px solid rgba(255, 92, 219, 0.78);
+  border-radius: 4px 7px 7px 4px;
+  background: linear-gradient(135deg, #ff35bd, #7d3cff);
+  box-shadow: 0 0 12px rgba(255, 53, 189, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  transform: skewX(-9deg);
+}
+
+.usb-token::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  width: 10px;
+  height: 14px;
+  border: 1px solid #8befff;
+  border-right: 0;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(180deg, #dffcff, #70b9cb);
+}
+
+.usb-token::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  width: 5px;
+  height: 2px;
+  border-top: 2px solid #174458;
+  border-bottom: 2px solid #174458;
+}
+
+.usb-token i {
+  position: absolute;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #bff7ff;
+  border-radius: 50%;
+  box-shadow: 0 0 5px #8ff5ff;
+}
+
+.usb-token b {
+  color: #fff;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  transform: skewX(9deg);
+}
+
+.daily-mission-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: min(620px, 100%);
+  margin: 18px auto 12px;
+}
+
+.daily-mission-summary > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border: 1px solid rgba(24, 224, 255, 0.36);
+  border-radius: 6px;
+  background: rgba(8, 25, 38, 0.88);
+  color: #bde7f2;
+  font-size: 13px;
+}
+
+.daily-mission-summary strong {
+  min-width: 36px;
+  color: #27ffc8;
+  font-size: 24px;
+  text-align: right;
+  text-shadow: 0 0 12px rgba(39, 255, 200, 0.42);
+}
+
+.daily-mission-back {
+  display: block;
+  width: min(390px, 100%);
+  margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .lobby-feature-screen {
+    align-items: start;
+    padding: 14px;
+  }
+
+  .daily-mission-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .daily-mission-card {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .daily-mission-grid,
+  .daily-mission-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 .splash-content,
 .lobby-panel {
   position: relative;
@@ -141,6 +392,18 @@ button.secondary {
   font-weight: 800;
   letter-spacing: 2px;
   text-shadow: 0 0 14px rgba(24, 224, 255, 0.46);
+}
+
+.splash-enter-button {
+  min-width: min(280px, 76vw);
+  min-height: 52px;
+  margin-top: 28px;
+  border: 1px solid rgba(24, 224, 255, 0.72);
+  border-radius: 4px;
+  background: linear-gradient(90deg, #18e0ff, #27ffc8);
+  color: #031018;
+  letter-spacing: 2px;
+  box-shadow: 0 0 28px rgba(24, 224, 255, 0.3);
 }
 
 .splash-content h1,
@@ -420,23 +683,33 @@ button.secondary {
   border: 1px solid #2d516d;
 }
 
-body.lobby-active .topbar,
+body.lobby-active:not(.lobby-ready) .topbar,
 body.lobby-modal-open .topbar {
   display: none;
 }
 
-body.lobby-active.lobby-settings-open .topbar {
+body.lobby-active.lobby-ready:not(.lobby-modal-open) .topbar {
   display: flex;
   z-index: 220;
+  pointer-events: auto;
 }
 
-body.lobby-active.lobby-settings-open #restartBtn,
-body.lobby-active.lobby-settings-open #pauseAttackBtn {
+body.lobby-active.lobby-ready:not(.lobby-modal-open) #app {
+  position: relative;
+  z-index: 161;
+  pointer-events: none;
+}
+
+body.lobby-active .topbar-actions > :not(.settings-menu) {
   display: none;
 }
 
-body.lobby-active.lobby-settings-open .topbar-actions {
+body.lobby-active .topbar-actions {
   margin-left: auto;
+}
+
+body.lobby-active .settings-toggle-row[for="guideBubbleSkipToggle"] {
+  display: none;
 }
 
 body.lobby-active .side-panel,
@@ -463,7 +736,7 @@ body.lobby-active .game-layout {
 }
 
 body.lobby-modal-open .game-layout,
-body.lobby-active.lobby-settings-open .topbar {
+body.lobby-active .topbar {
   pointer-events: auto;
 }
 

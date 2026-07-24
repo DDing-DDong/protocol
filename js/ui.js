@@ -17,7 +17,16 @@ import {
   getCameraEmpowerAssignments,
   getOrientedTrapBox,
 } from "./trap.js?v=20260723-floor-trap-lift";
-import { getBgmVolume, getSfxVolume, playSfx, setBgmVolume, setSfxVolume, unlockAudio } from "./audio.js?v=20260711-dash-wav";
+import {
+  getBackgroundBgmEnabled,
+  getBgmVolume,
+  getSfxVolume,
+  playSfx,
+  setBackgroundBgmEnabled,
+  setBgmVolume,
+  setSfxVolume,
+  unlockAudio,
+} from "./audio.js?v=20260724-background-bgm-keepalive";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
 const CANVAS_WIDTH = 1200;
@@ -334,6 +343,7 @@ export function initUI(callbacks) {
     settingsPanel: document.getElementById("settingsPanel"),
     bgmVolume: document.getElementById("bgmVolume"),
     sfxVolume: document.getElementById("sfxVolume"),
+    backgroundBgmToggle: document.getElementById("backgroundBgmToggle"),
     guideBubbleSkipToggle: document.getElementById("guideBubbleSkipToggle"),
     helpBtn: document.getElementById("helpBtn"),
     lobbyBtn: document.getElementById("lobbyBtn"),
@@ -378,6 +388,7 @@ export function initUI(callbacks) {
   function syncVolumeInputs() {
     if (ui.bgmVolume) ui.bgmVolume.value = String(Math.round(getBgmVolume() * 100));
     if (ui.sfxVolume) ui.sfxVolume.value = String(Math.round(getSfxVolume() * 100));
+    if (ui.backgroundBgmToggle) ui.backgroundBgmToggle.checked = getBackgroundBgmEnabled();
   }
 
   function syncGuideBubbleSkipToggle() {
@@ -3337,6 +3348,7 @@ export function initUI(callbacks) {
     document.addEventListener("keydown", unlockAudio);
     document.addEventListener("click", (event) => {
       if (!event.target?.closest?.("button")) return;
+      if (event.target?.closest?.("#splashEnterBtn")) return;
       unlockAudio();
       playSfx("click");
     }, true);
@@ -3473,6 +3485,11 @@ export function initUI(callbacks) {
       event.preventDefault();
       event.stopPropagation();
       console.log("[Settings] toggle");
+      if (ui.lobbyBtn) {
+        ui.lobbyBtn.textContent = document.body.classList.contains("lobby-active")
+          ? "닫기"
+          : "로비로 이동";
+      }
       setSettingsPanelOpen(!settingsPanelOpen);
     });
 
@@ -3494,6 +3511,10 @@ export function initUI(callbacks) {
       setSfxVolume(Number(event.target.value) / 100);
     });
 
+    ui.backgroundBgmToggle?.addEventListener("change", (event) => {
+      setBackgroundBgmEnabled(Boolean(event.target.checked));
+    });
+
     ui.guideBubbleSkipToggle?.addEventListener("change", (event) => {
       applyGuideBubbleSkipSetting(Boolean(event.target.checked));
     });
@@ -3511,6 +3532,10 @@ export function initUI(callbacks) {
     ui.lobbyBtn?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (document.body.classList.contains("lobby-active")) {
+        setSettingsPanelOpen(false);
+        return;
+      }
       if (callbacks.onReturnToLobby?.()) return;
       setLog("로비 기능은 추후 추가 예정입니다.");
     });

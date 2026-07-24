@@ -17,7 +17,7 @@ import {
   pickStageOneLayoutPresetId,
 } from "./data.js?v=20260723-shield-module";
 import { createHacker, updateAttack, activateHack } from "./player.js?v=20260723-shield-module";
-import { initUI } from "./ui.js?v=20260723-darkweb-reopen-fix";
+import { initUI } from "./ui.js?v=20260724-splash-click-sfx";
 import { isAttackStage, getDefenseBudget, createPlatforms, createBaseHazards, createTrapSlots } from "./stage.js?v=20260722-shock-tile-alignment";
 import {
   placeTrapAtSlot,
@@ -28,8 +28,8 @@ import {
   getTrapCost,
 } from "./trap.js?v=20260723-floor-trap-lift";
 import { startReplay as startReplayMode, updateDefenseReplay } from "./replay.js?v=20260722-shock-tile-alignment";
-import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260711-dash-wav";
-import { initLobby } from "./lobby.js?v=20260723-stage-select-items";
+import { playBgm, playLobbyBgm, playSfx, stopAllSfx, stopBgm, stopSfx } from "./audio.js?v=20260724-background-bgm-keepalive";
+import { initLobby } from "./lobby.js?v=20260724-lobby-mission-shop";
 import { getBestStage, resetBestStage, saveBestStage } from "./repositories/localGameRepository.js";
 
 const BGM_TRACKS = {
@@ -1480,6 +1480,7 @@ function updateBest(stage, success) {
 }
 
 function showHelp() {
+  uiModule.setSettingsPanelOpen?.(false);
   if (game.tutorialInputLocked && stageStarted) return;
   if (game.turn === TURN.ENDING) {
     flashLog("결과 화면에서는 보상 카드나 진행 버튼을 선택하세요.");
@@ -1829,6 +1830,5 @@ uiModule.updateLaserDirection(laserRotation);
 lobbyModule = initLobby({
   onStart: startMission,
   onHelp: showHelp,
-  onSettings: () => uiModule.setSettingsPanelOpen?.(true),
 });
 requestAnimationFrame(loop);

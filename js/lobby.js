@@ -1,7 +1,7 @@
 // js/lobby.js
 // Handles only Splash/Lobby screen transitions and lobby button wiring.
 
-import { playLobbyBgm, unlockAudio } from "./audio.js?v=20260711-dash-wav";
+import { playLobbyBgm, playSfx, unlockAudio } from "./audio.js?v=20260724-background-bgm-keepalive";
 import {
   getPurchasedSkins as loadPurchasedSkins,
   getSelectedSkin as loadSelectedSkin,
@@ -9,7 +9,6 @@ import {
   saveSelectedSkin,
 } from "./repositories/localGameRepository.js";
 
-const SPLASH_DELAY_MS = 1400;
 const CLASSIC_CLEAR_STORAGE_KEY = "traceProtocolClassicStage11Returned";
 const SELECTABLE_AI_SKINS = [
   {
@@ -29,16 +28,19 @@ const SELECTABLE_AI_SKINS = [
 export function initLobby({
   onStart,
   onHelp,
-  onSettings,
 } = {}) {
   const root = document.getElementById("lobbyRoot");
   const splashScreen = document.getElementById("splashScreen");
+  const splashEnterBtn = document.getElementById("splashEnterBtn");
   const lobbyScreen = document.getElementById("lobbyScreen");
   const startBtn = document.getElementById("lobbyStartBtn");
   const skinBtn = document.getElementById("lobbySkinBtn");
   const helpBtn = document.getElementById("lobbyHelpBtn");
-  const settingsBtn = document.getElementById("lobbySettingsBtn");
   const pathNoteBtn = document.getElementById("lobbyPathNoteBtn");
+  const missionBtn = document.getElementById("lobbyMissionBtn");
+  const shopBtn = document.getElementById("lobbyShopBtn");
+  const dailyMissionScreen = document.getElementById("dailyMissionScreen");
+  const shopScreen = document.getElementById("shopScreen");
   const skinPanel = createSkinPanel();
   const skinPurchaseModal = createSkinPurchaseModal();
   const pathNoteModal = createPathNoteModal();
@@ -51,6 +53,7 @@ export function initLobby({
   let modePanelOpen = false;
   let stageSelectOpen = false;
   let pendingPurchaseSkinId = "";
+  let enteringLobby = false;
 
   document.body.classList.add("lobby-active");
   startBtn?.after(modePanel);
@@ -121,16 +124,25 @@ export function initLobby({
     if (!stageSelectOpen) setModePanelOpen(false);
   };
 
+  const showFeatureScreen = (screen) => {
+    setSkinPanelOpen(false);
+    setModePanelOpen(false);
+    dailyMissionScreen?.classList.toggle("hidden", screen !== dailyMissionScreen);
+    shopScreen?.classList.toggle("hidden", screen !== shopScreen);
+    lobbyScreen?.classList.toggle("hidden", Boolean(screen));
+  };
+
   const showStageSelect = () => {
     active = true;
     root?.classList.remove("hidden");
-    document.body.classList.add("lobby-active");
-    document.body.classList.remove("lobby-modal-open", "lobby-settings-open");
+    document.body.classList.add("lobby-active", "lobby-ready");
+    document.body.classList.remove("lobby-modal-open");
     splashScreen?.classList.add("hidden");
     setSkinPanelOpen(false);
     setModePanelOpen(false);
     setSkinPurchaseModalOpen(false);
     setPathNoteModalOpen(false);
+    showFeatureScreen(null);
     setStageSelectOpen(true);
   };
 
@@ -182,25 +194,28 @@ export function initLobby({
   const showLobby = () => {
     active = true;
     root?.classList.remove("hidden");
-    document.body.classList.add("lobby-active");
-    document.body.classList.remove("lobby-modal-open", "lobby-settings-open");
+    document.body.classList.add("lobby-active", "lobby-ready");
+    document.body.classList.remove("lobby-modal-open");
     setSkinPanelOpen(false);
     setModePanelOpen(false);
     setStageSelectOpen(false);
     setSkinPurchaseModalOpen(false);
     setPathNoteModalOpen(false);
     splashScreen?.classList.add("hidden");
-    lobbyScreen?.classList.remove("hidden");
+    showFeatureScreen(null);
+    playLobbyBgm();
   };
 
   const hideLobby = () => {
     active = false;
     root?.classList.add("hidden");
-    document.body.classList.remove("lobby-active", "lobby-modal-open", "lobby-settings-open");
+    document.body.classList.remove("lobby-active", "lobby-ready", "lobby-modal-open");
     setSkinPanelOpen(false);
     setModePanelOpen(false);
     setSkinPurchaseModalOpen(false);
     setPathNoteModalOpen(false);
+    dailyMissionScreen?.classList.add("hidden");
+    shopScreen?.classList.add("hidden");
   };
 
   const startLobbyBgm = () => {
@@ -216,12 +231,42 @@ export function initLobby({
     document.body.classList.remove("lobby-modal-open");
   };
 
-  window.setTimeout(showLobby, SPLASH_DELAY_MS);
   selectSkin(getSelectedSkin(), { persist: false });
   refreshSkinButtons();
 
-  root?.addEventListener("pointerdown", startLobbyBgm);
-  document.addEventListener("keydown", startLobbyBgm);
+  const prepareLobbyAudio = () => {
+    if (splashScreen?.classList.contains("hidden")) {
+      startLobbyBgm();
+      return;
+    }
+    unlockAudio();
+  };
+
+  root?.addEventListener("pointerdown", prepareLobbyAudio);
+  document.addEventListener("keydown", prepareLobbyAudio);
+
+  const enterLobby = () => {
+    if (!active || enteringLobby || splashScreen?.classList.contains("hidden")) return;
+    enteringLobby = true;
+    unlockAudio();
+    playSfx("click");
+    splashEnterBtn?.setAttribute("disabled", "");
+    window.setTimeout(() => {
+      showLobby();
+      enteringLobby = false;
+    }, 180);
+  };
+
+  splashEnterBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    enterLobby();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.code !== "Enter" && event.code !== "Space") return;
+    enterLobby();
+  });
 
   startBtn?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -331,18 +376,28 @@ export function initLobby({
     }
   });
 
-  settingsBtn?.addEventListener("click", (event) => {
+  missionBtn?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     startLobbyBgm();
-    document.body.classList.add("lobby-settings-open");
-    onSettings?.();
+    showFeatureScreen(dailyMissionScreen);
   });
 
-  document.addEventListener("protocol:settings-panel-toggle", (event) => {
-    if (event.detail?.open) return;
-    document.body.classList.remove("lobby-settings-open");
+  shopBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    startLobbyBgm();
+    showFeatureScreen(shopScreen);
   });
+
+  for (const screen of [dailyMissionScreen, shopScreen]) {
+    screen?.addEventListener("click", (event) => {
+      if (!event.target?.closest?.("[data-action='back-to-lobby']")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      showFeatureScreen(null);
+    });
+  }
 
   document.addEventListener("click", (event) => {
     if (!skinPurchaseModal.classList.contains("hidden")) return;
@@ -352,9 +407,6 @@ export function initLobby({
     if (modePanelOpen && !event.target?.closest?.("#lobbyStartBtn, .lobby-mode-panel")) {
       setModePanelOpen(false);
     }
-    if (!document.body.classList.contains("lobby-settings-open")) return;
-    if (event.target?.closest?.(".settings-menu, #lobbySettingsBtn")) return;
-    document.body.classList.remove("lobby-settings-open");
   });
 
   const overlay = document.getElementById("overlay");
