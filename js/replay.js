@@ -19,7 +19,7 @@ import {
   empowerCameraTargetsByPlacementOrder,
   tickPlacedTrapTimers,
 } from "./trap.js?v=20260723-floor-trap-lift";
-import { playSfx, stopSfx } from "./audio.js?v=20260711-dash-wav";
+import { playSfx, stopSfx } from "./audio.js?v=20260724-stage-effect-cleanup";
 
 const REPLAY_PLAYBACK_SPEED = 1.5;
 const DETECTION_EFFECT_DURATION = 0.95;

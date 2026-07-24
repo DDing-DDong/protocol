@@ -325,13 +325,17 @@ function markStageHazardBlockedSlots(slots, stage, game) {
 }
 
 function getStageHazardsForDefenseSlots(stage, game) {
-  const defenseStageData = getStageById(stage, getLayoutOptions(stage, game));
-  const nextAttackStage = Number(stage) + 1;
-  const stageData = getStageById(nextAttackStage, getLayoutOptions(nextAttackStage, game));
-  const defenseStageHazards = Array.isArray(defenseStageData?.trapNodes) ? defenseStageData.trapNodes : [];
-  const stageHazards = createStageHazardsForSlotBlocking(nextAttackStage, game, stageData);
   const activeHazards = Array.isArray(game?.baseHazards) ? game.baseHazards : [];
-  return [...activeHazards, ...defenseStageHazards, ...stageHazards];
+  if (activeHazards.length > 0) return activeHazards;
+
+  // Direct defense-stage selection has no live attack snapshot. In that one
+  // case, reconstruct only the immediately preceding attack-stage hazards.
+  const previousAttackStage = Math.max(1, Number(stage) - 1);
+  const previousAttackData = getStageById(
+    previousAttackStage,
+    getLayoutOptions(previousAttackStage, game)
+  );
+  return createStageHazardsForSlotBlocking(previousAttackStage, game, previousAttackData);
 }
 
 function getStageHazardSlotAnchor(hazard) {

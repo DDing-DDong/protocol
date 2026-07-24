@@ -26,7 +26,7 @@ import {
   setBgmVolume,
   setSfxVolume,
   unlockAudio,
-} from "./audio.js?v=20260724-background-bgm-keepalive";
+} from "./audio.js?v=20260724-stage-effect-cleanup";
 import { getSelectedSkin } from "./repositories/localGameRepository.js";
 
 const CANVAS_WIDTH = 1200;
@@ -1220,7 +1220,8 @@ export function initUI(callbacks) {
   }
 
   function showStageFourGuideBubbles({ onComplete } = {}) {
-    closeDefenseGuidePanels();
+    openObjectivePanel();
+    openTrapToolsPanel();
     const steps = [
       {
         target: () => ui.objectiveToggle,
